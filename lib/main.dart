@@ -4,7 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'screens/questionnaire/questionnaire_screen.dart';
-import 'screens/daily_workout_selection.dart'; // Changed import
+import 'screens/daily_workout_selection.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

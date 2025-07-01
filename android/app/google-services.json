@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "283369077287",
+    "project_id": "peakfit-40ce8",
+    "storage_bucket": "peakfit-40ce8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283369077287:android:9ec7adb3b637a9b6e52c02",
+        "android_client_info": {
+          "package_name": "PeakFit.ai.peakfit_frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZNdzBqJqgpC9uyWQx29VGnGDOqEyfVOo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

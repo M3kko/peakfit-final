@@ -98,38 +98,47 @@ class _AgePageState extends State<AgePage> with TickerProviderStateMixin {
       ),
       child: FadeTransition(
         opacity: _fadeAnimation,
-        child: Center(
+        child: Container(
+          padding: const EdgeInsets.only(bottom: 120), // Account for Continue button
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // YOUR AGE text above
-              Text(
-                'YOUR AGE',
-                style: TextStyle(
-                  fontSize: 14,
-                  letterSpacing: 3,
-                  color: Colors.white.withOpacity(0.5),
-                  fontWeight: FontWeight.w300,
-                ),
-              ),
-              const SizedBox(height: 40),
+              // Add negative margin to center properly with header
+              Transform.translate(
+                offset: const Offset(0, -40), // Adjust this value to perfectly center
+                child: Column(
+                  children: [
+                    // YOUR AGE text above
+                    Text(
+                      'YOUR AGE',
+                      style: TextStyle(
+                        fontSize: 14,
+                        letterSpacing: 3,
+                        color: Colors.white.withOpacity(0.5),
+                        fontWeight: FontWeight.w300,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
 
-              // Age slider
-              SizedBox(
-                height: 200,
-                child: _buildAgeSlider(),
-              ),
+                    // Age slider
+                    SizedBox(
+                      height: 200,
+                      child: _buildAgeSlider(),
+                    ),
 
-              const SizedBox(height: 40),
+                    const SizedBox(height: 40),
 
-              // YEARS OLD text below
-              Text(
-                'YEARS OLD',
-                style: TextStyle(
-                  fontSize: 14,
-                  letterSpacing: 2,
-                  color: Colors.white.withOpacity(0.5),
-                  fontWeight: FontWeight.w300,
+                    // YEARS OLD text below
+                    Text(
+                      'YEARS OLD',
+                      style: TextStyle(
+                        fontSize: 14,
+                        letterSpacing: 2,
+                        color: Colors.white.withOpacity(0.5),
+                        fontWeight: FontWeight.w300,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

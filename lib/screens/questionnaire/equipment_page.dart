@@ -143,7 +143,7 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'PeakFit creates primarily bodyweight-based workouts designed for athletic performance. While equipment isn\'t required, having access to certain tools can enhance your training and unlock additional exercise variations.',
+                  'PeakFit creates primarily bodyweight-based workouts designed for athletic performance. While equipment isn\'t required, having access to certain tools can enhance your training and unlock additional exercise variations. You can update your equipment anytime in settings.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -155,7 +155,7 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
                 ),
               ),
 
-              const SizedBox(height: 30), // Consistent spacing
+              const SizedBox(height: 20), // Reduced spacing
 
               // Equipment grid
               GridView.builder(

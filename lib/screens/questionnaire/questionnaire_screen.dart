@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../weekly_plan_screen.dart';
@@ -24,6 +25,10 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
   late AnimationController _glowController;
   late Animation<double> _buttonAnimation;
   late Animation<double> _glowAnimation;
+
+  // Error notification state
+  bool _showError = false;
+  String _errorMessage = '';
 
   // Store all questionnaire responses
   Map<String, dynamic> _responses = {};
@@ -103,6 +108,23 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
     });
   }
 
+  void _showGoalsError() {
+    setState(() {
+      _showError = true;
+      _errorMessage = 'Maximum 3 goals can be selected';
+    });
+    HapticFeedback.heavyImpact();
+
+    // Hide error after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _showError = false;
+        });
+      }
+    });
+  }
+
   Future<void> _submitQuestionnaire() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -153,6 +175,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
               GoalsPage(
                 onSelected: (value) => _updateResponse('goals', value),
                 selectedValue: _responses['goals'],
+                onMaxGoalsExceeded: _showGoalsError, // Pass callback
               ),
               EquipmentPage(
                 onSelected: (value) => _updateResponse('equipment', value),
@@ -355,6 +378,53 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
                     },
                   );
                 },
+              ),
+            ),
+          ),
+
+          // Error notification at the very top
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: _showError ? 0 : -100,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 12,
+                bottom: 12,
+                left: 24,
+                right: 24,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB71C1C), // Dark red with full opacity
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _errorMessage,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

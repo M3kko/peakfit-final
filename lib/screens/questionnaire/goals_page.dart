@@ -21,6 +21,8 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
   late List<Animation<double>> _animations;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  bool _showError = false;
+  String _errorMessage = '';
 
   final List<Map<String, dynamic>> goals = [
     {
@@ -114,18 +116,24 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     setState(() {
       if (selected.contains(goal)) {
         selected.remove(goal);
+        _showError = false;
       } else if (selected.length < 3) {
         selected.add(goal);
+        _showError = false;
       } else {
-        // Show feedback that max goals reached
+        // Show error message
+        _showError = true;
+        _errorMessage = 'Maximum 3 goals can be selected';
         HapticFeedback.heavyImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Maximum 3 goals can be selected'),
-            backgroundColor: Colors.white.withOpacity(0.1),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+
+        // Hide error after 3 seconds
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() {
+              _showError = false;
+            });
+          }
+        });
       }
       widget.onSelected(selected);
     });
@@ -143,14 +151,69 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
             // Main scrollable content
             SingleChildScrollView(
               padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 160, // Space for header + indicator
+                top: MediaQuery.of(context).padding.top + 100,
                 bottom: 120,
                 left: 24,
                 right: 24,
               ),
               child: Column(
                 children: [
-                  // TODO: Add description paragraph here
+                  // Description paragraph
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'These goals help PeakFit personalize your athletic training program. You\'ll have the opportunity to update your goals every 6 weeks as you progress and evolve in your fitness journey.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.6),
+                        fontWeight: FontWeight.w300,
+                        height: 1.4,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Selection indicator
+                  Column(
+                    children: [
+                      Text(
+                        '${selected.length}/3 goals selected',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.6),
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(3, (index) {
+                          final isFilled = index < selected.length;
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isFilled
+                                  ? Colors.white.withOpacity(0.8)
+                                  : Colors.transparent,
+                              border: Border.all(
+                                color: Colors.white.withOpacity(isFilled ? 0.8 : 0.3),
+                                width: 1.5,
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 30),
 
                   // Goals list
                   ...List.generate(goals.length, (index) {
@@ -171,58 +234,38 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
               ),
             ),
 
-            // Sticky selection indicator at top
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 100,
-              left: 0,
-              right: 0,
+            // Error message at top
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              top: _showError ? MediaQuery.of(context).padding.top + 80 : -100,
+              left: 24,
+              right: 24,
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black,
-                      Colors.black.withOpacity(0.9),
-                      Colors.black.withOpacity(0.0),
-                    ],
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.red.withOpacity(0.3),
                   ),
                 ),
-                child: Column(
+                child: Row(
                   children: [
-                    // Selection count
-                    Text(
-                      '${selected.length}/3 goals selected',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.6),
-                        fontWeight: FontWeight.w300,
-                        letterSpacing: 1,
-                      ),
+                    Icon(
+                      Icons.error_outline,
+                      color: Colors.red[300],
+                      size: 20,
                     ),
-                    const SizedBox(height: 12),
-                    // Progress dots
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(3, (index) {
-                        final isFilled = index < selected.length;
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isFilled
-                                ? Colors.white.withOpacity(0.8)
-                                : Colors.transparent,
-                            border: Border.all(
-                              color: Colors.white.withOpacity(isFilled ? 0.8 : 0.3),
-                              width: 1.5,
-                            ),
-                          ),
-                        );
-                      }),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _errorMessage,
+                        style: TextStyle(
+                          color: Colors.red[300],
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ],
                 ),

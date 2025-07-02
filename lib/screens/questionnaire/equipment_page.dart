@@ -130,7 +130,7 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
         opacity: _fadeAnimation,
         child: SingleChildScrollView(
           padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 100,
+            top: 20,
             bottom: 120,
             left: 24,
             right: 24,

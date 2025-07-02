@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 class GoalsPage extends StatefulWidget {
   final Function(List<String>) onSelected;
   final List<String>? selectedValue;
-  final VoidCallback? onMaxGoalsExceeded; // Add callback for error
+  final VoidCallback? onMaxGoalsExceeded;
 
   const GoalsPage({
     Key? key,
@@ -119,7 +119,6 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       } else if (selected.length < 3) {
         selected.add(goal);
       } else {
-        // Call the parent's error handler
         widget.onMaxGoalsExceeded?.call();
       }
       widget.onSelected(selected);
@@ -129,95 +128,92 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Container(
-        color: Colors.black,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 100,
-              bottom: 120,
-              left: 24,
-              right: 24,
-            ),
-            child: Column(
-              children: [
-                // Description paragraph
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'These goals help PeakFit personalize your athletic training program. You\'ll have the opportunity to update your goals every 6 weeks as you progress and evolve in your fitness journey.',
-                    textAlign: TextAlign.center,
+    return Container(
+      color: Colors.black,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            top: 20,  // Fixed: Changed from MediaQuery.of(context).padding.top + 100
+            bottom: 120,
+            left: 24,
+            right: 24,
+          ),
+          child: Column(
+            children: [
+              // Description paragraph
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'These goals help PeakFit personalize your athletic training program. You\'ll have the opportunity to update your goals every 6 weeks as you progress and evolve in your fitness journey.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.6),
+                    fontWeight: FontWeight.w300,
+                    height: 1.4,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),  // Consistent spacing
+
+              // Selection indicator
+              Column(
+                children: [
+                  Text(
+                    '${selected.length}/3 goals selected',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.white.withOpacity(0.6),
                       fontWeight: FontWeight.w300,
-                      height: 1.4,
-                      letterSpacing: 0.3,
+                      letterSpacing: 1,
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Selection indicator
-                Column(
-                  children: [
-                    Text(
-                      '${selected.length}/3 goals selected',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.6),
-                        fontWeight: FontWeight.w300,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(3, (index) {
-                        final isFilled = index < selected.length;
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isFilled
-                                ? Colors.white.withOpacity(0.8)
-                                : Colors.transparent,
-                            border: Border.all(
-                              color: Colors.white.withOpacity(isFilled ? 0.8 : 0.3),
-                              width: 1.5,
-                            ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(3, (index) {
+                      final isFilled = index < selected.length;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isFilled
+                              ? Colors.white.withOpacity(0.8)
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(isFilled ? 0.8 : 0.3),
+                            width: 1.5,
                           ),
-                        );
-                      }),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 30),
-
-                // Goals list
-                ...List.generate(goals.length, (index) {
-                  final goal = goals[index];
-                  final isSelected = selected.contains(goal['title']);
-
-                  return AnimatedBuilder(
-                    animation: _animations[index],
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _animations[index].value,
-                        child: _buildGoalCard(goal, isSelected),
+                        ),
                       );
-                    },
-                  );
-                }),
-              ],
-            ),
+                    }),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 30),  // Consistent spacing
+
+              // Goals list
+              ...List.generate(goals.length, (index) {
+                final goal = goals[index];
+                final isSelected = selected.contains(goal['title']);
+
+                return AnimatedBuilder(
+                  animation: _animations[index],
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _animations[index].value,
+                      child: _buildGoalCard(goal, isSelected),
+                    );
+                  },
+                );
+              }),
+            ],
           ),
         ),
       ),

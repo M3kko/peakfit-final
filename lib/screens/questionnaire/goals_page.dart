@@ -145,7 +145,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'These goals help PeakFit personalize your athletic training program. You\'ll have the opportunity to update your goals every 6 weeks as you progress and evolve in your fitness journey.',
+                  'Select up to 3 training goals. Every 6 weeks, you\'ll be prompted to review and adjust these goals, allowing PeakFit to continuously optimize your workouts. You can also update them anytime in settings.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,

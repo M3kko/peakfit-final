@@ -23,8 +23,11 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
   // Animation controllers
   late AnimationController _buttonController;
   late AnimationController _glowController;
+  late AnimationController _errorController;
   late Animation<double> _buttonAnimation;
   late Animation<double> _glowAnimation;
+  late Animation<double> _errorSlideAnimation;
+  late Animation<double> _errorFadeAnimation;
 
   // Error notification state
   bool _showError = false;
@@ -57,6 +60,11 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
       vsync: this,
     )..repeat(reverse: true);
 
+    _errorController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
     _buttonAnimation = Tween<double>(
       begin: 1.0,
       end: 0.95,
@@ -72,6 +80,22 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
       parent: _glowController,
       curve: Curves.easeInOut,
     ));
+
+    _errorSlideAnimation = Tween<double>(
+      begin: -200.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _errorController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _errorFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _errorController,
+      curve: Curves.easeIn,
+    ));
   }
 
   @override
@@ -79,6 +103,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
     _pageController.dispose();
     _buttonController.dispose();
     _glowController.dispose();
+    _errorController.dispose();
     super.dispose();
   }
 
@@ -113,13 +138,19 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
       _showError = true;
       _errorMessage = 'Maximum 3 goals can be selected';
     });
-    HapticFeedback.heavyImpact();
 
-    // Hide error after 3 seconds
+    _errorController.forward();
+    HapticFeedback.mediumImpact();
+
+    // Auto-hide after 3 seconds
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        setState(() {
-          _showError = false;
+        _errorController.reverse().then((_) {
+          if (mounted) {
+            setState(() {
+              _showError = false;
+            });
+          }
         });
       }
     });
@@ -154,163 +185,172 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
 
   @override
   Widget build(BuildContext context) {
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Main page content
-          PageView(
-            controller: _pageController,
-            onPageChanged: (page) {
-              setState(() {
-                _currentPage = page;
-              });
-            },
-            physics: const NeverScrollableScrollPhysics(),
+          // Main content with header
+          Column(
             children: [
-              AgePage(
-                onSelected: (value) => _updateResponse('age', value),
-                selectedValue: _responses['age'],
-              ),
-              GoalsPage(
-                onSelected: (value) => _updateResponse('goals', value),
-                selectedValue: _responses['goals'],
-                onMaxGoalsExceeded: _showGoalsError, // Pass callback
-              ),
-              EquipmentPage(
-                onSelected: (value) => _updateResponse('equipment', value),
-                selectedValue: _responses['equipment'],
-              ),
-              InjuriesPage(
-                onSelected: (value) => _updateResponse('injuries', value),
-                selectedValue: _responses['injuries'],
-              ),
-              SportPage(
-                onSelected: (value) => _updateResponse('sport', value),
-                selectedValue: _responses['sport'],
-              ),
-              TrainingHoursPage(
-                onSelected: (value) => _updateResponse('training_hours', value),
-                selectedValue: _responses['training_hours'],
-              ),
-              FlexibilityPage(
-                onSelected: (value) => _updateResponse('flexibility', value),
-                selectedValue: _responses['flexibility'],
-              ),
-            ],
-          ),
-
-          // Header directly at top
-          Container(
-            color: Colors.black,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top, // This accounts for status bar
-              left: 24,
-              right: 24,
-              bottom: 20,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Navigation row
-                Stack(
-                  alignment: Alignment.center,
+              // Header
+              Container(
+                color: Colors.black,
+                padding: EdgeInsets.only(
+                  top: statusBarHeight + 20, // Reduced from statusBarHeight alone
+                  left: 24,
+                  right: 24,
+                  bottom: 12, // Reduced from 20
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // Navigation row
+                    Stack(
+                      alignment: Alignment.center,
                       children: [
-                        // Back button
-                        GestureDetector(
-                          onTap: _currentPage > 0 ? _previousPage : null,
-                          child: Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: _currentPage > 0
-                                  ? Colors.white.withOpacity(0.1)
-                                  : Colors.transparent,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: _currentPage > 0
-                                    ? Colors.white.withOpacity(0.2)
-                                    : Colors.white.withOpacity(0.05),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Back button
+                            GestureDetector(
+                              onTap: _currentPage > 0 ? _previousPage : null,
+                              child: Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: _currentPage > 0
+                                      ? Colors.white.withOpacity(0.1)
+                                      : Colors.transparent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _currentPage > 0
+                                        ? Colors.white.withOpacity(0.2)
+                                        : Colors.white.withOpacity(0.05),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.arrow_back,
+                                  color: _currentPage > 0
+                                      ? Colors.white.withOpacity(0.8)
+                                      : Colors.white.withOpacity(0.2),
+                                  size: 24,
+                                ),
                               ),
                             ),
-                            child: Icon(
-                              Icons.arrow_back,
-                              color: _currentPage > 0
-                                  ? Colors.white.withOpacity(0.8)
-                                  : Colors.white.withOpacity(0.2),
-                              size: 24,
+
+                            // Step indicator
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              child: Text(
+                                '${_currentPage + 1} of 7',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
 
-                        // Step indicator
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          child: Text(
-                            '${_currentPage + 1} of 7',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white.withOpacity(0.8),
-                              fontWeight: FontWeight.w400,
-                            ),
+                        // Title
+                        Text(
+                          _pageNames[_currentPage],
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w300,
+                            color: Colors.white.withOpacity(0.8),
+                            letterSpacing: 1,
                           ),
                         ),
                       ],
                     ),
 
-                    // Title
-                    Text(
-                      _pageNames[_currentPage],
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w300,
-                        color: Colors.white.withOpacity(0.8),
-                        letterSpacing: 1,
+                    const SizedBox(height: 16), // Reduced from 20
+
+                    // Progress bar
+                    Container(
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: (_currentPage + 1) / 7,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(1),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.3),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
+              ),
 
-                const SizedBox(height: 20),
-
-                // Progress bar
-                Container(
-                  height: 2,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(1),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: (_currentPage + 1) / 7,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.white.withOpacity(0.3),
-                            blurRadius: 10,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
+              // Pages
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (page) {
+                    setState(() {
+                      _currentPage = page;
+                    });
+                  },
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    AgePage(
+                      onSelected: (value) => _updateResponse('age', value),
+                      selectedValue: _responses['age'],
                     ),
-                  ),
+                    GoalsPage(
+                      onSelected: (value) => _updateResponse('goals', value),
+                      selectedValue: _responses['goals'],
+                      onMaxGoalsExceeded: _showGoalsError,
+                    ),
+                    EquipmentPage(
+                      onSelected: (value) => _updateResponse('equipment', value),
+                      selectedValue: _responses['equipment'],
+                    ),
+                    InjuriesPage(
+                      onSelected: (value) => _updateResponse('injuries', value),
+                      selectedValue: _responses['injuries'],
+                    ),
+                    SportPage(
+                      onSelected: (value) => _updateResponse('sport', value),
+                      selectedValue: _responses['sport'],
+                    ),
+                    TrainingHoursPage(
+                      onSelected: (value) => _updateResponse('training_hours', value),
+                      selectedValue: _responses['training_hours'],
+                    ),
+                    FlexibilityPage(
+                      onSelected: (value) => _updateResponse('flexibility', value),
+                      selectedValue: _responses['flexibility'],
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
 
-          // Continue button at bottom
+          // Continue button
           Positioned(
             bottom: 50,
             left: 24,
@@ -382,52 +422,83 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
             ),
           ),
 
-          // Error notification at the very top
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            top: _showError ? 0 : -100,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 12,
-                bottom: 12,
-                left: 24,
-                right: 24,
-              ),
-              decoration: BoxDecoration(
-                color: const Color(0xFFB71C1C), // Dark red with full opacity
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _errorMessage,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
+          // Error notification overlay - positioned absolutely at the top
+          if (_showError)
+            AnimatedBuilder(
+              animation: _errorController,
+              builder: (context, child) {
+                return Positioned(
+                  top: _errorSlideAnimation.value,
+                  left: 0,
+                  right: 0,
+                  child: FadeTransition(
+                    opacity: _errorFadeAnimation,
+                    child: Container(
+                      margin: EdgeInsets.only(
+                        top: statusBarHeight + 8,
+                        left: 24,
+                        right: 24,
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF1A0000), // Very dark red, almost black
+                            Color(0xFF2D0000), // Matching the goal card gradient style
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                          color: Colors.red.withOpacity(0.2),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.2),
+                            blurRadius: 20,
+                            spreadRadius: -5,
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.warning_rounded,
+                              color: Colors.red[400],
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _errorMessage,
+                              style: TextStyle(
+                                color: Colors.red[300],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
-          ),
         ],
       ),
     );

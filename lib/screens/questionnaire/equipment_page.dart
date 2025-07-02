@@ -130,14 +130,16 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
         opacity: _fadeAnimation,
         child: SingleChildScrollView(
           padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 100, // Account for status bar + header
-            bottom: 120, // Space for continue button
+            top: MediaQuery.of(context).padding.top + 100,
+            bottom: 120,
+            left: 24,
+            right: 24,
           ),
           child: Column(
             children: [
               // Description paragraph
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   'PeakFit creates primarily bodyweight-based workouts designed for athletic performance. While equipment isn\'t required, having access to certain tools can enhance your training and unlock additional exercise variations.',
                   textAlign: TextAlign.center,
@@ -151,36 +153,33 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
                 ),
               ),
 
-              const SizedBox(height: 40),
+              const SizedBox(height: 10), // Much smaller gap
 
               // Equipment grid
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 1.0,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: equipment.length,
-                  itemBuilder: (context, index) {
-                    final item = equipment[index];
-                    final isSelected = selected.contains(item['name']);
-
-                    return AnimatedBuilder(
-                      animation: _scaleAnimations[index],
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _scaleAnimations[index].value,
-                          child: _buildEquipmentCard(item, isSelected),
-                        );
-                      },
-                    );
-                  },
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 1.0,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
                 ),
+                itemCount: equipment.length,
+                itemBuilder: (context, index) {
+                  final item = equipment[index];
+                  final isSelected = selected.contains(item['name']);
+
+                  return AnimatedBuilder(
+                    animation: _scaleAnimations[index],
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _scaleAnimations[index].value,
+                        child: _buildEquipmentCard(item, isSelected),
+                      );
+                    },
+                  );
+                },
               ),
 
               const SizedBox(height: 30),

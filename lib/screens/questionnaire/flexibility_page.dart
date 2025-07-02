@@ -251,22 +251,9 @@ class _FlexibilityPageState extends State<FlexibilityPage> with TickerProviderSt
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        level['icon'],
-                        style: const TextStyle(fontSize: 24),
-                      ),
-                      Text(
-                        '${index + 1}/5',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.white.withOpacity(0.5),
-                          fontWeight: FontWeight.w300,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    level['icon'],
+                    style: const TextStyle(fontSize: 28),
                   ),
                 ],
               ),

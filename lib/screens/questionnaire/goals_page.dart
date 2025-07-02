@@ -142,137 +142,149 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Stack(
-          children: [
-            // Main scrollable content
-            SingleChildScrollView(
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 100,
-                bottom: 120,
-                left: 24,
-                right: 24,
-              ),
-              child: Column(
-                children: [
-                  // Description paragraph
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'These goals help PeakFit personalize your athletic training program. You\'ll have the opportunity to update your goals every 6 weeks as you progress and evolve in your fitness journey.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.6),
-                        fontWeight: FontWeight.w300,
-                        height: 1.4,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Selection indicator
-                  Column(
-                    children: [
-                      Text(
-                        '${selected.length}/3 goals selected',
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Main content
+          Container(
+            color: Colors.black,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 100,
+                  bottom: 120,
+                  left: 24,
+                  right: 24,
+                ),
+                child: Column(
+                  children: [
+                    // Description paragraph
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'These goals help PeakFit personalize your athletic training program. You\'ll have the opportunity to update your goals every 6 weeks as you progress and evolve in your fitness journey.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.white.withOpacity(0.6),
                           fontWeight: FontWeight.w300,
-                          letterSpacing: 1,
+                          height: 1.4,
+                          letterSpacing: 0.3,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(3, (index) {
-                          final isFilled = index < selected.length;
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isFilled
-                                  ? Colors.white.withOpacity(0.8)
-                                  : Colors.transparent,
-                              border: Border.all(
-                                color: Colors.white.withOpacity(isFilled ? 0.8 : 0.3),
-                                width: 1.5,
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Selection indicator
+                    Column(
+                      children: [
+                        Text(
+                          '${selected.length}/3 goals selected',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.6),
+                            fontWeight: FontWeight.w300,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(3, (index) {
+                            final isFilled = index < selected.length;
+                            return Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isFilled
+                                    ? Colors.white.withOpacity(0.8)
+                                    : Colors.transparent,
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(isFilled ? 0.8 : 0.3),
+                                  width: 1.5,
+                                ),
                               ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // Goals list
-                  ...List.generate(goals.length, (index) {
-                    final goal = goals[index];
-                    final isSelected = selected.contains(goal['title']);
-
-                    return AnimatedBuilder(
-                      animation: _animations[index],
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _animations[index].value,
-                          child: _buildGoalCard(goal, isSelected),
-                        );
-                      },
-                    );
-                  }),
-                ],
-              ),
-            ),
-
-            // Error message at top
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              top: _showError ? MediaQuery.of(context).padding.top + 80 : -100,
-              left: 24,
-              right: 24,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: Colors.red.withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      color: Colors.red[300],
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _errorMessage,
-                        style: TextStyle(
-                          color: Colors.red[300],
-                          fontSize: 14,
+                            );
+                          }),
                         ),
-                      ),
+                      ],
                     ),
+
+                    const SizedBox(height: 30),
+
+                    // Goals list
+                    ...List.generate(goals.length, (index) {
+                      final goal = goals[index];
+                      final isSelected = selected.contains(goal['title']);
+
+                      return AnimatedBuilder(
+                        animation: _animations[index],
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _animations[index].value,
+                            child: _buildGoalCard(goal, isSelected),
+                          );
+                        },
+                      );
+                    }),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+
+          // Error notification at the very top
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: _showError ? 0 : -100,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 12,
+                bottom: 12,
+                left: 24,
+                right: 24,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB71C1C), // Dark red with full opacity
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _errorMessage,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

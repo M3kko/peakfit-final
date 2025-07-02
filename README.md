@@ -10,3 +10,5 @@ Things to Add:
 - For Age Page add glassy background
 - fix age error
 - Fix scroll on equipment page
+- Remove Calisthenics 
+- Add general fitness option but make it a big rectangle

@@ -9,3 +9,4 @@ Things to Add:
 - Come up with better tagline
 - For Age Page add glassy background
 - fix age error
+- Fix scroll on equipment page

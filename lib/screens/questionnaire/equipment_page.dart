@@ -185,40 +185,6 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
               ),
 
               const SizedBox(height: 30), // Consistent spacing
-
-              // Selected indicator
-              if (selected.isNotEmpty) ...[
-                Text(
-                  '${selected.length} ${selected.length == 1 ? 'item' : 'items'} selected',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.6),
-                    fontWeight: FontWeight.w300,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    equipment.length,
-                        (index) {
-                      final isSelected = selected.contains(equipment[index]['name']);
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isSelected
-                              ? Colors.white.withOpacity(0.8)
-                              : Colors.white.withOpacity(0.2),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
             ],
           ),
         ),

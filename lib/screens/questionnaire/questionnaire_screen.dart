@@ -244,7 +244,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
 
                     // Title
                     Text(
-                      'Assessment',
+                      _pageNames[_currentPage],
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w300,

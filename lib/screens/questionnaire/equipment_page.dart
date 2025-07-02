@@ -128,78 +128,98 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
       color: Colors.black,
       child: FadeTransition(
         opacity: _fadeAnimation,
-        child: Column(
-          children: [
-            Expanded(
-              child: CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 120), // Space for fixed header
-                        _buildTitle(),
-                        const SizedBox(height: 30),
-                      ],
-                    ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top + 100, // Account for status bar + header
+            bottom: 120, // Space for continue button
+          ),
+          child: Column(
+            children: [
+              // Description paragraph
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  'PeakFit creates primarily bodyweight-based workouts designed for athletic performance. While equipment isn\'t required, having access to certain tools can enhance your training and unlock additional exercise variations.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.6),
+                    fontWeight: FontWeight.w300,
+                    height: 1.4,
+                    letterSpacing: 0.3,
                   ),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 1.0,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                          final item = equipment[index];
-                          final isSelected = selected.contains(item['name']);
-
-                          return AnimatedBuilder(
-                            animation: _scaleAnimations[index],
-                            builder: (context, child) {
-                              return Transform.scale(
-                                scale: _scaleAnimations[index].value,
-                                child: _buildEquipmentCard(item, isSelected),
-                              );
-                            },
-                          );
-                        },
-                        childCount: equipment.length,
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 20),
-                        _buildSelectedIndicator(),
-                        const SizedBox(height: 120), // Space for continue button
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildTitle() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Text(
-        'PeakFit creates primarily bodyweight-based workouts designed for athletic performance. While equipment isn\'t required, having access to certain tools can enhance your training and unlock additional exercise variations.',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.white.withOpacity(0.6),
-          fontWeight: FontWeight.w300,
-          height: 1.4,
-          letterSpacing: 0.3,
+              const SizedBox(height: 40),
+
+              // Equipment grid
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 1.0,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
+                  itemCount: equipment.length,
+                  itemBuilder: (context, index) {
+                    final item = equipment[index];
+                    final isSelected = selected.contains(item['name']);
+
+                    return AnimatedBuilder(
+                      animation: _scaleAnimations[index],
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _scaleAnimations[index].value,
+                          child: _buildEquipmentCard(item, isSelected),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              // Selected indicator
+              if (selected.isNotEmpty) ...[
+                Text(
+                  '${selected.length} ${selected.length == 1 ? 'item' : 'items'} selected',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.6),
+                    fontWeight: FontWeight.w300,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    equipment.length,
+                        (index) {
+                      final isSelected = selected.contains(equipment[index]['name']);
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected
+                              ? Colors.white.withOpacity(0.8)
+                              : Colors.white.withOpacity(0.2),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -321,49 +341,6 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSelectedIndicator() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      height: selected.isEmpty ? 0 : 60,
-      child: selected.isNotEmpty
-          ? Column(
-        children: [
-          Text(
-            '${selected.length} ${selected.length == 1 ? 'item' : 'items'} selected',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.6),
-              fontWeight: FontWeight.w300,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              equipment.length,
-                  (index) {
-                final isSelected = selected.contains(equipment[index]['name']);
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isSelected
-                        ? Colors.white.withOpacity(0.8)
-                        : Colors.white.withOpacity(0.2),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      )
-          : null,
     );
   }
 }

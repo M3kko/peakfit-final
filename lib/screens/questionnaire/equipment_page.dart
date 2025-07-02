@@ -130,14 +130,58 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
         opacity: _fadeAnimation,
         child: Column(
           children: [
-            const SizedBox(height: 120), // Space for header
-            _buildTitle(),
-            const SizedBox(height: 40),
             Expanded(
-              child: _buildEquipmentGrid(),
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 120), // Space for fixed header
+                        _buildTitle(),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    sliver: SliverGrid(
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 1.0,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                          final item = equipment[index];
+                          final isSelected = selected.contains(item['name']);
+
+                          return AnimatedBuilder(
+                            animation: _scaleAnimations[index],
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: _scaleAnimations[index].value,
+                                child: _buildEquipmentCard(item, isSelected),
+                              );
+                            },
+                          );
+                        },
+                        childCount: equipment.length,
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+                        _buildSelectedIndicator(),
+                        const SizedBox(height: 120), // Space for continue button
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            _buildSelectedIndicator(),
-            const SizedBox(height: 120), // Space for continue button
           ],
         ),
       ),
@@ -167,33 +211,6 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildEquipmentGrid() {
-    return GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.0,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: equipment.length,
-      itemBuilder: (context, index) {
-        final item = equipment[index];
-        final isSelected = selected.contains(item['name']);
-
-        return AnimatedBuilder(
-          animation: _scaleAnimations[index],
-          builder: (context, child) {
-            return Transform.scale(
-              scale: _scaleAnimations[index].value,
-              child: _buildEquipmentCard(item, isSelected),
-            );
-          },
-        );
-      },
     );
   }
 

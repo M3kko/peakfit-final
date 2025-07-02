@@ -114,8 +114,18 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     setState(() {
       if (selected.contains(goal)) {
         selected.remove(goal);
-      } else {
+      } else if (selected.length < 3) {
         selected.add(goal);
+      } else {
+        // Show feedback that max goals reached
+        HapticFeedback.heavyImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Maximum 3 goals can be selected'),
+            backgroundColor: Colors.white.withOpacity(0.1),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
       widget.onSelected(selected);
     });
@@ -128,70 +138,97 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       color: Colors.black,
       child: FadeTransition(
         opacity: _fadeAnimation,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 100,
-            bottom: 120,
-            left: 24,
-            right: 24,
-          ),
-          child: Column(
-            children: [
-              // TODO: Add description paragraph here
+        child: Stack(
+          children: [
+            // Main scrollable content
+            SingleChildScrollView(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 160, // Space for header + indicator
+                bottom: 120,
+                left: 24,
+                right: 24,
+              ),
+              child: Column(
+                children: [
+                  // TODO: Add description paragraph here
 
-              // Goals list
-              ...List.generate(goals.length, (index) {
-                final goal = goals[index];
-                final isSelected = selected.contains(goal['title']);
+                  // Goals list
+                  ...List.generate(goals.length, (index) {
+                    final goal = goals[index];
+                    final isSelected = selected.contains(goal['title']);
 
-                return AnimatedBuilder(
-                  animation: _animations[index],
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _animations[index].value,
-                      child: _buildGoalCard(goal, isSelected),
+                    return AnimatedBuilder(
+                      animation: _animations[index],
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _animations[index].value,
+                          child: _buildGoalCard(goal, isSelected),
+                        );
+                      },
                     );
-                  },
-                );
-              }),
+                  }),
+                ],
+              ),
+            ),
 
-              const SizedBox(height: 30),
-
-              // Selected indicator
-              if (selected.isNotEmpty) ...[
-                Text(
-                  '${selected.length} ${selected.length == 1 ? 'goal' : 'goals'} selected',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.6),
-                    fontWeight: FontWeight.w300,
-                    letterSpacing: 1,
+            // Sticky selection indicator at top
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 100,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black,
+                      Colors.black.withOpacity(0.9),
+                      Colors.black.withOpacity(0.0),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    goals.length,
-                        (index) {
-                      final isSelected = selected.contains(goals[index]['title']);
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isSelected
-                              ? Colors.white.withOpacity(0.8)
-                              : Colors.white.withOpacity(0.2),
-                        ),
-                      );
-                    },
-                  ),
+                child: Column(
+                  children: [
+                    // Selection count
+                    Text(
+                      '${selected.length}/3 goals selected',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.6),
+                        fontWeight: FontWeight.w300,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Progress dots
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(3, (index) {
+                        final isFilled = index < selected.length;
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isFilled
+                                ? Colors.white.withOpacity(0.8)
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(isFilled ? 0.8 : 0.3),
+                              width: 1.5,
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
                 ),
-              ],
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );

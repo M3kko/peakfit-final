@@ -23,35 +23,36 @@ class _SportPageState extends State<SportPage> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
 
   final List<Map<String, dynamic>> sports = [
-    {'name': 'Figure Skating', 'icon': '⛸️'},
+    {'name': 'Archery', 'icon': '🏹'},
     {'name': 'Badminton', 'icon': '🏸'},
-    {'name': 'Basketball', 'icon': '🏀'},
-    {'name': 'Running', 'icon': '🏃'},
-    {'name': 'Soccer', 'icon': '⚽'},
+    {'name': 'Ballet', 'icon': '🩰'},
     {'name': 'Baseball', 'icon': '⚾'},
+    {'name': 'Basketball', 'icon': '🏀'},
+    {'name': 'Bowling', 'icon': '🎳'},
+    {'name': 'Boxing', 'icon': '🥊'},
+    {'name': 'Calisthenics', 'icon': '💪'},
+    {'name': 'Cheerleading', 'icon': '📣'},
+    {'name': 'Cycling', 'icon': '🚴'},
+    {'name': 'Dance', 'icon': '💃'},
+    {'name': 'Fencing', 'icon': '🤺'},
+    {'name': 'Figure Skating', 'icon': '⛸️'},
     {'name': 'Football', 'icon': '🏈'},
-    {'name': 'Tennis', 'icon': '🎾'},
-    {'name': 'Volleyball', 'icon': '🏐'},
     {'name': 'Golf', 'icon': '⛳'},
+    {'name': 'Gymnastics', 'icon': '🤸'},
     {'name': 'Ice Hockey', 'icon': '🏒'},
-    {'name': 'Speed Skating', 'icon': '⛸️'},
+    {'name': 'Martial Arts', 'icon': '🥋'},
+    {'name': 'Parkour', 'icon': '🏃‍♂️'},
+    {'name': 'Rock Climbing', 'icon': '🧗'},
+    {'name': 'Rowing', 'icon': '🚣'},
+    {'name': 'Running', 'icon': '🏃'},
     {'name': 'Skiing', 'icon': '⛷️'},
     {'name': 'Snowboarding', 'icon': '🏂'},
-    {'name': 'Cycling', 'icon': '🚴'},
+    {'name': 'Soccer', 'icon': '⚽'},
+    {'name': 'Speed Skating', 'icon': '⛸️'},
     {'name': 'Swimming', 'icon': '🏊'},
-    {'name': 'Rowing', 'icon': '🚣'},
-    {'name': 'Boxing', 'icon': '🥊'},
-    {'name': 'Martial Arts', 'icon': '🥋'},
-    {'name': 'Gymnastics', 'icon': '🤸'},
-    {'name': 'Calisthenics', 'icon': '💪'},
-    {'name': 'Rock Climbing', 'icon': '🧗'},
-    {'name': 'Archery', 'icon': '🏹'},
-    {'name': 'Fencing', 'icon': '🤺'},
-    {'name': 'Parkour', 'icon': '🏃‍♂️'},
-    {'name': 'Dance', 'icon': '💃'},
-    {'name': 'Ballet', 'icon': '🩰'},
-    {'name': 'Cheerleading', 'icon': '📣'},
+    {'name': 'Tennis', 'icon': '🎾'},
     {'name': 'Triathlon', 'icon': '🏊‍♂️'},
+    {'name': 'Volleyball', 'icon': '🏐'},
   ];
 
   @override
@@ -149,10 +150,10 @@ class _SportPageState extends State<SportPage> with TickerProviderStateMixin {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 1.0,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
+                    crossAxisCount: 2,
+                    childAspectRatio: 1.3,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
                   ),
                   itemCount: sports.length,
                   itemBuilder: (context, index) {
@@ -235,30 +236,32 @@ class _SportPageState extends State<SportPage> with TickerProviderStateMixin {
                 ),
               ),
 
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    sport['icon'],
-                    style: const TextStyle(fontSize: 32),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    sport['name'],
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color: Colors.white.withOpacity(isSelected ? 1 : 0.8),
-                      height: 1.2,
+            // Content centered
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      sport['icon'],
+                      style: const TextStyle(fontSize: 36),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      sport['name'],
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        color: Colors.white.withOpacity(isSelected ? 1 : 0.8),
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

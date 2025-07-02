@@ -189,43 +189,19 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
   }
 
   Widget _buildTitle() {
-    return Column(
-      children: [
-        Text(
-          'EQUIPMENT',
-          style: TextStyle(
-            fontSize: 14,
-            letterSpacing: 3,
-            color: Colors.white.withOpacity(0.5),
-            fontWeight: FontWeight.w300,
-          ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Text(
+        'PeakFit creates primarily bodyweight-based workouts designed for athletic performance. While equipment isn\'t required, having access to certain tools can enhance your training and unlock additional exercise variations.',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 14,
+          color: Colors.white.withOpacity(0.6),
+          fontWeight: FontWeight.w300,
+          height: 1.4,
+          letterSpacing: 0.3,
         ),
-        const SizedBox(height: 8),
-        Text(
-          'SELECT YOUR TOOLS',
-          style: TextStyle(
-            fontSize: 24,
-            letterSpacing: 1,
-            color: Colors.white.withOpacity(0.9),
-            fontWeight: FontWeight.w300,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Text(
-            'PeakFit creates primarily bodyweight-based workouts designed for athletic performance. While equipment isn\'t required, having access to certain tools can enhance your training and unlock additional exercise variations.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.6),
-              fontWeight: FontWeight.w300,
-              height: 1.4,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 

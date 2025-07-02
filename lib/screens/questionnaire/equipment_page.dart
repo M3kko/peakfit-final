@@ -1,55 +1,361 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-class EquipmentPage extends StatelessWidget {
+class EquipmentPage extends StatefulWidget {
   final Function(List<String>) onSelected;
   final List<String>? selectedValue;
 
-  EquipmentPage({required this.onSelected, this.selectedValue});
+  const EquipmentPage({
+    Key? key,
+    required this.onSelected,
+    this.selectedValue,
+  }) : super(key: key);
 
-  final List<String> equipment = [
-    'None (bodyweight only)',
-    'Jump rope',
-    'Resistance bands',
-    'Dumbbells',
-    'Plyometric box',
-    'Balance board',
+  @override
+  State<EquipmentPage> createState() => _EquipmentPageState();
+}
+
+class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateMixin {
+  late List<String> selected;
+  late List<AnimationController> _animationControllers;
+  late List<Animation<double>> _scaleAnimations;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  final List<Map<String, dynamic>> equipment = [
+    {
+      'name': 'None (bodyweight only)',
+      'icon': '💪',
+      'description': 'Pure body control',
+      'gradient': [const Color(0xFF1A1A1A), const Color(0xFF2D2D2D)],
+    },
+    {
+      'name': 'Jump rope',
+      'icon': '🏃',
+      'description': 'Cardio & coordination',
+      'gradient': [const Color(0xFFEB5757), const Color(0xFFF2994A)],
+    },
+    {
+      'name': 'Resistance bands',
+      'icon': '🔗',
+      'description': 'Variable resistance',
+      'gradient': [const Color(0xFF9B51E0), const Color(0xFFBB6BD9)],
+    },
+    {
+      'name': 'Dumbbells',
+      'icon': '🏋️',
+      'description': 'Strength building',
+      'gradient': [const Color(0xFF56CCF2), const Color(0xFF2F80ED)],
+    },
+    {
+      'name': 'Plyometric box',
+      'icon': '📦',
+      'description': 'Explosive power',
+      'gradient': [const Color(0xFF6FCF97), const Color(0xFF27AE60)],
+    },
+    {
+      'name': 'Balance board',
+      'icon': '⚖️',
+      'description': 'Stability & control',
+      'gradient': [const Color(0xFFF2C94C), const Color(0xFFF2994A)],
+    },
   ];
 
   @override
-  Widget build(BuildContext context) {
-    List<String> selected = selectedValue ?? [];
+  void initState() {
+    super.initState();
+    selected = widget.selectedValue ?? [];
 
-    return Padding(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    ));
+
+    _animationControllers = List.generate(
+      equipment.length,
+          (index) => AnimationController(
+        duration: Duration(milliseconds: 400 + (index * 100)),
+        vsync: this,
+      ),
+    );
+
+    _scaleAnimations = _animationControllers.map((controller) =>
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(parent: controller, curve: Curves.easeOutBack),
+        ),
+    ).toList();
+
+    _fadeController.forward();
+    Future.delayed(const Duration(milliseconds: 100), () {
+      for (var controller in _animationControllers) {
+        controller.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    for (var controller in _animationControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _toggleEquipment(String item) {
+    setState(() {
+      if (selected.contains(item)) {
+        selected.remove(item);
+      } else {
+        selected.add(item);
+      }
+      widget.onSelected(selected);
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Column(
+          children: [
+            const SizedBox(height: 120), // Space for header
+            _buildTitle(),
+            const SizedBox(height: 40),
+            Expanded(
+              child: _buildEquipmentGrid(),
+            ),
+            _buildSelectedIndicator(),
+            const SizedBox(height: 120), // Space for continue button
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTitle() {
+    return Column(
+      children: [
+        Text(
+          'EQUIPMENT',
+          style: TextStyle(
+            fontSize: 14,
+            letterSpacing: 3,
+            color: Colors.white.withOpacity(0.5),
+            fontWeight: FontWeight.w300,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'SELECT YOUR TOOLS',
+          style: TextStyle(
+            fontSize: 24,
+            letterSpacing: 1,
+            color: Colors.white.withOpacity(0.9),
+            fontWeight: FontWeight.w300,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEquipmentGrid() {
+    return GridView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.0,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: equipment.length,
+      itemBuilder: (context, index) {
+        final item = equipment[index];
+        final isSelected = selected.contains(item['name']);
+
+        return AnimatedBuilder(
+          animation: _scaleAnimations[index],
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnimations[index].value,
+              child: _buildEquipmentCard(item, isSelected),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildEquipmentCard(Map<String, dynamic> item, bool isSelected) {
+    return GestureDetector(
+      onTap: () => _toggleEquipment(item['name']),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: item['gradient'],
+          )
+              : null,
+          color: !isSelected ? Colors.white.withOpacity(0.05) : null,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isSelected
+                ? Colors.white.withOpacity(0.3)
+                : Colors.white.withOpacity(0.1),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: item['gradient'][0].withOpacity(0.4),
+              blurRadius: 20,
+              spreadRadius: -5,
+            ),
+          ] : [],
+        ),
+        child: Stack(
+          children: [
+            if (isSelected)
+              Positioned(
+                top: -20,
+                right: -20,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['icon'],
+                        style: const TextStyle(fontSize: 36),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        item['name'].replaceAll(' (bodyweight only)', ''),
+                        style: TextStyle(
+                          fontSize: item['name'].contains('bodyweight') ? 18 : 16,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: Colors.white,
+                          height: 1.2,
+                        ),
+                      ),
+                      if (item['name'].contains('bodyweight'))
+                        Text(
+                          '(bodyweight only)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.6),
+                          ),
+                        ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item['description'],
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.7),
+                            fontWeight: FontWeight.w300,
+                          ),
+                        ),
+                      ),
+                      if (isSelected)
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.2),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.4),
+                              width: 2,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedIndicator() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      height: selected.isEmpty ? 0 : 60,
+      child: selected.isNotEmpty
+          ? Column(
         children: [
           Text(
-            'What equipment do you have available?',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            '${selected.length} ${selected.length == 1 ? 'item' : 'items'} selected',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withOpacity(0.6),
+              fontWeight: FontWeight.w300,
+              letterSpacing: 1,
+            ),
           ),
-          Text(
-            'Select all that apply',
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              equipment.length,
+                  (index) {
+                final isSelected = selected.contains(equipment[index]['name']);
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected
+                        ? Colors.white.withOpacity(0.8)
+                        : Colors.white.withOpacity(0.2),
+                  ),
+                );
+              },
+            ),
           ),
-          SizedBox(height: 30),
-          ...equipment.map((item) =>
-              CheckboxListTile(
-                title: Text(item, style: TextStyle(fontSize: 18)),
-                value: selected.contains(item),
-                onChanged: (bool? value) {
-                  List<String> newSelected = List.from(selected);
-                  if (value == true) {
-                    newSelected.add(item);
-                  } else {
-                    newSelected.remove(item);
-                  }
-                  onSelected(newSelected);
-                },
-              ),
-          ).toList(),
         ],
-      ),
+      )
+          : null,
     );
   }
 }

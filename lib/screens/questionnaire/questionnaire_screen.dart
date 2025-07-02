@@ -107,7 +107,54 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
     super.dispose();
   }
 
+  bool _validateCurrentPage() {
+    switch (_currentPage) {
+      case 0: // Age page
+        return _responses['age'] != null && _responses['age'].isNotEmpty;
+      case 1: // Goals page
+        return _responses['goals'] != null && (_responses['goals'] as List).isNotEmpty;
+      case 2: // Equipment page
+        return _responses['equipment'] != null && (_responses['equipment'] as List).isNotEmpty;
+      case 3: // Injuries page
+        return _responses['injuries'] != null && (_responses['injuries'] as List).isNotEmpty;
+      case 4: // Sport page
+        return _responses['sport'] != null && _responses['sport'].isNotEmpty;
+      case 5: // Training hours page
+        return _responses['training_hours'] != null && _responses['training_hours'].isNotEmpty;
+      case 6: // Flexibility page
+        return _responses['flexibility'] != null && _responses['flexibility'].isNotEmpty;
+      default:
+        return false;
+    }
+  }
+
+  String _getValidationMessage() {
+    switch (_currentPage) {
+      case 0:
+        return 'Please select your age';
+      case 1:
+        return 'Please select at least one goal';
+      case 2:
+        return 'Please select at least one equipment option';
+      case 3:
+        return 'Please select at least one option';
+      case 4:
+        return 'Please select your sport';
+      case 5:
+        return 'Please select your training hours';
+      case 6:
+        return 'Please select your flexibility level';
+      default:
+        return 'Please make a selection';
+    }
+  }
+
   void _nextPage() {
+    if (!_validateCurrentPage()) {
+      _showValidationError(_getValidationMessage());
+      return;
+    }
+
     if (_currentPage < 6) {
       _pageController.nextPage(
         duration: Duration(milliseconds: 400),
@@ -133,10 +180,10 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
     });
   }
 
-  void _showGoalsError() {
+  void _showValidationError(String message) {
     setState(() {
       _showError = true;
-      _errorMessage = 'Maximum 3 goals can be selected';
+      _errorMessage = message;
     });
 
     _errorController.forward();
@@ -154,6 +201,10 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
         });
       }
     });
+  }
+
+  void _showGoalsError() {
+    _showValidationError('Maximum 3 goals can be selected');
   }
 
   Future<void> _submitQuestionnaire() async {
@@ -198,10 +249,10 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
               Container(
                 color: Colors.black,
                 padding: EdgeInsets.only(
-                  top: statusBarHeight + 20, // Reduced from statusBarHeight alone
+                  top: statusBarHeight + 20,
                   left: 24,
                   right: 24,
-                  bottom: 12, // Reduced from 20
+                  bottom: 12,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -272,7 +323,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
                       ],
                     ),
 
-                    const SizedBox(height: 16), // Reduced from 20
+                    const SizedBox(height: 16),
 
                     // Progress bar
                     Container(

@@ -12,3 +12,5 @@ Things to Add:
 - Fix scroll on equipment page
 - Remove Calisthenics 
 - Add general fitness option but make it a big rectangle
+- Add in biological gender option 
+- Add in discipline for sports that have that

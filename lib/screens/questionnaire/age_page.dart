@@ -33,6 +33,11 @@ class _AgePageState extends State<AgePage> with TickerProviderStateMixin {
     // Initialize age from selected value or default
     if (widget.selectedValue != null) {
       _currentAge = int.tryParse(widget.selectedValue!) ?? 19;
+    } else {
+      // Schedule the callback for after the build is complete
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onSelected(_currentAge.toString());
+      });
     }
 
     _pageController = PageController(

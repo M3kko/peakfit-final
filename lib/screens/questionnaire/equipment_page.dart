@@ -113,10 +113,18 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
 
   void _toggleEquipment(String item) {
     setState(() {
-      if (selected.contains(item)) {
-        selected.remove(item);
+      if (item == 'None') {
+        // If selecting "None", clear all other selections
+        selected = ['None'];
       } else {
-        selected.add(item);
+        // Remove "None" if selecting any equipment
+        selected.remove('None');
+
+        if (selected.contains(item)) {
+          selected.remove(item);
+        } else {
+          selected.add(item);
+        }
       }
       widget.onSelected(selected);
     });

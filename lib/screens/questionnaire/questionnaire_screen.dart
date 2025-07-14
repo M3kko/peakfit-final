@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'gender_page.dart';import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -38,6 +38,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
 
   final List<String> _pageNames = [
     'AGE',
+    'GENDER',
     'GOALS',
     'EQUIPMENT',
     'INJURIES',
@@ -111,17 +112,19 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
     switch (_currentPage) {
       case 0: // Age page
         return _responses['age'] != null && _responses['age'].isNotEmpty;
-      case 1: // Goals page
+      case 1: // Gender page
+        return _responses['gender'] != null && _responses['gender'].isNotEmpty;
+      case 2: // Goals page
         return _responses['goals'] != null && (_responses['goals'] as List).isNotEmpty;
-      case 2: // Equipment page
+      case 3: // Equipment page
         return _responses['equipment'] != null && (_responses['equipment'] as List).isNotEmpty;
-      case 3: // Injuries page
+      case 4: // Injuries page
         return _responses['injuries'] != null && (_responses['injuries'] as List).isNotEmpty;
-      case 4: // Sport page
+      case 5: // Sport page
         return _responses['sport'] != null && _responses['sport'].isNotEmpty;
-      case 5: // Training hours page
+      case 6: // Training hours page
         return _responses['training_hours'] != null && _responses['training_hours'].isNotEmpty;
-      case 6: // Flexibility page
+      case 7: // Flexibility page
         return _responses['flexibility'] != null && _responses['flexibility'].isNotEmpty;
       default:
         return false;
@@ -133,16 +136,18 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
       case 0:
         return 'Please select your age';
       case 1:
-        return 'Please select at least one goal';
+        return 'Please select your gender';
       case 2:
-        return 'Please select at least one equipment option';
+        return 'Please select at least one goal';
       case 3:
-        return 'Please select at least one option';
+        return 'Please select at least one equipment option';
       case 4:
-        return 'Please select your sport';
+        return 'Please select at least one option';
       case 5:
-        return 'Please select your training hours';
+        return 'Please select your sport';
       case 6:
+        return 'Please select your training hours';
+      case 7:
         return 'Please select your flexibility level';
       default:
         return 'Please make a selection';
@@ -155,7 +160,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
       return;
     }
 
-    if (_currentPage < 6) {
+    if (_currentPage < 7) {
       _pageController.nextPage(
         duration: Duration(milliseconds: 400),
         curve: Curves.easeInOut,
@@ -299,7 +304,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
                                 borderRadius: BorderRadius.circular(25),
                               ),
                               child: Text(
-                                '${_currentPage + 1} of 7',
+                                '${_currentPage + 1} of 8',
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: Colors.white.withOpacity(0.8),
@@ -334,7 +339,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
                       ),
                       child: FractionallySizedBox(
                         alignment: Alignment.centerLeft,
-                        widthFactor: (_currentPage + 1) / 7,
+                        widthFactor: (_currentPage + 1) / 8,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           decoration: BoxDecoration(
@@ -369,6 +374,10 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
                     AgePage(
                       onSelected: (value) => _updateResponse('age', value),
                       selectedValue: _responses['age'],
+                    ),
+                    GenderPage(
+                      onSelected: (value) => _updateResponse('gender', value),
+                      selectedValue: _responses['gender'],
                     ),
                     GoalsPage(
                       onSelected: (value) => _updateResponse('goals', value),
@@ -448,7 +457,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                _currentPage == 6 ? 'Complete' : 'Continue',
+                                _currentPage == 7 ? 'Complete' : 'Continue',
                                 style: const TextStyle(
                                   color: Colors.black,
                                   fontSize: 18,

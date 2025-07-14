@@ -10,6 +10,7 @@ import 'injuries_page.dart';
 import 'sport_page.dart';
 import 'training_hours_page.dart';
 import 'flexibility_page.dart';
+import '../home_screen.dart';
 
 class QuestionnaireScreen extends StatefulWidget {
   @override
@@ -226,7 +227,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => WeeklyPlanScreen()),
+          MaterialPageRoute(builder: (context) => HomeScreen()),
         );
       }
     } catch (e) {

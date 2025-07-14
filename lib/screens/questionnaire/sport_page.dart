@@ -22,7 +22,8 @@ class _SportPageState extends State<SportPage> with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  final List<Map<String, dynamic>> sports = [
+  final List<Map<String, dynamic>> allSports = [
+    {'name': 'General Fitness', 'icon': '💪'},
     {'name': 'Archery', 'icon': '🏹'},
     {'name': 'Badminton', 'icon': '🏸'},
     {'name': 'Ballet', 'icon': '🩰'},
@@ -74,9 +75,9 @@ class _SportPageState extends State<SportPage> with TickerProviderStateMixin {
     ));
 
     _animationControllers = List.generate(
-      sports.length,
+      allSports.length,
           (index) => AnimationController(
-        duration: Duration(milliseconds: 300 + (index * 50)),
+        duration: Duration(milliseconds: 300 + (index * 30)),
         vsync: this,
       ),
     );
@@ -109,7 +110,7 @@ class _SportPageState extends State<SportPage> with TickerProviderStateMixin {
       selected = sport;
     });
     widget.onSelected(sport);
-    HapticFeedback.lightImpact(); // This is the haptic feedback
+    HapticFeedback.lightImpact();
   }
 
   @override
@@ -118,62 +119,61 @@ class _SportPageState extends State<SportPage> with TickerProviderStateMixin {
       color: Colors.black,
       child: FadeTransition(
         opacity: _fadeAnimation,
-        child: Column(
-          children: [
-            // Description paragraph with its own padding
-            Padding(
-              padding: const EdgeInsets.fromLTRB(40, 20, 40, 0),
-              child: Text(
-                'What is your main sport? PeakFit will create sport-specific exercises to enhance your performance and address the unique demands of your athletic discipline.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.6),
-                  fontWeight: FontWeight.w300,
-                  height: 1.4,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Sports grid in expanded scroll view
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(
-                  left: 24,
-                  right: 24,
-                  bottom: 120,
-                ),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 1.3,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(
+            top: 20,
+            bottom: 120,
+            left: 24,
+            right: 24,
+          ),
+          child: Column(
+            children: [
+              // Description paragraph
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'What is your main sport? PeakFit will create sport-specific exercises to enhance your performance and address the unique demands of your athletic discipline.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.6),
+                    fontWeight: FontWeight.w300,
+                    height: 1.4,
+                    letterSpacing: 0.3,
                   ),
-                  itemCount: sports.length,
-                  itemBuilder: (context, index) {
-                    final sport = sports[index];
-                    final isSelected = selected == sport['name'];
-
-                    return AnimatedBuilder(
-                      animation: _animations[index],
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _animations[index].value,
-                          child: _buildSportCard(sport, isSelected),
-                        );
-                      },
-                    );
-                  },
                 ),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 20),
+
+              // All sports grid including General Fitness
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 1.3,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: allSports.length,
+                itemBuilder: (context, index) {
+                  final sport = allSports[index];
+                  final isSelected = selected == sport['name'];
+
+                  return AnimatedBuilder(
+                    animation: _animations[index],
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _animations[index].value,
+                        child: _buildSportCard(sport, isSelected),
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

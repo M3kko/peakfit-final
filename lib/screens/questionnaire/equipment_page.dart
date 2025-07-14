@@ -137,62 +137,61 @@ class _EquipmentPageState extends State<EquipmentPage> with TickerProviderStateM
       color: Colors.black,
       child: FadeTransition(
         opacity: _fadeAnimation,
-        child: Column(
-          children: [
-            // Description paragraph with its own padding
-            Padding(
-              padding: const EdgeInsets.fromLTRB(40, 20, 40, 0),
-              child: Text(
-                'PeakFit creates primarily bodyweight-based workouts designed for athletic performance. While equipment isn\'t required, having access to certain tools can enhance your training and unlock additional exercise variations. You can update your equipment anytime in settings.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.6),
-                  fontWeight: FontWeight.w300,
-                  height: 1.4,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24), // Space between paragraph and grid
-
-            // Equipment grid in expanded scroll view
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(
-                  left: 24,
-                  right: 24,
-                  bottom: 120,
-                ),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 1.0,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(
+            top: 20,
+            bottom: 120,
+            left: 24,
+            right: 24,
+          ),
+          child: Column(
+            children: [
+              // Description paragraph
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'PeakFit creates primarily bodyweight-based workouts designed for athletic performance. While equipment isn\'t required, having access to certain tools can enhance your training and unlock additional exercise variations. You can update your equipment anytime in settings.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.6),
+                    fontWeight: FontWeight.w300,
+                    height: 1.4,
+                    letterSpacing: 0.3,
                   ),
-                  itemCount: equipment.length,
-                  itemBuilder: (context, index) {
-                    final item = equipment[index];
-                    final isSelected = selected.contains(item['name']);
-
-                    return AnimatedBuilder(
-                      animation: _animations[index],
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _animations[index].value,
-                          child: _buildEquipmentCard(item, isSelected),
-                        );
-                      },
-                    );
-                  },
                 ),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 20), // Reduced spacing
+
+              // Equipment grid
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 1.0,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: equipment.length,
+                itemBuilder: (context, index) {
+                  final item = equipment[index];
+                  final isSelected = selected.contains(item['name']);
+
+                  return AnimatedBuilder(
+                    animation: _animations[index],
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _animations[index].value,
+                        child: _buildEquipmentCard(item, isSelected),
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -32,7 +32,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     super.initState();
 
     // Initialize video
-    _videoController = VideoPlayerController.asset('assets/videos/skate-montage.mp4')
+    _videoController = VideoPlayerController.asset('assets/videos/skate-montage2.mp4')
       ..initialize().then((_) {
         _videoController.play();
         _videoController.setLooping(true);

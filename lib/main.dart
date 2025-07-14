@@ -4,7 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'screens/questionnaire/questionnaire_screen.dart';
-import 'screens/daily_workout_selection.dart';
+import 'screens/home_screen.dart';
 import 'screens/auth_screen.dart'; // Import your new auth screen
 
 void main() async {

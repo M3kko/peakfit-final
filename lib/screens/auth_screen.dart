@@ -351,6 +351,9 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
+        cursorColor: Colors.white,
+        cursorWidth: 2.5,
+        cursorRadius: const Radius.circular(1),
         style: const TextStyle(
           color: Colors.white,
           fontSize: 16,

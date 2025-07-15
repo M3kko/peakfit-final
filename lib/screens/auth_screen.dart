@@ -145,21 +145,29 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         );
         _msg = 'Welcome back';
 
+        // Show welcome message for 1 second before navigating
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-              const HomeScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: child,
-                );
-              },
-              transitionDuration: const Duration(milliseconds: 600),
-            ),
-          );
+          setState(() {});
+
+          // Wait 1 second
+          await Future.delayed(const Duration(seconds: 1));
+
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                const HomeScreen(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 600),
+              ),
+            );
+          }
         }
       }
     } on FirebaseAuthException catch (e) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:video_player/video_player.dart';
 import 'questionnaire/questionnaire_screen.dart';
+import 'home_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -105,33 +106,58 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
     try {
       if (!_isLogin) {
+        // Sign Up - Navigate to Questionnaire/Onboarding
         await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailC.text.trim(),
           password: _passC.text.trim(),
         );
         _msg = 'Welcome to PeakFit';
-        // Navigate to questionnaire after signup
+
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder: (context) => QuestionnaireScreen(),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  QuestionnaireScreen(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                const begin = Offset(1.0, 0.0);
+                const end = Offset.zero;
+                const curve = Curves.easeOutExpo;
+
+                var tween = Tween(begin: begin, end: end).chain(
+                  CurveTween(curve: curve),
+                );
+
+                return SlideTransition(
+                  position: animation.drive(tween),
+                  child: child,
+                );
+              },
+              transitionDuration: const Duration(milliseconds: 500),
             ),
           );
         }
       } else {
+        // Sign In - Navigate to Home Screen
         await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailC.text.trim(),
           password: _passC.text.trim(),
         );
         _msg = 'Welcome back';
-        // Navigate to main app after login (you can change this to your main screen)
-        // For now, let's also go to questionnaire, but you might want WorkoutPages() here
+
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder: (context) => QuestionnaireScreen(),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+              const HomeScreen(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: child,
+                );
+              },
+              transitionDuration: const Duration(milliseconds: 600),
             ),
           );
         }

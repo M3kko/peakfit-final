@@ -8,37 +8,40 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late AnimationController _scaleController;
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  // Animation Controllers
+  late AnimationController _entryController;
   late AnimationController _glowController;
   late AnimationController _statsGlowController;
+  late AnimationController _transformController;
+  late AnimationController _backButtonController;
 
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _glowAnimation;
-  late Animation<double> _statsGlowAnimation;
+  // Animations
+  late Animation<double> _fadeIn;
+  late Animation<double> _slideUp;
+  late Animation<double> _glowFade;
+  late Animation<double> _statsGlow;
+  late Animation<double> _transform;
+  late Animation<double> _backButtonFade;
 
-  String? _selectedOption;
+  String? _selectedWorkout;
 
   @override
   void initState() {
     super.initState();
+    _initAnimations();
+    _startAnimations();
+  }
 
-    // Initialize animation controllers
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+  void _initAnimations() {
+    // Entry animations
+    _entryController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
 
     _glowController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 800), // Slightly slower
       vsync: this,
     );
 
@@ -47,24 +50,31 @@ class _HomeScreenState extends State<HomeScreen>
       vsync: this,
     )..repeat(reverse: true);
 
-    // Setup animations
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
+    _transformController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    _backButtonController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    // Define animations
+    _fadeIn = CurvedAnimation(
+      parent: _entryController,
       curve: Curves.easeOut,
-    ));
+    );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.7,
-      end: 1.0,
+    _slideUp = Tween<double>(
+      begin: 30.0,
+      end: 0.0,
     ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.elasticOut,
+      parent: _entryController,
+      curve: Curves.easeOutCubic,
     ));
 
-    _glowAnimation = Tween<double>(
+    _glowFade = Tween<double>(
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
@@ -72,28 +82,60 @@ class _HomeScreenState extends State<HomeScreen>
       curve: Curves.easeInOut,
     ));
 
-    _statsGlowAnimation = Tween<double>(
-      begin: 0.6,
+    _statsGlow = Tween<double>(
+      begin: 0.5,
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _statsGlowController,
       curve: Curves.easeInOut,
     ));
 
-    // Start animations
-    _fadeController.forward();
-    Future.delayed(const Duration(milliseconds: 200), () {
-      _scaleController.forward();
-    });
+    _transform = CurvedAnimation(
+      parent: _transformController,
+      curve: Curves.easeInOutCubic,
+    );
+
+    _backButtonFade = CurvedAnimation(
+      parent: _backButtonController,
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _startAnimations() {
+    _entryController.forward();
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
-    _scaleController.dispose();
+    _entryController.dispose();
     _glowController.dispose();
     _statsGlowController.dispose();
+    _transformController.dispose();
+    _backButtonController.dispose();
     super.dispose();
+  }
+
+  void _onWorkoutSelected(String workout) {
+    if (_selectedWorkout != workout) {
+      setState(() {
+        _selectedWorkout = workout;
+      });
+      _glowController.reset();
+      _glowController.forward();
+      _transformController.forward();
+      _backButtonController.forward();
+      HapticFeedback.mediumImpact();
+    }
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selectedWorkout = null;
+    });
+    _glowController.reset();
+    _transformController.reverse();
+    _backButtonController.reverse();
+    HapticFeedback.lightImpact();
   }
 
   String _getGreeting() {
@@ -103,149 +145,159 @@ class _HomeScreenState extends State<HomeScreen>
     return 'Good Evening';
   }
 
-  String _getDayString() {
+  String _getDateString() {
     final now = DateTime.now();
-    const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-    const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
-      'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
 
     return '${days[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
-  }
-
-  void _selectWorkout(String option) {
-    setState(() {
-      _selectedOption = option;
-    });
-
-    // Reset and restart the glow animation for smooth fade-in every time
-    _glowController.reset();
-    _glowController.forward();
-
-    HapticFeedback.mediumImpact();
-
-    // Start workout after a delay
-    Future.delayed(const Duration(milliseconds: 800), () {
-      // Navigate to workout
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
         children: [
-          // Background gradient layer 1
-          Container(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(0.3, -0.5),
-                radius: 1.5,
-                colors: [
-                  Colors.white.withOpacity(0.05),
-                  Colors.white.withOpacity(0.02),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
+          _buildBackground(),
+          _buildContent(),
+        ],
+      ),
+    );
+  }
 
-          // Background gradient layer 2
-          Container(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(-0.5, 0.8),
-                radius: 1.2,
-                colors: [
-                  Colors.white.withOpacity(0.03),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
+  Widget _buildBackground() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFF0A0A0A),
+            const Color(0xFF0F0F0F),
+            const Color(0xFF050505),
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ),
+      ),
+    );
+  }
 
-          // Glass morphism layer
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(0.01),
-                  Colors.white.withOpacity(0.005),
-                ],
-              ),
-            ),
-          ),
-
-          // Main content
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
+  Widget _buildContent() {
+    return SafeArea(
+      child: AnimatedBuilder(
+        animation: _fadeIn,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _fadeIn.value,
+            child: Transform.translate(
+              offset: Offset(0, _slideUp.value),
               child: Column(
                 children: [
                   _buildHeader(),
                   Expanded(
-                    child: _buildMainContent(),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 40),
+                          _buildMainWorkout(),
+                          const SizedBox(height: 35),
+                          _buildSecondaryWorkouts(),
+                          const SizedBox(height: 50),
+                          _buildStatsOrButton(),
+                          const Spacer(),
+                        ],
+                      ),
+                    ),
                   ),
-                  _buildBottomSection(),
+                  _buildBottomNav(),
                 ],
               ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(28, 20, 28, 20),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(
-                _getDayString(),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 12,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w300,
-                ),
+              // Back button
+              AnimatedBuilder(
+                animation: _backButtonFade,
+                builder: (context, child) {
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: _selectedWorkout != null ? 40 : 0,
+                    child: _selectedWorkout != null
+                        ? FadeTransition(
+                      opacity: _backButtonFade,
+                      child: IconButton(
+                        onPressed: _clearSelection,
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        padding: EdgeInsets.zero,
+                      ),
+                    )
+                        : const SizedBox.shrink(),
+                  );
+                },
               ),
-              const SizedBox(height: 6),
-              Text(
-                _getGreeting(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w200,
-                  letterSpacing: 0.5,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _getDateString(),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _getGreeting(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           Container(
-            width: 42,
-            height: 42,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.05),
               border: Border.all(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withOpacity(0.1),
                 width: 1,
               ),
             ),
-            child: Center(
+            child: const Center(
               child: Text(
                 'JD',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 0.5,
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),
@@ -255,175 +307,117 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildMainContent() {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Today's Focus
-          Text(
-            "TODAY'S FOCUS",
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 14,
-              letterSpacing: 2.5,
-              fontWeight: FontWeight.w300,
+  Widget _buildMainWorkout() {
+    final isSelected = _selectedWorkout == 'strength';
+
+    return GestureDetector(
+      onTap: () => _onWorkoutSelected('strength'),
+      child: AnimatedBuilder(
+        animation: _glowFade,
+        builder: (context, child) {
+          return Container(
+            width: 240,
+            height: 240,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF0A0A0A),
+              border: Border.all(
+                color: Colors.white.withOpacity(isSelected ? 0.8 : 0.15),
+                width: isSelected ? 2 : 1,
+              ),
+              boxShadow: isSelected ? [
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.4 * _glowFade.value),
+                  blurRadius: 30,
+                  spreadRadius: 2,
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.2 * _glowFade.value),
+                  blurRadius: 60,
+                  spreadRadius: 10,
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.1 * _glowFade.value),
+                  blurRadius: 100,
+                  spreadRadius: 30,
+                ),
+              ] : [],
             ),
-          ),
-
-          const SizedBox(height: 50),
-
-          // Main workout circle
-          GestureDetector(
-            onTap: () => _selectWorkout('main'),
-            child: AnimatedBuilder(
-              animation: _glowAnimation,
-              builder: (context, child) {
-                final isSelected = _selectedOption == 'main';
-                return Container(
-                  width: 240,
-                  height: 240,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black,
-                    border: Border.all(
-                      color: isSelected
-                          ? Colors.white.withOpacity(0.6 * _glowAnimation.value)
-                          : Colors.white.withOpacity(0.15),
-                      width: isSelected ? 2 : 1,
-                    ),
-                    boxShadow: isSelected ? [
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.3 * _glowAnimation.value),
-                        blurRadius: 20,
-                        spreadRadius: -5,
-                      ),
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.15 * _glowAnimation.value),
-                        blurRadius: 40,
-                        spreadRadius: 5,
-                      ),
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.08 * _glowAnimation.value),
-                        blurRadius: 80,
-                        spreadRadius: 20,
-                      ),
-                    ] : [],
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 190,
-                        height: 190,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              Colors.white.withOpacity(0.03),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'STRENGTH',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(isSelected ? 1.0 : 0.9),
-                              fontSize: 32,
-                              fontWeight: FontWeight.w200,
-                              letterSpacing: 2.5,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            width: 50,
-                            height: 1,
-                            color: Colors.white.withOpacity(0.2),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
+            child: Center(
+              child: Text(
+                'STRENGTH',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(isSelected ? 1.0 : 0.7),
+                  fontSize: 28,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 3,
+                ),
+              ),
             ),
-          ),
-
-          const SizedBox(height: 60),
-
-          // Quick options
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildQuickOption('WARM UP', Icons.wb_sunny_outlined, 'warmup'),
-              const SizedBox(width: 60),
-              _buildQuickOption('COOL DOWN', Icons.ac_unit_outlined, 'cooldown'),
-            ],
-          ),
-
-          const SizedBox(height: 80),
-
-          // Stats section
-          _buildStatsSection(),
-        ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildQuickOption(String title, IconData icon, String id) {
-    final isSelected = _selectedOption == id;
+  Widget _buildSecondaryWorkouts() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _buildSecondaryOption('WARM UP', Icons.wb_sunny_outlined, 'warmup'),
+        const SizedBox(width: 60),
+        _buildSecondaryOption('COOL DOWN', Icons.ac_unit, 'cooldown'),
+      ],
+    );
+  }
+
+  Widget _buildSecondaryOption(String title, IconData icon, String id) {
+    final isSelected = _selectedWorkout == id;
 
     return GestureDetector(
-      onTap: () => _selectWorkout(id),
+      onTap: () => _onWorkoutSelected(id),
       child: AnimatedBuilder(
-        animation: _glowAnimation,
+        animation: _glowFade,
         builder: (context, child) {
           return Column(
             children: [
               Container(
-                width: 72,
-                height: 72,
+                width: 85,
+                height: 85,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.black,
+                  color: const Color(0xFF0A0A0A),
                   border: Border.all(
-                    color: isSelected
-                        ? Colors.white.withOpacity(0.5 * _glowAnimation.value)
-                        : Colors.white.withOpacity(0.12),
+                    color: Colors.white.withOpacity(isSelected ? 0.7 : 0.15),
                     width: isSelected ? 1.5 : 1,
                   ),
                   boxShadow: isSelected ? [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.25 * _glowAnimation.value),
-                      blurRadius: 15,
-                      spreadRadius: -3,
+                      color: Colors.white.withOpacity(0.3 * _glowFade.value),
+                      blurRadius: 25,
+                      spreadRadius: 1,
                     ),
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.1 * _glowAnimation.value),
-                      blurRadius: 30,
-                      spreadRadius: 2,
+                      color: Colors.white.withOpacity(0.15 * _glowFade.value),
+                      blurRadius: 50,
+                      spreadRadius: 5,
                     ),
                   ] : [],
                 ),
                 child: Icon(
                   icon,
-                  color: Colors.white.withOpacity(isSelected ? 0.8 : 0.5),
-                  size: 28,
+                  color: Colors.white.withOpacity(isSelected ? 0.8 : 0.4),
+                  size: 36,
                 ),
               ),
               const SizedBox(height: 14),
               Text(
                 title,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(isSelected ? 0.9 : 0.7),
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w300,
+                  color: Colors.white.withOpacity(isSelected ? 0.9 : 0.6),
+                  fontSize: 14,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],
@@ -433,140 +427,221 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildStatsSection() {
+  Widget _buildStatsOrButton() {
     return AnimatedBuilder(
-      animation: _statsGlowAnimation,
+      animation: _transform,
       builder: (context, child) {
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildGlowingStat('7', 'DAY STREAK', true),
-              _buildDivider(),
-              _buildGlowingStat('4', 'THIS WEEK', false),
-              _buildDivider(),
-              _buildGlowingStat('156', 'TOTAL', false),
-            ],
+          // Maintain minimum height to prevent glow cutoff
+          constraints: const BoxConstraints(minHeight: 120),
+          child: AnimatedCrossFade(
+            firstChild: _buildStatsBox(),
+            secondChild: Container(
+              // Wrapper to maintain space for glow
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: _buildStartButton(),
+            ),
+            crossFadeState: _selectedWorkout == null
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 500),
+            sizeCurve: Curves.easeInOut,
           ),
         );
       },
     );
   }
 
-  Widget _buildGlowingStat(String value, String label, bool highlight) {
-    final glowColors = {
-      'DAY STREAK': const Color(0xFFFFD700),
-      'THIS WEEK': const Color(0xFF00D4FF),
-      'TOTAL': const Color(0xFF9B51E0),
-    };
-
-    final glowColor = glowColors[label] ?? Colors.white;
-
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  Widget _buildStatsBox() {
+    return AnimatedBuilder(
+      animation: _statsGlow,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
+            color: const Color(0xFF0F0F0F),
+            border: Border.all(
+              color: const Color(0xFFFFD700).withOpacity(0.2),
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
-                color: glowColor.withOpacity(0.15 * _statsGlowAnimation.value),
-                blurRadius: 25,
-                spreadRadius: 3,
+                color: const Color(0xFFFFD700).withOpacity(0.1 * _statsGlow.value),
+                blurRadius: 30,
+                spreadRadius: 0,
               ),
               BoxShadow(
-                color: glowColor.withOpacity(0.08 * _statsGlowAnimation.value),
-                blurRadius: 40,
-                spreadRadius: 8,
+                color: const Color(0xFFFFD700).withOpacity(0.05 * _statsGlow.value),
+                blurRadius: 60,
+                spreadRadius: 10,
               ),
             ],
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: Color.lerp(Colors.white, glowColor, 0.2),
-                  fontSize: 28,
-                  fontWeight: FontWeight.w300,
-                  shadows: [
-                    Shadow(
-                      color: glowColor.withOpacity(0.4),
-                      blurRadius: 12,
-                    ),
-                  ],
-                ),
-              ),
-              if (highlight) ...[
-                const SizedBox(width: 6),
-                Text(
-                  '🔥',
-                  style: TextStyle(
-                    fontSize: 16,
-                    shadows: [
-                      Shadow(
-                        color: Colors.orange.withOpacity(0.5),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                ),
+          child: IntrinsicHeight(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(child: _buildStatItem('7', 'DAY STREAK')),
+                _buildDivider(),
+                Expanded(child: _buildStatItem('4', 'THIS WEEK')),
+                _buildDivider(),
+                Expanded(child: _buildStatItem('156', 'TOTAL')),
               ],
-            ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatItem(String value, String label) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.w200,
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 11,
-            letterSpacing: 1,
-            fontWeight: FontWeight.w300,
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 11,
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w400,
+            ),
           ),
         ),
+        if (label != 'DAY STREAK') ...[
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'WORKOUTS',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.3),
+                fontSize: 9,
+                letterSpacing: 1,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
 
   Widget _buildDivider() {
     return Container(
-      width: 1,
       height: 40,
-      color: Colors.white.withOpacity(0.08),
+      width: 1,
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      color: const Color(0xFFFFD700).withOpacity(0.2),
     );
   }
 
-  Widget _buildBottomSection() {
+  Widget _buildStartButton() {
+    return Center(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.heavyImpact();
+          // Navigate to workout
+        },
+        child: Container(
+          width: 200,
+          height: 60,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            gradient: const LinearGradient(
+              colors: [
+                Colors.white,
+                Color(0xFFE0E0E0),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withOpacity(0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 5),
+                spreadRadius: 5,
+              ),
+              BoxShadow(
+                color: Colors.white.withOpacity(0.15),
+                blurRadius: 40,
+                offset: const Offset(0, 10),
+                spreadRadius: 10,
+              ),
+              BoxShadow(
+                color: Colors.white.withOpacity(0.05),
+                blurRadius: 60,
+                offset: const Offset(0, 15),
+                spreadRadius: 20,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'START',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward,
+                color: Colors.black.withOpacity(0.8),
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.home_rounded, true),
-          _buildNavItem(Icons.calendar_today_rounded, false),
-          _buildNavItem(Icons.bar_chart_rounded, false),
-          _buildNavItem(Icons.person_outline_rounded, false),
+          _buildNavItem(Icons.home, true),
+          _buildNavItem(Icons.calendar_today, false),
+          _buildNavItem(Icons.trending_up, false),
+          _buildNavItem(Icons.person, false),
         ],
       ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, bool isSelected) {
+  Widget _buildNavItem(IconData icon, bool isActive) {
     return GestureDetector(
       onTap: () => HapticFeedback.lightImpact(),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? Colors.white.withOpacity(0.08) : null,
+          borderRadius: BorderRadius.circular(12),
+          color: isActive ? Colors.white.withOpacity(0.1) : Colors.transparent,
         ),
         child: Icon(
           icon,
-          color: isSelected ? Colors.white : Colors.white.withOpacity(0.25),
+          color: Colors.white.withOpacity(isActive ? 0.8 : 0.3),
           size: 24,
         ),
       ),

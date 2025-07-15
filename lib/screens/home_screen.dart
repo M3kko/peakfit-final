@@ -432,13 +432,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       animation: _transform,
       builder: (context, child) {
         return Container(
-          // Maintain minimum height to prevent glow cutoff
-          constraints: const BoxConstraints(minHeight: 120),
+          // Expand container significantly to prevent any glow cutoff
+          constraints: const BoxConstraints(minHeight: 160),
           child: AnimatedCrossFade(
             firstChild: _buildStatsBox(),
             secondChild: Container(
-              // Wrapper to maintain space for glow
-              padding: const EdgeInsets.symmetric(vertical: 20),
+              // More padding for the glow
+              padding: const EdgeInsets.symmetric(vertical: 40),
               child: _buildStartButton(),
             ),
             crossFadeState: _selectedWorkout == null
@@ -571,22 +571,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.white.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 5),
+                color: Colors.white.withOpacity(0.2),
+                blurRadius: 15,
+                offset: const Offset(0, 0),
+                spreadRadius: 2,
+              ),
+              BoxShadow(
+                color: Colors.white.withOpacity(0.1),
+                blurRadius: 30,
+                offset: const Offset(0, 0),
                 spreadRadius: 5,
               ),
               BoxShadow(
-                color: Colors.white.withOpacity(0.15),
-                blurRadius: 40,
-                offset: const Offset(0, 10),
-                spreadRadius: 10,
-              ),
-              BoxShadow(
                 color: Colors.white.withOpacity(0.05),
-                blurRadius: 60,
-                offset: const Offset(0, 15),
-                spreadRadius: 20,
+                blurRadius: 50,
+                offset: const Offset(0, 0),
+                spreadRadius: 10,
               ),
             ],
           ),

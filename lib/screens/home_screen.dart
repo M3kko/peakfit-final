@@ -1,762 +1,575 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _LuxuriousHomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _LuxuriousHomeScreenState extends State<HomeScreen>
+class _HomeScreenState extends State<HomeScreen>
     with TickerProviderStateMixin {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
-  String _selectedDuration = '15 min';
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
+  late AnimationController _glowController;
+  late AnimationController _statsGlowController;
 
-  // Animation controllers
-  late final AnimationController _glowController;
-  late final AnimationController _titleShimmerController;
-  late final AnimationController _fadeController;
-  late final AnimationController _pulseController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _glowAnimation;
+  late Animation<double> _statsGlowAnimation;
 
-  late final Animation<double> _glowAnimation;
-  late final Animation<double> _titleShimmerAnimation;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<double> _pulseAnimation;
-
-  // Workout data with luxury theme
-  final List<Map<String, dynamic>> workouts = [
-    {
-      'title': 'Morning Ritual',
-      'subtitle': 'Upper Body\nElegance & Power',
-      'icon': '✨',
-      'gradient': [const Color(0xFF2D1B69), const Color(0xFF11998E)],
-      'glowColor': const Color(0xFF38EF7D),
-      'accentColor': const Color(0xFF11998E),
-      'description': 'Begin your day with intention',
-    },
-    {
-      'title': 'Recovery Suite',
-      'subtitle': 'Mobility &\nRestoration',
-      'icon': '🌙',
-      'gradient': [const Color(0xFF8E2DE2), const Color(0xFF4A00E0)],
-      'glowColor': const Color(0xFF8E2DE2),
-      'accentColor': const Color(0xFF4A00E0),
-      'description': 'Nurture your body\'s wisdom',
-    },
-    {
-      'title': 'Elite Performance',
-      'subtitle': 'High Intensity\nMastery',
-      'icon': '⚡',
-      'gradient': [const Color(0xFFFF6B6B), const Color(0xFF4ECDC4)],
-      'glowColor': const Color(0xFF4ECDC4),
-      'accentColor': const Color(0xFFFF6B6B),
-      'description': 'Unleash your potential',
-    },
-  ];
+  String? _selectedOption;
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize animations
-    _glowController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat(reverse: true);
-
-    _titleShimmerController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
-
+    // Initialize animation controllers
     _fadeController = AnimationController(
-      vsync: this,
       duration: const Duration(milliseconds: 1200),
+      vsync: this,
     );
 
-    _pulseController = AnimationController(
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
+    );
+
+    _glowController = AnimationController(
       duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+
+    _statsGlowController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
     )..repeat(reverse: true);
 
-    // Create animations
-    _glowAnimation = Tween<double>(begin: 0.3, end: 0.8)
-        .animate(CurvedAnimation(parent: _glowController, curve: Curves.easeInOut));
+    // Setup animations
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    ));
 
-    _titleShimmerAnimation = Tween<double>(begin: -1.0, end: 2.0)
-        .animate(CurvedAnimation(parent: _titleShimmerController, curve: Curves.easeInOut));
+    _scaleAnimation = Tween<double>(
+      begin: 0.7,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _scaleController,
+      curve: Curves.elasticOut,
+    ));
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
-        .animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
+    _glowAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _glowController,
+      curve: Curves.easeInOut,
+    ));
 
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05)
-        .animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
+    _statsGlowAnimation = Tween<double>(
+      begin: 0.6,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _statsGlowController,
+      curve: Curves.easeInOut,
+    ));
 
+    // Start animations
     _fadeController.forward();
+    Future.delayed(const Duration(milliseconds: 200), () {
+      _scaleController.forward();
+    });
   }
 
   @override
   void dispose() {
-    _glowController.dispose();
-    _titleShimmerController.dispose();
     _fadeController.dispose();
-    _pulseController.dispose();
-    _pageController.dispose();
+    _scaleController.dispose();
+    _glowController.dispose();
+    _statsGlowController.dispose();
     super.dispose();
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
+  String _getDayString() {
+    final now = DateTime.now();
+    const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+    const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+      'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+
+    return '${days[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
+  }
+
+  void _selectWorkout(String option) {
+    setState(() {
+      _selectedOption = option;
+    });
+
+    // Reset and restart the glow animation for smooth fade-in every time
+    _glowController.reset();
+    _glowController.forward();
+
+    HapticFeedback.mediumImpact();
+
+    // Start workout after a delay
+    Future.delayed(const Duration(milliseconds: 800), () {
+      // Navigate to workout
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-      body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Column(
-            children: [
-              _buildLuxuriousHeader(),
-              _buildElegantWeekStreak(),
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  onPageChanged: (i) => setState(() => _currentPage = i),
-                  itemCount: workouts.length,
-                  itemBuilder: (_, i) => _buildLuxuriousWorkoutCard(workouts[i]),
-                ),
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Background gradient layer 1
+          Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0.3, -0.5),
+                radius: 1.5,
+                colors: [
+                  Colors.white.withOpacity(0.05),
+                  Colors.white.withOpacity(0.02),
+                  Colors.transparent,
+                ],
               ),
-              _buildPremiumBottomNavigation(),
-            ],
+            ),
           ),
-        ),
+
+          // Background gradient layer 2
+          Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(-0.5, 0.8),
+                radius: 1.2,
+                colors: [
+                  Colors.white.withOpacity(0.03),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+
+          // Glass morphism layer
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.01),
+                  Colors.white.withOpacity(0.005),
+                ],
+              ),
+            ),
+          ),
+
+          // Main content
+          SafeArea(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Column(
+                children: [
+                  _buildHeader(),
+                  Expanded(
+                    child: _buildMainContent(),
+                  ),
+                  _buildBottomSection(),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildLuxuriousHeader() {
+  Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFF0A0A0A),
-            const Color(0xFF0A0A0A).withOpacity(0.8),
-          ],
-        ),
-      ),
+      padding: const EdgeInsets.fromLTRB(28, 20, 28, 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Streak indicator with luxury styling
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFFFD700).withOpacity(0.2),
-                  const Color(0xFFFFA500).withOpacity(0.1),
-                ],
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _getDayString(),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 12,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w300,
+                ),
               ),
-              borderRadius: BorderRadius.circular(20),
+              const SizedBox(height: 6),
+              Text(
+                _getGreeting(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w200,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFFFFD700).withOpacity(0.3),
+                color: Colors.white.withOpacity(0.15),
                 width: 1,
               ),
             ),
-            child: Row(
-              children: [
-                const Text('🔥', style: TextStyle(fontSize: 18)),
-                const SizedBox(width: 8),
+            child: Center(
+              child: Text(
+                'JD',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainContent() {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Today's Focus
+          Text(
+            "TODAY'S FOCUS",
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 14,
+              letterSpacing: 2.5,
+              fontWeight: FontWeight.w300,
+            ),
+          ),
+
+          const SizedBox(height: 50),
+
+          // Main workout circle
+          GestureDetector(
+            onTap: () => _selectWorkout('main'),
+            child: AnimatedBuilder(
+              animation: _glowAnimation,
+              builder: (context, child) {
+                final isSelected = _selectedOption == 'main';
+                return Container(
+                  width: 240,
+                  height: 240,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black,
+                    border: Border.all(
+                      color: isSelected
+                          ? Colors.white.withOpacity(0.6 * _glowAnimation.value)
+                          : Colors.white.withOpacity(0.15),
+                      width: isSelected ? 2 : 1,
+                    ),
+                    boxShadow: isSelected ? [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.3 * _glowAnimation.value),
+                        blurRadius: 20,
+                        spreadRadius: -5,
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.15 * _glowAnimation.value),
+                        blurRadius: 40,
+                        spreadRadius: 5,
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.08 * _glowAnimation.value),
+                        blurRadius: 80,
+                        spreadRadius: 20,
+                      ),
+                    ] : [],
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 190,
+                        height: 190,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.03),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'STRENGTH',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(isSelected ? 1.0 : 0.9),
+                              fontSize: 32,
+                              fontWeight: FontWeight.w200,
+                              letterSpacing: 2.5,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            width: 50,
+                            height: 1,
+                            color: Colors.white.withOpacity(0.2),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 60),
+
+          // Quick options
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildQuickOption('WARM UP', Icons.wb_sunny_outlined, 'warmup'),
+              const SizedBox(width: 60),
+              _buildQuickOption('COOL DOWN', Icons.ac_unit_outlined, 'cooldown'),
+            ],
+          ),
+
+          const SizedBox(height: 80),
+
+          // Stats section
+          _buildStatsSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickOption(String title, IconData icon, String id) {
+    final isSelected = _selectedOption == id;
+
+    return GestureDetector(
+      onTap: () => _selectWorkout(id),
+      child: AnimatedBuilder(
+        animation: _glowAnimation,
+        builder: (context, child) {
+          return Column(
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.black,
+                  border: Border.all(
+                    color: isSelected
+                        ? Colors.white.withOpacity(0.5 * _glowAnimation.value)
+                        : Colors.white.withOpacity(0.12),
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                  boxShadow: isSelected ? [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.25 * _glowAnimation.value),
+                      blurRadius: 15,
+                      spreadRadius: -3,
+                    ),
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.1 * _glowAnimation.value),
+                      blurRadius: 30,
+                      spreadRadius: 2,
+                    ),
+                  ] : [],
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.white.withOpacity(isSelected ? 0.8 : 0.5),
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(isSelected ? 0.9 : 0.7),
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w300,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStatsSection() {
+    return AnimatedBuilder(
+      animation: _statsGlowAnimation,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildGlowingStat('7', 'DAY STREAK', true),
+              _buildDivider(),
+              _buildGlowingStat('4', 'THIS WEEK', false),
+              _buildDivider(),
+              _buildGlowingStat('156', 'TOTAL', false),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGlowingStat(String value, String label, bool highlight) {
+    final glowColors = {
+      'DAY STREAK': const Color(0xFFFFD700),
+      'THIS WEEK': const Color(0xFF00D4FF),
+      'TOTAL': const Color(0xFF9B51E0),
+    };
+
+    final glowColor = glowColors[label] ?? Colors.white;
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: glowColor.withOpacity(0.15 * _statsGlowAnimation.value),
+                blurRadius: 25,
+                spreadRadius: 3,
+              ),
+              BoxShadow(
+                color: glowColor.withOpacity(0.08 * _statsGlowAnimation.value),
+                blurRadius: 40,
+                spreadRadius: 8,
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: Color.lerp(Colors.white, glowColor, 0.2),
+                  fontSize: 28,
+                  fontWeight: FontWeight.w300,
+                  shadows: [
+                    Shadow(
+                      color: glowColor.withOpacity(0.4),
+                      blurRadius: 12,
+                    ),
+                  ],
+                ),
+              ),
+              if (highlight) ...[
+                const SizedBox(width: 6),
                 Text(
-                  '28',
+                  '🔥',
                   style: TextStyle(
-                    color: const Color(0xFFFFD700),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
                     shadows: [
                       Shadow(
-                        color: const Color(0xFFFFD700).withOpacity(0.5),
+                        color: Colors.orange.withOpacity(0.5),
                         blurRadius: 10,
                       ),
                     ],
                   ),
                 ),
               ],
-            ),
-          ),
-
-          // Elegant logo
-          AnimatedBuilder(
-            animation: _titleShimmerAnimation,
-            builder: (context, child) {
-              return ShaderMask(
-                shaderCallback: (rect) {
-                  return LinearGradient(
-                    begin: Alignment(_titleShimmerAnimation.value - 1, 0),
-                    end: Alignment(_titleShimmerAnimation.value, 0),
-                    colors: [
-                      Colors.white.withOpacity(0.5),
-                      Colors.white,
-                      Colors.white.withOpacity(0.5),
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ).createShader(rect);
-                },
-                child: const Text(
-                  'PEAKFIT',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w200,
-                    letterSpacing: 4,
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Profile avatar with glow
-          AnimatedBuilder(
-            animation: _glowAnimation,
-            builder: (context, child) {
-              return Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF6366F1),
-                      const Color(0xFF8B5CF6),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6366F1).withOpacity(_glowAnimation.value * 0.6),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildElegantWeekStreak() {
-    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    const currentDay = 3;
-    const completedDays = [0, 1, 2];
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.02),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(days.length, (idx) {
-          final isToday = idx == currentDay;
-          final isCompleted = completedDays.contains(idx);
-
-          return AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: isToday ? _pulseAnimation.value : 1.0,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: isCompleted
-                        ? LinearGradient(
-                      colors: [
-                        const Color(0xFFFFD700),
-                        const Color(0xFFFFA500),
-                      ],
-                    )
-                        : isToday
-                        ? LinearGradient(
-                      colors: [
-                        const Color(0xFF6366F1),
-                        const Color(0xFF8B5CF6),
-                      ],
-                    )
-                        : null,
-                    color: !isCompleted && !isToday
-                        ? Colors.white.withOpacity(0.05)
-                        : null,
-                    border: Border.all(
-                      color: isToday
-                          ? const Color(0xFF6366F1).withOpacity(0.8)
-                          : isCompleted
-                          ? const Color(0xFFFFD700).withOpacity(0.8)
-                          : Colors.white.withOpacity(0.1),
-                      width: isToday ? 2 : 1,
-                    ),
-                    boxShadow: (isToday || isCompleted)
-                        ? [
-                      BoxShadow(
-                        color: (isCompleted
-                            ? const Color(0xFFFFD700)
-                            : const Color(0xFF6366F1))
-                            .withOpacity(0.4),
-                        blurRadius: 15,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          days[idx],
-                          style: TextStyle(
-                            color: isCompleted || isToday
-                                ? Colors.white
-                                : Colors.white.withOpacity(0.5),
-                            fontWeight: (isToday || isCompleted)
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            fontSize: 12,
-                          ),
-                        ),
-                        if (isCompleted)
-                          const Text(
-                            '✨',
-                            style: TextStyle(fontSize: 8),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildLuxuriousWorkoutCard(Map<String, dynamic> workout) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-
-          // Elegant title with shimmer effect
-          AnimatedBuilder(
-            animation: _titleShimmerAnimation,
-            builder: (context, child) {
-              return ShaderMask(
-                shaderCallback: (rect) {
-                  return LinearGradient(
-                    begin: Alignment(_titleShimmerAnimation.value - 1, 0),
-                    end: Alignment(_titleShimmerAnimation.value, 0),
-                    colors: [
-                      workout['glowColor'].withOpacity(0.3),
-                      workout['glowColor'],
-                      workout['glowColor'].withOpacity(0.3),
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ).createShader(rect);
-                },
-                child: Text(
-                  workout['title'],
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w300,
-                    color: Colors.white,
-                    letterSpacing: 2,
-                  ),
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(height: 8),
-
-          // Subtitle
-          Text(
-            workout['subtitle'],
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w200,
-              color: Colors.white,
-              height: 1.1,
-              letterSpacing: 1,
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Description
-          Text(
-            workout['description'],
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.6),
-              fontWeight: FontWeight.w300,
-              letterSpacing: 0.5,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Icon and date
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                workout['icon'],
-                style: const TextStyle(fontSize: 24),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.1),
-                  ),
-                ),
-                child: Text(
-                  'Jun 4',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
-              ),
             ],
           ),
-
-          const SizedBox(height: 30),
-
-          _buildPageIndicator(),
-
-          const Spacer(),
-
-          _buildLuxuriousStartButton(workout),
-
-          const SizedBox(height: 30),
-
-          _buildElegantDurationSelector(),
-
-          const SizedBox(height: 40),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPageIndicator() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(workouts.length, (idx) {
-        final isActive = _currentPage == idx;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 6),
-          width: isActive ? 24 : 8,
-          height: 8,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
-            gradient: isActive
-                ? LinearGradient(
-              colors: [
-                workouts[_currentPage]['glowColor'],
-                workouts[_currentPage]['accentColor'],
-              ],
-            )
-                : null,
-            color: !isActive ? Colors.white.withOpacity(0.2) : null,
-            boxShadow: isActive
-                ? [
-              BoxShadow(
-                color: workouts[_currentPage]['glowColor'].withOpacity(0.5),
-                blurRadius: 10,
-                spreadRadius: 1,
-              ),
-            ]
-                : null,
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildLuxuriousStartButton(Map<String, dynamic> workout) {
-    return AnimatedBuilder(
-      animation: _glowAnimation,
-      builder: (context, child) {
-        return GestureDetector(
-          onTap: () {
-            // TODO: Navigate to workout
-          },
-          child: Container(
-            width: 180,
-            height: 180,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  Colors.white,
-                  Colors.white.withOpacity(0.95),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: workout['glowColor'].withOpacity(_glowAnimation.value * 0.6),
-                  blurRadius: 40 + (_glowAnimation.value * 20),
-                  spreadRadius: 5 + (_glowAnimation.value * 10),
-                ),
-                BoxShadow(
-                  color: workout['accentColor'].withOpacity(_glowAnimation.value * 0.3),
-                  blurRadius: 60,
-                  spreadRadius: 15,
-                ),
-                BoxShadow(
-                  color: Colors.white.withOpacity(0.1),
-                  blurRadius: 80,
-                  spreadRadius: 20,
-                ),
-              ],
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'START',
-                    style: TextStyle(
-                      color: const Color(0xFF0A0A0A),
-                      fontSize: 28,
-                      fontWeight: FontWeight.w300,
-                      letterSpacing: 3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    width: 30,
-                    height: 1,
-                    color: const Color(0xFF0A0A0A).withOpacity(0.3),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildElegantDurationSelector() {
-    return GestureDetector(
-      onTap: _showDurationPicker,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
-          borderRadius: BorderRadius.circular(25),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.15),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 20,
-              spreadRadius: -5,
-            ),
-          ],
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _selectedDuration,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w300,
-                letterSpacing: 1,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Icon(
-              Icons.expand_more,
-              color: Colors.white.withOpacity(0.7),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showDurationPicker() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (context) {
-        const options = ['5 min', '10 min', '15 min', '20 min', '30 min', '45 min'];
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                const Color(0xFF1A1A1A),
-                const Color(0xFF0A0A0A),
-              ],
-            ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Select Duration',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w300,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ...options.map((duration) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    title: Text(
-                      duration,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w300,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    onTap: () {
-                      setState(() => _selectedDuration = duration);
-                      Navigator.pop(context);
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    tileColor: Colors.white.withOpacity(0.03),
-                    trailing: _selectedDuration == duration
-                        ? Icon(
-                      Icons.check,
-                      color: workouts[_currentPage]['glowColor'],
-                    )
-                        : null,
-                  ),
-                )),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPremiumBottomNavigation() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFF0A0A0A).withOpacity(0.8),
-            const Color(0xFF0A0A0A),
-          ],
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildNavItem(Icons.home_outlined, 'Home', true),
-          _buildNavItem(Icons.emoji_events_outlined, 'Challenges', false),
-          _buildNavItem(Icons.calendar_month_outlined, 'Calendar', false),
-          _buildNavItem(Icons.person_outline, 'Profile', false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, bool isSelected) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: isSelected
-                ? LinearGradient(
-              colors: [
-                const Color(0xFF6366F1).withOpacity(0.2),
-                const Color(0xFF8B5CF6).withOpacity(0.1),
-              ],
-            )
-                : null,
-          ),
-          child: Icon(
-            icon,
-            color: isSelected ? const Color(0xFF6366F1) : Colors.white.withOpacity(0.5),
-            size: 24,
-          ),
-        ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Text(
           label,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF6366F1) : Colors.white.withOpacity(0.5),
-            fontSize: 12,
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 11,
+            letterSpacing: 1,
             fontWeight: FontWeight.w300,
-            letterSpacing: 0.5,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      width: 1,
+      height: 40,
+      color: Colors.white.withOpacity(0.08),
+    );
+  }
+
+  Widget _buildBottomSection() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(Icons.home_rounded, true),
+          _buildNavItem(Icons.calendar_today_rounded, false),
+          _buildNavItem(Icons.bar_chart_rounded, false),
+          _buildNavItem(Icons.person_outline_rounded, false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, bool isSelected) {
+    return GestureDetector(
+      onTap: () => HapticFeedback.lightImpact(),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isSelected ? Colors.white.withOpacity(0.08) : null,
+        ),
+        child: Icon(
+          icon,
+          color: isSelected ? Colors.white : Colors.white.withOpacity(0.25),
+          size: 24,
+        ),
+      ),
     );
   }
 }

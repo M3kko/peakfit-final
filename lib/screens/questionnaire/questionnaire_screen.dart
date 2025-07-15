@@ -2,7 +2,6 @@ import 'gender_page.dart';import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../weekly_plan_screen.dart';
 import 'age_page.dart';
 import 'goals_page.dart';
 import 'equipment_page.dart';

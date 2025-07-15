@@ -7,5 +7,4 @@ PeakFit TRUST
 Things to Add:
 - Come up with better tagline
 - Add in discipline for sports that have that
-- Finish Redesigning Home screen
 - Create profile + settings screen

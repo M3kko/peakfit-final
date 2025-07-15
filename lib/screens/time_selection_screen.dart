@@ -92,18 +92,27 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen>
     // Convert to minutes
     double minutes = (angle / (2 * math.pi)) * 60;
 
-    // Lock at 0 and 60 - don't allow wrapping
-    if (minutes < 0.5) {
-      minutes = 0;
-    } else if (minutes > 59.5) {
-      minutes = 60;
-    }
+    // Round to nearest 5
+    minutes = (minutes / 5).round() * 5;
 
-    // Prevent going backwards from 0 or forwards from 60
-    if (_selectedMinutes <= 1 && minutes > 55) {
-      minutes = 0;
-    } else if (_selectedMinutes >= 59 && minutes < 5) {
-      minutes = 60;
+    // Strict boundary enforcement
+    if (_selectedMinutes >= 60) {
+      // At 60, only allow backwards movement
+      if (minutes < 30 || minutes >= 60) {
+        return; // Don't update if trying to go forward from 60
+      }
+    } else if (_selectedMinutes <= 0) {
+      // At 0, only allow forward movement
+      if (minutes > 30) {
+        return; // Don't update if trying to go backward from 0
+      }
+    } else {
+      // Normal range - prevent wrapping
+      if (_selectedMinutes <= 5 && minutes > 55) {
+        minutes = 0;
+      } else if (_selectedMinutes >= 55 && minutes < 5) {
+        minutes = 60;
+      }
     }
 
     setState(() {
@@ -142,11 +151,13 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          const Spacer(flex: 2),
                           _buildTitle(),
-                          const SizedBox(height: 80),
+                          const Spacer(flex: 1),
                           _buildTimeSelector(),
-                          const SizedBox(height: 100),
+                          const Spacer(flex: 2),
                           _buildStartButton(),
+                          const SizedBox(height: 80),
                         ],
                       ),
                     ),
@@ -181,12 +192,14 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen>
 
   Widget _buildTitle() {
     return Text(
-      'How much time do you have?',
+      'How much time\ndo you have?',
+      textAlign: TextAlign.center,
       style: TextStyle(
         color: Colors.white.withOpacity(0.9),
-        fontSize: 26,
+        fontSize: 28,
         fontWeight: FontWeight.w200,
         letterSpacing: 0.5,
+        height: 1.3,
       ),
     );
   }
@@ -204,7 +217,7 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen>
               HapticFeedback.lightImpact();
             },
             onPanUpdate: (details) {
-              _updateTime(details.localPosition, const Size(320, 320));
+              _updateTime(details.localPosition, const Size(360, 360));
             },
             onPanEnd: (details) {
               setState(() => _isDragging = false);
@@ -212,19 +225,20 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen>
               HapticFeedback.mediumImpact();
             },
             child: Container(
-              width: 320,
-              height: 320,
+              width: 360,
+              height: 360,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.transparent,
               ),
               child: Stack(
                 alignment: Alignment.center,
+                clipBehavior: Clip.none, // Allow content to extend beyond bounds
                 children: [
                   // Background circle
                   Container(
-                    width: 300,
-                    height: 300,
+                    width: 320,
+                    height: 320,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
@@ -239,8 +253,8 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen>
                     animation: _glow,
                     builder: (context, child) {
                       return SizedBox(
-                        width: 300,
-                        height: 300,
+                        width: 320,
+                        height: 320,
                         child: CustomPaint(
                           painter: _CircularProgressPainter(
                             progress: _selectedMinutes / 60,
@@ -280,18 +294,20 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen>
 
                   // Drag handle
                   SizedBox(
-                    width: 300,
-                    height: 300,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final angle = (_selectedMinutes / 60) * 2 * math.pi - math.pi / 2;
-                        final radius = 150;
-                        final handleX = radius + radius * math.cos(angle);
-                        final handleY = radius + radius * math.sin(angle);
+                    width: 320,
+                    height: 320,
+                    child: Stack(
+                      clipBehavior: Clip.none, // Allow handle to extend beyond bounds
+                      children: [
+                        AnimatedBuilder(
+                          animation: Listenable.merge([_fadeIn]),
+                          builder: (context, child) {
+                            final angle = (_selectedMinutes / 60) * 2 * math.pi - math.pi / 2;
+                            final radius = 160;
+                            final handleX = radius + radius * math.cos(angle);
+                            final handleY = radius + radius * math.sin(angle);
 
-                        return Stack(
-                          children: [
-                            Positioned(
+                            return Positioned(
                               left: handleX - 15,
                               top: handleY - 15,
                               child: AnimatedContainer(
@@ -310,10 +326,10 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen>
                                   ],
                                 ),
                               ),
-                            ),
-                          ],
-                        );
-                      },
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ],

@@ -222,8 +222,10 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
             .doc(user.uid)
             .set({
           'profile': _responses,
+          'questionnaire_completed': true,
+          'completed_at': FieldValue.serverTimestamp(),
           'created_at': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
 
         Navigator.pushReplacement(
           context,

@@ -703,14 +703,13 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Spacer(flex: 2),
+                      const Spacer(flex: 1),
 
                       // Logo/Title
                       _buildLogo(),
 
-                      const SizedBox(height: 60),
+                      const SizedBox(height: 40),
 
                       // Auth Form or Verification Form
                       _showVerification
@@ -719,7 +718,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                           ? _buildPasswordResetForm()
                           : _buildAuthForm()),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
 
                       // Forgot Password (only for login)
                       if (_isLogin && !_showVerification && !_showPasswordReset)
@@ -734,12 +733,12 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                           ),
                         ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
 
                       // Toggle Login/Signup or Back button
                       if (!_showVerification && !_showPasswordReset)
                         _buildAuthToggle()
-                      else if (_showPasswordReset && _resetEmail == null || _resetEmail!.isEmpty)
+                      else if (_showPasswordReset && (_resetEmail == null || _resetEmail!.isEmpty))
                         TextButton(
                           onPressed: () {
                             setState(() {
@@ -756,12 +755,13 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                           ),
                         ),
 
-                      const Spacer(flex: 3),
+                      const Spacer(flex: 2),
 
                       // Message
-                      if (_msg.isNotEmpty) _buildMessage(),
-
-                      const SizedBox(height: 40),
+                      if (_msg.isNotEmpty) ...[
+                        _buildMessage(),
+                        const SizedBox(height: 20),
+                      ],
                     ],
                   ),
                 ),
@@ -854,7 +854,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             BlendMode.overlay,
           ),
           child: Padding(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(24),
             child: Column(
               children: [
                 _buildTextField(

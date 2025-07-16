@@ -108,24 +108,92 @@ exports.logVerificationCode = onDocumentWritten({
   const data = event.data?.after?.data();
   if (data) {
     console.log(`Verification code for ${data.email}: ${data.code}`);
+    // In production, send actual email here using SendGrid, etc.
   }
   return null;
+});
+
+// Log password reset codes
+exports.logPasswordResetCode = onDocumentWritten({
+  document: 'password_resets/{email}',
+  region: 'us-central1',
+}, async (event) => {
+  const data = event.data?.after?.data();
+  if (data) {
+    console.log(`Password reset code for ${data.email}: ${data.code}`);
+    // In production, send actual email here
+  }
+  return null;
+});
+
+// Reset password with code (requires Firebase Admin)
+exports.resetPasswordWithCode = onRequest(async (request, response) => {
+  const { email, code, newPassword } = request.body;
+  
+  if (!email || !code || !newPassword) {
+    response.status(400).json({ error: 'Missing required fields' });
+    return;
+  }
+  
+  try {
+    // Verify the reset code
+    const doc = await admin.firestore()
+      .collection('password_resets')
+      .doc(email)
+      .get();
+    
+    if (!doc.exists || doc.data().code !== code) {
+      response.status(400).json({ error: 'Invalid reset code' });
+      return;
+    }
+    
+    // Get user by email
+    const userRecord = await admin.auth().getUserByEmail(email);
+    
+    // Update password
+    await admin.auth().updateUser(userRecord.uid, {
+      password: newPassword
+    });
+    
+    // Delete the reset code
+    await admin.firestore()
+      .collection('password_resets')
+      .doc(email)
+      .delete();
+    
+    response.json({ success: true, message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Password reset error:', error);
+    response.status(500).json({ error: 'Failed to reset password' });
+  }
 });
 
 // Clean up verification codes older than 15 minutes
 exports.cleanupOldVerificationCodes = onSchedule('every 15 minutes', async (event) => {
   const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
   
-  const snapshot = await admin.firestore()
+  // Clean up verification codes
+  const verificationSnapshot = await admin.firestore()
     .collection('verifications')
     .where('created_at', '<', fifteenMinutesAgo)
     .get();
   
+  // Clean up password reset codes
+  const resetSnapshot = await admin.firestore()
+    .collection('password_resets')
+    .where('created_at', '<', fifteenMinutesAgo)
+    .get();
+  
   const batch = admin.firestore().batch();
-  snapshot.docs.forEach((doc) => {
+  
+  verificationSnapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  
+  resetSnapshot.docs.forEach((doc) => {
     batch.delete(doc.ref);
   });
   
   await batch.commit();
-  console.log(`Cleaned up ${snapshot.size} old verification codes`);
+  console.log(`Cleaned up ${verificationSnapshot.size} verification codes and ${resetSnapshot.size} password reset codes`);
 });

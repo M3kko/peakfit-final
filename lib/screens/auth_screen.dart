@@ -106,36 +106,88 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     return (100000 + random.nextInt(900000)).toString();
   }
 
-  Future<void> _sendVerificationEmail() async {
-    _actualVerificationCode = _generateVerificationCode();
+  // Custom method to show glassy error/success messages
+  void _showGlassySnackBar(String message, bool isError) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: isError
+                ? Colors.red.withOpacity(0.1)
+                : Colors.green.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isError
+                  ? Colors.red.withOpacity(0.3)
+                  : Colors.green.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isError ? Icons.error_outline : Icons.check_circle_outline,
+                color: isError ? Colors.red[300] : Colors.green[300],
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: isError ? Colors.red[300] : Colors.green[300],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: isError ? 4 : 3),
+      ),
+    );
+  }
 
-    // Store verification code in Firestore
+  Future<void> _sendVerificationEmail() async {
+    final email = _emailC.text.trim().toLowerCase();
+
+    // Delete any existing verification codes for this email
     await FirebaseFirestore.instance
         .collection('verifications')
-        .doc(_emailC.text.trim())
+        .doc(email)
+        .delete();
+
+    _actualVerificationCode = _generateVerificationCode();
+
+    // Store new verification code
+    await FirebaseFirestore.instance
+        .collection('verifications')
+        .doc(email)
         .set({
       'code': _actualVerificationCode,
       'created_at': FieldValue.serverTimestamp(),
-      'email': _emailC.text.trim(),
+      'email': email,
     });
 
     // The cloud function will log this code
     // In production, it would send an actual email
     if (mounted) {
       debugPrint('Verification code: $_actualVerificationCode');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Verification code sent to ${_emailC.text.trim()}'),
-          backgroundColor: Colors.green.withOpacity(0.8),
-        ),
-      );
+      _showGlassySnackBar('Verification code sent to $email', false);
     }
   }
 
   Future<bool> _verifyCode() async {
+    final email = _emailC.text.trim().toLowerCase();
     final doc = await FirebaseFirestore.instance
         .collection('verifications')
-        .doc(_emailC.text.trim())
+        .doc(email)
         .get();
 
     if (doc.exists) {
@@ -163,11 +215,43 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<bool> _checkEmailExists(String email) async {
+    try {
+      // Normalize email
+      final normalizedEmail = email.trim().toLowerCase();
+      // Check in the user_emails collection (more secure approach)
+      final doc = await FirebaseFirestore.instance
+          .collection('user_emails')
+          .doc(normalizedEmail)
+          .get();
+
+      return doc.exists;
+    } catch (e) {
+      print('Error checking email existence: $e');
+      // Fallback: try checking in users collection
+      try {
+        final querySnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .where('email', isEqualTo: email)
+            .limit(1)
+            .get();
+
+        return querySnapshot.docs.isNotEmpty;
+      } catch (e2) {
+        print('Fallback error checking email: $e2');
+        return false;
+      }
+    }
+  }
+
   Future<void> _authAction() async {
+    final email = _emailC.text.trim().toLowerCase();
+    final password = _passC.text.trim();
+
     if (_showVerification) {
       // Handle verification
-      if (_verificationCodeC.text.isEmpty) {
-        setState(() => _msg = 'Enter verification code');
+      if (_verificationCodeC.text.trim().isEmpty) {
+        setState(() => _msg = 'Please enter the verification code');
         return;
       }
 
@@ -176,7 +260,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       final isValid = await _verifyCode();
       if (!isValid) {
         setState(() {
-          _msg = 'Invalid verification code';
+          _msg = 'Invalid verification code. Please try again.';
           _loading = false;
         });
         return;
@@ -185,8 +269,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       // Code is valid, create account
       try {
         final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _emailC.text.trim(),
-          password: _passC.text.trim(),
+          email: email,
+          password: password,
         );
 
         // Create user document with ONLY the required fields
@@ -212,16 +296,27 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             'marketing_consent_date': _agreeToUpdates ? FieldValue.serverTimestamp() : null,
           });
 
+          // Also create entry in user_emails collection for future email lookups
+          await FirebaseFirestore.instance
+              .collection('user_emails')
+              .doc(email)
+              .set({
+            'uid': user.uid,
+            'created_at': FieldValue.serverTimestamp(),
+          });
+
           // Clean up verification code
           await FirebaseFirestore.instance
               .collection('verifications')
-              .doc(_emailC.text.trim())
+              .doc(email)
               .delete();
         }
 
-        _msg = 'Welcome to PeakFit';
+        _msg = 'Welcome to PeakFit! Let\'s set up your profile.';
+        _showGlassySnackBar('Account created successfully!', false);
 
         if (mounted) {
+          await Future.delayed(const Duration(milliseconds: 500));
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
@@ -247,15 +342,15 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         }
       } catch (e) {
         setState(() {
-          _msg = 'Error creating account';
+          _msg = 'Failed to create account. Please try again.';
           _loading = false;
         });
       }
       return;
     }
 
-    if (_emailC.text.trim().isEmpty || _passC.text.isEmpty) {
-      setState(() => _msg = 'Fill in all fields');
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _msg = 'Please fill in all fields');
       return;
     }
 
@@ -266,13 +361,23 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
     try {
       if (!_isLogin) {
-        // Sign Up - Send verification email
+        // Sign Up - Check if email already exists
         try {
-          // First check if email is already in use
-          final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(_emailC.text.trim());
+          // First check Firebase Auth
+          final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
           if (methods.isNotEmpty) {
             setState(() {
-              _msg = 'Email already registered';
+              _msg = 'This email is already registered. Please sign in instead.';
+              _loading = false;
+            });
+            return;
+          }
+
+          // Also check Firestore to be sure
+          final emailExists = await _checkEmailExists(email);
+          if (emailExists) {
+            setState(() {
+              _msg = 'This email is already registered. Please sign in instead.';
               _loading = false;
             });
             return;
@@ -288,21 +393,22 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         } catch (e) {
           print('Sign up error: $e');
           setState(() {
-            _msg = 'Error: ${e.toString()}';
+            _msg = 'An error occurred. Please try again.';
             _loading = false;
           });
         }
       } else {
         // Sign In
         final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailC.text.trim(),
-          password: _passC.text.trim(),
+          email: email,
+          password: password,
         );
 
         final isQuestionnaireCompleted = await _checkQuestionnaireStatus(credential.user!.uid);
 
         if (!isQuestionnaireCompleted) {
-          _msg = 'Please complete your profile';
+          _msg = 'Welcome back! Please complete your profile.';
+          _showGlassySnackBar('Please complete your fitness profile', false);
 
           if (mounted) {
             setState(() {});
@@ -334,7 +440,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             }
           }
         } else {
-          _msg = 'Welcome back';
+          _msg = 'Welcome back to PeakFit!';
+          _showGlassySnackBar('Signed in successfully!', false);
 
           if (mounted) {
             setState(() {});
@@ -362,21 +469,29 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
         case 'email-already-in-use':
-          _msg = 'Email already registered';
+          _msg = 'This email is already registered. Please sign in instead.';
           break;
         case 'weak-password':
-          _msg = 'Password too weak';
+          _msg = 'Password should be at least 6 characters long.';
           break;
         case 'user-not-found':
+          _msg = 'No account found with this email. Please sign up first.';
+          break;
         case 'wrong-password':
-          _msg = 'Invalid credentials';
+          _msg = 'Incorrect password. Please try again.';
+          break;
+        case 'invalid-email':
+          _msg = 'Please enter a valid email address.';
+          break;
+        case 'too-many-requests':
+          _msg = 'Too many failed attempts. Please try again later.';
           break;
         default:
-          _msg = 'Something went wrong';
+          _msg = 'An error occurred. Please try again.';
       }
     } catch (e) {
       print('Auth error: $e');
-      _msg = 'Error occurred: ${e.toString()}';
+      _msg = 'An unexpected error occurred. Please try again.';
     }
 
     if (!mounted) return;
@@ -478,17 +593,29 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
               onPressed: () async {
                 if (!codeSent) {
                   // Send reset code
-                  if (emailController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Please enter your email')),
-                    );
+                  resetEmail = emailController.text.trim();
+
+                  if (resetEmail.isEmpty) {
+                    _showGlassySnackBar('Please enter your email address', true);
                     return;
                   }
 
                   try {
-                    // Generate and store reset code
+                    // Check if email exists in the system
+                    final emailExists = await _checkEmailExists(resetEmail);
+                    if (!emailExists) {
+                      _showGlassySnackBar('No account found with this email address', true);
+                      return;
+                    }
+
+                    // Delete any existing password reset codes for this email
+                    await FirebaseFirestore.instance
+                        .collection('password_resets')
+                        .doc(resetEmail)
+                        .delete();
+
+                    // Generate and store new reset code
                     final resetCode = _generateVerificationCode();
-                    resetEmail = emailController.text.trim();
 
                     await FirebaseFirestore.instance
                         .collection('password_resets')
@@ -506,26 +633,19 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                       codeSent = true;
                     });
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Reset code sent to $resetEmail'),
-                        backgroundColor: Colors.green.withOpacity(0.8),
-                      ),
-                    );
+                    _showGlassySnackBar('Reset code sent to $resetEmail', false);
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error: ${e.toString()}'),
-                        backgroundColor: Colors.red.withOpacity(0.8),
-                      ),
-                    );
+                    _showGlassySnackBar('Failed to send reset code. Please try again.', true);
                   }
                 } else {
                   // Verify code and reset password
-                  if (codeController.text.isEmpty || newPasswordController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Please fill all fields')),
-                    );
+                  if (codeController.text.trim().isEmpty || newPasswordController.text.trim().isEmpty) {
+                    _showGlassySnackBar('Please fill in all fields', true);
+                    return;
+                  }
+
+                  if (newPasswordController.text.trim().length < 6) {
+                    _showGlassySnackBar('Password must be at least 6 characters long', true);
                     return;
                   }
 
@@ -536,8 +656,9 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                         .doc(resetEmail)
                         .get();
 
-                    if (!doc.exists || doc.data()?['code'] != codeController.text) {
-                      throw Exception('Invalid reset code');
+                    if (!doc.exists || doc.data()?['code'] != codeController.text.trim()) {
+                      _showGlassySnackBar('Invalid reset code. Please try again.', true);
+                      return;
                     }
 
                     // Call the Cloud Function to reset password
@@ -550,32 +671,28 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                           .httpsCallable('resetPasswordWithCode')
                           .call({
                         'email': resetEmail,
-                        'code': codeController.text,
-                        'newPassword': newPasswordController.text,
+                        'code': codeController.text.trim(),
+                        'newPassword': newPasswordController.text.trim(),
                       });
 
                       if (result.data['success'] == true) {
+                        // Delete the used reset code
+                        await FirebaseFirestore.instance
+                            .collection('password_resets')
+                            .doc(resetEmail)
+                            .delete();
+
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Password reset successfully!'),
-                            backgroundColor: Colors.green.withOpacity(0.8),
-                          ),
-                        );
+                        _showGlassySnackBar('Password reset successfully! You can now sign in.', false);
                       } else {
                         throw Exception('Password reset failed');
                       }
                     } catch (e) {
-                      throw Exception('Error resetting password: ${e.toString()}');
+                      throw Exception('Failed to reset password. Please try again.');
                     }
 
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error: ${e.toString()}'),
-                        backgroundColor: Colors.red.withOpacity(0.8),
-                      ),
-                    );
+                    _showGlassySnackBar(e.toString().replaceAll('Exception: ', ''), true);
                   }
                 }
               },
@@ -846,12 +963,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                 TextButton(
                   onPressed: () async {
                     await _sendVerificationEmail();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('New code sent'),
-                        backgroundColor: Colors.green.withOpacity(0.8),
-                      ),
-                    );
+                    _showGlassySnackBar('New verification code sent', false);
                   },
                   child: Text(
                     'Resend Code',
@@ -1047,11 +1159,15 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMessage() {
-    final isError = _msg.contains('wrong') ||
-        _msg.contains('Invalid') ||
-        _msg.contains('Error') ||
-        _msg.contains('weak') ||
-        _msg.contains('Fill');
+    final isError = _msg.toLowerCase().contains('error') ||
+        _msg.toLowerCase().contains('invalid') ||
+        _msg.toLowerCase().contains('incorrect') ||
+        _msg.toLowerCase().contains('failed') ||
+        _msg.toLowerCase().contains('wrong') ||
+        _msg.toLowerCase().contains('weak') ||
+        _msg.toLowerCase().contains('fill') ||
+        _msg.toLowerCase().contains('no account') ||
+        _msg.toLowerCase().contains('already');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

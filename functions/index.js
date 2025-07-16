@@ -109,3 +109,21 @@ exports.logVerificationCode = onDocumentWritten({
   }
   return null;
 });
+
+// Clean up verification codes older than 15 minutes
+exports.cleanupOldVerificationCodes = functions.pubsub.schedule('every 15 minutes').onRun(async (context) => {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    
+    const snapshot = await admin.firestore()
+      .collection('verifications')
+      .where('created_at', '<', fifteenMinutesAgo)
+      .get();
+    
+    const batch = admin.firestore().batch();
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    console.log(`Cleaned up ${snapshot.size} old verification codes`);
+  });

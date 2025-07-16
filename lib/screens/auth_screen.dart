@@ -257,13 +257,72 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
     try {
       if (!_isLogin) {
-        // Sign Up - Send verification email first
+        // Sign Up - Temporarily skip verification for testing
+        try {
+          // Create account directly
+          final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: _emailC.text.trim(),
+            password: _passC.text.trim(),
+          );
+
+          // Create user document
+          final user = credential.user;
+          if (user != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .set({
+              'email': user.email,
+              'created_at': FieldValue.serverTimestamp(),
+              'questionnaire_completed': false,
+              'email_verified': false, // Changed to false for now
+              'marketing_consent': _agreeToUpdates,
+              'marketing_consent_date': _agreeToUpdates ? FieldValue.serverTimestamp() : null,
+            });
+          }
+
+          _msg = 'Welcome to PeakFit';
+
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    QuestionnaireScreen(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  const begin = Offset(1.0, 0.0);
+                  const end = Offset.zero;
+                  const curve = Curves.easeOutExpo;
+
+                  var tween = Tween(begin: begin, end: end).chain(
+                    CurveTween(curve: curve),
+                  );
+
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: child,
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 500),
+              ),
+            );
+          }
+        } catch (e) {
+          print('Sign up error: $e');
+          setState(() {
+            _msg = 'Error: ${e.toString()}';
+            _loading = false;
+          });
+        }
+
+        /* Commented out verification for testing
         await _sendVerificationEmail();
         setState(() {
           _showVerification = true;
           _loading = false;
           _msg = 'Enter the 6-digit code sent to your email';
         });
+        */
       } else {
         // Sign In
         final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -347,7 +406,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           _msg = 'Something went wrong';
       }
     } catch (e) {
-      _msg = 'Error occurred';
+      print('Auth error: $e');
+      _msg = 'Error occurred: ${e.toString()}';
     }
 
     if (!mounted) return;

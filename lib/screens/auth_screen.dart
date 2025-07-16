@@ -644,25 +644,84 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             .delete();
 
         setState(() {
-          _loading = false;  // Stop loading
-          _msg = 'Password reset successfully!';
+          _msg = 'Password reset successfully! Signing you in...';
         });
 
-        _showGlassySnackBar('Password reset successfully! You can now sign in.', false);
+        _showGlassySnackBar('Password reset successfully!', false);
 
-        if (mounted) {
-          // Clear any snackbars before navigation
-          ScaffoldMessenger.of(context).clearSnackBars();
+        // Automatically sign in the user with their new password
+        try {
+          final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+            email: _resetEmail!,
+            password: _newPasswordC.text.trim(),
+          );
 
-          await Future.delayed(const Duration(milliseconds: 1500));
+          final isQuestionnaireCompleted = await _checkQuestionnaireStatus(credential.user!.uid);
 
           setState(() {
+            _loading = false;  // Stop loading
+          });
+
+          if (mounted) {
+            // Clear any snackbars before navigation
+            ScaffoldMessenger.of(context).clearSnackBars();
+
+            await Future.delayed(const Duration(milliseconds: 1500));
+
+            if (!isQuestionnaireCompleted) {
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        QuestionnaireScreen(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      const begin = Offset(1.0, 0.0);
+                      const end = Offset.zero;
+                      const curve = Curves.easeOutExpo;
+
+                      var tween = Tween(begin: begin, end: end).chain(
+                        CurveTween(curve: curve),
+                      );
+
+                      return SlideTransition(
+                        position: animation.drive(tween),
+                        child: child,
+                      );
+                    },
+                    transitionDuration: const Duration(milliseconds: 500),
+                  ),
+                );
+              }
+            } else {
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                    const HomeScreen(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      );
+                    },
+                    transitionDuration: const Duration(milliseconds: 600),
+                  ),
+                );
+              }
+            }
+          }
+        } catch (e) {
+          // If auto sign-in fails, go back to login
+          setState(() {
+            _loading = false;
             _showPasswordReset = false;
             _isLogin = true;
             _resetCodeC.clear();
             _newPasswordC.clear();
-            _msg = '';
-            _emailC.text = _resetEmail ?? '';  // Keep email for convenience
+            _msg = 'Password reset! Please sign in with your new password.';
+            _emailC.text = _resetEmail ?? '';
           });
         }
       } else {

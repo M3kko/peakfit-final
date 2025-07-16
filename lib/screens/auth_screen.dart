@@ -603,7 +603,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         _msg = 'Reset code sent to $email';
       });
 
-      _showGlassySnackBar('Reset code sent to $email', false);
+      // Don't show duplicate snackbar since we already have _msg
     } catch (e) {
       setState(() {
         _msg = 'Failed to send reset code. Please try again.';
@@ -643,7 +643,11 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             .doc(_resetEmail!)
             .delete();
 
-        _msg = 'Password reset successfully!';
+        setState(() {
+          _loading = false;  // Stop loading
+          _msg = 'Password reset successfully!';
+        });
+
         _showGlassySnackBar('Password reset successfully! You can now sign in.', false);
 
         if (mounted) {
@@ -658,6 +662,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             _resetCodeC.clear();
             _newPasswordC.clear();
             _msg = '';
+            _emailC.text = _resetEmail ?? '';  // Keep email for convenience
           });
         }
       } else {
@@ -1069,7 +1074,9 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                   TextButton(
                     onPressed: () async {
                       await _sendPasswordResetCode();
-                      _showGlassySnackBar('New reset code sent', false);
+                      if (mounted && _resetEmail != null && _resetEmail!.isNotEmpty) {
+                        _showGlassySnackBar('New reset code sent', false);
+                      }
                     },
                     child: Text(
                       'Resend Code',
@@ -1340,7 +1347,12 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         _msg.toLowerCase().contains('weak') ||
         _msg.toLowerCase().contains('fill') ||
         _msg.toLowerCase().contains('no account') ||
-        _msg.toLowerCase().contains('already');
+        _msg.toLowerCase().contains('already') ||
+        _msg.toLowerCase().contains('must contain') ||
+        _msg.toLowerCase().contains('at least') ||
+        _msg.toLowerCase().contains('characters') ||
+        _msg.toLowerCase().contains('uppercase') ||
+        _msg.toLowerCase().contains('symbol');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

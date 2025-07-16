@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:math';
 import 'questionnaire/questionnaire_screen.dart';
@@ -188,15 +189,23 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           password: _passC.text.trim(),
         );
 
-        // Create user document with marketing consent
+        // Create user document with ONLY the required fields
         final user = credential.user;
         if (user != null) {
+          // First, create with only required fields
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .set({
             'email': user.email,
             'created_at': FieldValue.serverTimestamp(),
+          });
+
+          // Then update with additional fields
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
             'questionnaire_completed': false,
             'email_verified': true,
             'marketing_consent': _agreeToUpdates,
@@ -257,56 +266,25 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
     try {
       if (!_isLogin) {
-        // Sign Up - Temporarily skip verification for testing
+        // Sign Up - Send verification email
         try {
-          // Create account directly
-          final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-            email: _emailC.text.trim(),
-            password: _passC.text.trim(),
-          );
-
-          // Create user document
-          final user = credential.user;
-          if (user != null) {
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .set({
-              'email': user.email,
-              'created_at': FieldValue.serverTimestamp(),
-              'questionnaire_completed': false,
-              'email_verified': false, // Changed to false for now
-              'marketing_consent': _agreeToUpdates,
-              'marketing_consent_date': _agreeToUpdates ? FieldValue.serverTimestamp() : null,
+          // First check if email is already in use
+          final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(_emailC.text.trim());
+          if (methods.isNotEmpty) {
+            setState(() {
+              _msg = 'Email already registered';
+              _loading = false;
             });
+            return;
           }
 
-          _msg = 'Welcome to PeakFit';
-
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (context, animation, secondaryAnimation) =>
-                    QuestionnaireScreen(),
-                transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                  const begin = Offset(1.0, 0.0);
-                  const end = Offset.zero;
-                  const curve = Curves.easeOutExpo;
-
-                  var tween = Tween(begin: begin, end: end).chain(
-                    CurveTween(curve: curve),
-                  );
-
-                  return SlideTransition(
-                    position: animation.drive(tween),
-                    child: child,
-                  );
-                },
-                transitionDuration: const Duration(milliseconds: 500),
-              ),
-            );
-          }
+          // Send verification email
+          await _sendVerificationEmail();
+          setState(() {
+            _showVerification = true;
+            _loading = false;
+            _msg = 'Enter the 6-digit code sent to your email';
+          });
         } catch (e) {
           print('Sign up error: $e');
           setState(() {
@@ -314,15 +292,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             _loading = false;
           });
         }
-
-        /* Commented out verification for testing
-        await _sendVerificationEmail();
-        setState(() {
-          _showVerification = true;
-          _loading = false;
-          _msg = 'Enter the 6-digit code sent to your email';
-        });
-        */
       } else {
         // Sign In
         final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -416,80 +385,207 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
   void _showForgotPasswordDialog() {
     final emailController = TextEditingController();
+    final codeController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    bool codeSent = false;
+    String resetEmail = '';
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Text(
-          'Reset Password',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Enter your email to receive a password reset link',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              style: TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Email',
-                hintStyle: TextStyle(color: Colors.white30),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            codeSent ? 'Reset Password' : 'Forgot Password',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!codeSent) ...[
+                Text(
+                  'Enter your email to receive a reset code',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Email',
+                    hintStyle: TextStyle(color: Colors.white30),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ] else ...[
+                Text(
+                  'Enter the 6-digit code sent to $resetEmail',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: codeController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  style: TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: '000000',
+                    hintStyle: TextStyle(color: Colors.white30),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: true,
+                  style: TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'New Password',
+                    hintStyle: TextStyle(color: Colors.white30),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel', style: TextStyle(color: Colors.white60)),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (!codeSent) {
+                  // Send reset code
+                  if (emailController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Please enter your email')),
+                    );
+                    return;
+                  }
+
+                  try {
+                    // Generate and store reset code
+                    final resetCode = _generateVerificationCode();
+                    resetEmail = emailController.text.trim();
+
+                    await FirebaseFirestore.instance
+                        .collection('password_resets')
+                        .doc(resetEmail)
+                        .set({
+                      'code': resetCode,
+                      'created_at': FieldValue.serverTimestamp(),
+                      'email': resetEmail,
+                    });
+
+                    // In production, send email here
+                    debugPrint('Password reset code: $resetCode');
+
+                    setDialogState(() {
+                      codeSent = true;
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Reset code sent to $resetEmail'),
+                        backgroundColor: Colors.green.withOpacity(0.8),
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString()}'),
+                        backgroundColor: Colors.red.withOpacity(0.8),
+                      ),
+                    );
+                  }
+                } else {
+                  // Verify code and reset password
+                  if (codeController.text.isEmpty || newPasswordController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Please fill all fields')),
+                    );
+                    return;
+                  }
+
+                  try {
+                    // Verify the reset code
+                    final doc = await FirebaseFirestore.instance
+                        .collection('password_resets')
+                        .doc(resetEmail)
+                        .get();
+
+                    if (!doc.exists || doc.data()?['code'] != codeController.text) {
+                      throw Exception('Invalid reset code');
+                    }
+
+                    // Call the Cloud Function to reset password
+                    try {
+                      // Get the Cloud Functions instance
+                      final functions = FirebaseFunctions.instance;
+
+                      // Call the resetPasswordWithCode function
+                      final result = await functions
+                          .httpsCallable('resetPasswordWithCode')
+                          .call({
+                        'email': resetEmail,
+                        'code': codeController.text,
+                        'newPassword': newPasswordController.text,
+                      });
+
+                      if (result.data['success'] == true) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Password reset successfully!'),
+                            backgroundColor: Colors.green.withOpacity(0.8),
+                          ),
+                        );
+                      } else {
+                        throw Exception('Password reset failed');
+                      }
+                    } catch (e) {
+                      throw Exception('Error resetting password: ${e.toString()}');
+                    }
+
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString()}'),
+                        backgroundColor: Colors.red.withOpacity(0.8),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text(
+                codeSent ? 'Reset Password' : 'Send Code',
+                style: TextStyle(color: Colors.white),
               ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Colors.white60)),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (emailController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Please enter your email')),
-                );
-                return;
-              }
-
-              try {
-                await FirebaseAuth.instance.sendPasswordResetEmail(
-                  email: emailController.text.trim(),
-                );
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Password reset email sent'),
-                    backgroundColor: Colors.green.withOpacity(0.8),
-                  ),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error sending reset email'),
-                    backgroundColor: Colors.red.withOpacity(0.8),
-                  ),
-                );
-              }
-            },
-            child: Text('Send', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
@@ -933,6 +1029,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             setState(() {
               _isLogin = !_isLogin;
               _msg = '';
+              _showVerification = false;
+              _verificationCodeC.clear();
             });
           },
           child: Text(

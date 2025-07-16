@@ -17,12 +17,16 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   final _emailC = TextEditingController();
   final _passC = TextEditingController();
   final _verificationCodeC = TextEditingController();
+  final _resetCodeC = TextEditingController();
+  final _newPasswordC = TextEditingController();
   bool _loading = false;
   String _msg = '';
   bool _isLogin = true;
   bool _showVerification = false;
+  bool _showPasswordReset = false;
   bool _agreeToUpdates = false;
   String? _actualVerificationCode;
+  String? _resetEmail;
 
   // Video controller
   late VideoPlayerController _videoController;
@@ -87,6 +91,18 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
     _fadeController.forward();
     _slideController.forward();
+
+    // Add listeners for password validation
+    _newPasswordC.addListener(() {
+      setState(() {
+        // Just trigger rebuild to update button state
+      });
+    });
+    _resetCodeC.addListener(() {
+      setState(() {
+        // Just trigger rebuild to update button state
+      });
+    });
   }
 
   @override
@@ -94,6 +110,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     _emailC.dispose();
     _passC.dispose();
     _verificationCodeC.dispose();
+    _resetCodeC.dispose();
+    _newPasswordC.dispose();
     _videoController.dispose();
     _fadeController.dispose();
     _slideController.dispose();
@@ -108,6 +126,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
   // Custom method to show glassy error/success messages
   void _showGlassySnackBar(String message, bool isError) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -149,9 +169,26 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         backgroundColor: Colors.transparent,
         elevation: 0,
         behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: isError ? 4 : 3),
+        duration: Duration(seconds: isError ? 4 : 2),
       ),
     );
+  }
+
+  bool _isPasswordValid(String password) {
+    if (password.length < 6) return false;
+    if (!password.contains(RegExp(r'[A-Z]'))) return false;
+    if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) return false;
+    return true;
+  }
+
+  String _getPasswordRequirements(String password) {
+    List<String> missing = [];
+    if (password.length < 6) missing.add('at least 6 characters');
+    if (!password.contains(RegExp(r'[A-Z]'))) missing.add('an uppercase letter');
+    if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) missing.add('a special symbol');
+
+    if (missing.isEmpty) return '';
+    return 'Password must contain ${missing.join(', ')}';
   }
 
   Future<void> _sendVerificationEmail() async {
@@ -312,11 +349,15 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
               .delete();
         }
 
-        _msg = 'Welcome to PeakFit! Let\'s set up your profile.';
-        _showGlassySnackBar('Account created successfully!', false);
+        _msg = 'Welcome to PeakFit!';
 
         if (mounted) {
-          await Future.delayed(const Duration(milliseconds: 500));
+          // Clear any snackbars before navigation
+          ScaffoldMessenger.of(context).clearSnackBars();
+
+          // Wait for animations to complete
+          await Future.delayed(const Duration(milliseconds: 1500));
+
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
@@ -408,11 +449,14 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
         if (!isQuestionnaireCompleted) {
           _msg = 'Welcome back! Please complete your profile.';
-          _showGlassySnackBar('Please complete your fitness profile', false);
 
           if (mounted) {
             setState(() {});
-            await Future.delayed(const Duration(milliseconds: 500));
+
+            // Clear any snackbars before navigation
+            ScaffoldMessenger.of(context).clearSnackBars();
+
+            await Future.delayed(const Duration(milliseconds: 1500));
 
             if (mounted) {
               Navigator.pushReplacement(
@@ -441,11 +485,14 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           }
         } else {
           _msg = 'Welcome back to PeakFit!';
-          _showGlassySnackBar('Signed in successfully!', false);
 
           if (mounted) {
             setState(() {});
-            await Future.delayed(const Duration(seconds: 1));
+
+            // Clear any snackbars before navigation
+            ScaffoldMessenger.of(context).clearSnackBars();
+
+            await Future.delayed(const Duration(milliseconds: 1500));
 
             if (mounted) {
               Navigator.pushReplacement(
@@ -499,212 +546,129 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   }
 
   void _showForgotPasswordDialog() {
-    final emailController = TextEditingController();
-    final codeController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    bool codeSent = false;
-    String resetEmail = '';
+    setState(() {
+      _showPasswordReset = true;
+      _resetEmail = '';
+      _resetCodeC.clear();
+      _newPasswordC.clear();
+      _msg = '';
+    });
+  }
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: Colors.grey[900],
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            codeSent ? 'Reset Password' : 'Forgot Password',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!codeSent) ...[
-                Text(
-                  'Enter your email to receive a reset code',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  style: TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Email',
-                    hintStyle: TextStyle(color: Colors.white30),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ] else ...[
-                Text(
-                  'Enter the 6-digit code sent to $resetEmail',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: codeController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  style: TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: '000000',
-                    hintStyle: TextStyle(color: Colors.white30),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    counterText: '',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: newPasswordController,
-                  obscureText: true,
-                  style: TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'New Password',
-                    hintStyle: TextStyle(color: Colors.white30),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: TextStyle(color: Colors.white60)),
-            ),
-            TextButton(
-              onPressed: () async {
-                if (!codeSent) {
-                  // Send reset code
-                  resetEmail = emailController.text.trim();
+  Future<void> _sendPasswordResetCode() async {
+    final email = _emailC.text.trim().toLowerCase();
 
-                  if (resetEmail.isEmpty) {
-                    _showGlassySnackBar('Please enter your email address', true);
-                    return;
-                  }
+    if (email.isEmpty) {
+      setState(() => _msg = 'Please enter your email address');
+      return;
+    }
 
-                  try {
-                    // Check if email exists in the system
-                    final emailExists = await _checkEmailExists(resetEmail);
-                    if (!emailExists) {
-                      _showGlassySnackBar('No account found with this email address', true);
-                      return;
-                    }
+    setState(() => _loading = true);
 
-                    // Delete any existing password reset codes for this email
-                    await FirebaseFirestore.instance
-                        .collection('password_resets')
-                        .doc(resetEmail)
-                        .delete();
+    try {
+      // Check if email exists in the system
+      final emailExists = await _checkEmailExists(email);
+      if (!emailExists) {
+        setState(() {
+          _msg = 'No account found with this email address';
+          _loading = false;
+        });
+        return;
+      }
 
-                    // Generate and store new reset code
-                    final resetCode = _generateVerificationCode();
+      // Delete any existing password reset codes for this email
+      await FirebaseFirestore.instance
+          .collection('password_resets')
+          .doc(email)
+          .delete();
 
-                    await FirebaseFirestore.instance
-                        .collection('password_resets')
-                        .doc(resetEmail)
-                        .set({
-                      'code': resetCode,
-                      'created_at': FieldValue.serverTimestamp(),
-                      'email': resetEmail,
-                    });
+      // Generate and store new reset code
+      final resetCode = _generateVerificationCode();
 
-                    // In production, send email here
-                    debugPrint('Password reset code: $resetCode');
+      await FirebaseFirestore.instance
+          .collection('password_resets')
+          .doc(email)
+          .set({
+        'code': resetCode,
+        'created_at': FieldValue.serverTimestamp(),
+        'email': email,
+      });
 
-                    setDialogState(() {
-                      codeSent = true;
-                    });
+      // In production, send email here
+      debugPrint('Password reset code: $resetCode');
 
-                    _showGlassySnackBar('Reset code sent to $resetEmail', false);
-                  } catch (e) {
-                    _showGlassySnackBar('Failed to send reset code. Please try again.', true);
-                  }
-                } else {
-                  // Verify code and reset password
-                  if (codeController.text.trim().isEmpty || newPasswordController.text.trim().isEmpty) {
-                    _showGlassySnackBar('Please fill in all fields', true);
-                    return;
-                  }
+      setState(() {
+        _resetEmail = email;
+        _loading = false;
+        _msg = 'Reset code sent to $email';
+      });
 
-                  if (newPasswordController.text.trim().length < 6) {
-                    _showGlassySnackBar('Password must be at least 6 characters long', true);
-                    return;
-                  }
+      _showGlassySnackBar('Reset code sent to $email', false);
+    } catch (e) {
+      setState(() {
+        _msg = 'Failed to send reset code. Please try again.';
+        _loading = false;
+      });
+    }
+  }
 
-                  try {
-                    // Verify the reset code
-                    final doc = await FirebaseFirestore.instance
-                        .collection('password_resets')
-                        .doc(resetEmail)
-                        .get();
+  Future<void> _resetPassword() async {
+    if (_resetCodeC.text.trim().isEmpty) {
+      setState(() => _msg = 'Please enter the reset code');
+      return;
+    }
 
-                    if (!doc.exists || doc.data()?['code'] != codeController.text.trim()) {
-                      _showGlassySnackBar('Invalid reset code. Please try again.', true);
-                      return;
-                    }
+    if (!_isPasswordValid(_newPasswordC.text.trim())) {
+      setState(() => _msg = _getPasswordRequirements(_newPasswordC.text.trim()));
+      return;
+    }
 
-                    // Call the Cloud Function to reset password
-                    try {
-                      // Get the Cloud Functions instance
-                      final functions = FirebaseFunctions.instance;
+    setState(() => _loading = true);
 
-                      // Call the resetPasswordWithCode function
-                      final result = await functions
-                          .httpsCallable('resetPasswordWithCode')
-                          .call({
-                        'email': resetEmail,
-                        'code': codeController.text.trim(),
-                        'newPassword': newPasswordController.text.trim(),
-                      });
+    try {
+      // Call the Cloud Function to reset password
+      final functions = FirebaseFunctions.instance;
+      final result = await functions
+          .httpsCallable('resetPasswordWithCode')
+          .call({
+        'email': _resetEmail,
+        'code': _resetCodeC.text.trim(),
+        'newPassword': _newPasswordC.text.trim(),
+      });
 
-                      if (result.data['success'] == true) {
-                        // Delete the used reset code
-                        await FirebaseFirestore.instance
-                            .collection('password_resets')
-                            .doc(resetEmail)
-                            .delete();
+      if (result.data['success'] == true) {
+        // Delete the used reset code
+        await FirebaseFirestore.instance
+            .collection('password_resets')
+            .doc(_resetEmail!)
+            .delete();
 
-                        Navigator.pop(context);
-                        _showGlassySnackBar('Password reset successfully! You can now sign in.', false);
-                      } else {
-                        throw Exception('Password reset failed');
-                      }
-                    } catch (e) {
-                      throw Exception('Failed to reset password. Please try again.');
-                    }
+        _msg = 'Password reset successfully!';
+        _showGlassySnackBar('Password reset successfully! You can now sign in.', false);
 
-                  } catch (e) {
-                    _showGlassySnackBar(e.toString().replaceAll('Exception: ', ''), true);
-                  }
-                }
-              },
-              child: Text(
-                codeSent ? 'Reset Password' : 'Send Code',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+        if (mounted) {
+          // Clear any snackbars before navigation
+          ScaffoldMessenger.of(context).clearSnackBars();
+
+          await Future.delayed(const Duration(milliseconds: 1500));
+
+          setState(() {
+            _showPasswordReset = false;
+            _isLogin = true;
+            _resetCodeC.clear();
+            _newPasswordC.clear();
+            _msg = '';
+          });
+        }
+      } else {
+        throw Exception('Password reset failed');
+      }
+    } catch (e) {
+      setState(() {
+        _msg = 'Invalid reset code or error occurred';
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -749,12 +713,16 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                       const SizedBox(height: 60),
 
                       // Auth Form or Verification Form
-                      _showVerification ? _buildVerificationForm() : _buildAuthForm(),
+                      _showVerification
+                          ? _buildVerificationForm()
+                          : (_showPasswordReset
+                          ? _buildPasswordResetForm()
+                          : _buildAuthForm()),
 
                       const SizedBox(height: 20),
 
                       // Forgot Password (only for login)
-                      if (_isLogin && !_showVerification)
+                      if (_isLogin && !_showVerification && !_showPasswordReset)
                         TextButton(
                           onPressed: _showForgotPasswordDialog,
                           child: Text(
@@ -768,8 +736,25 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
                       const SizedBox(height: 20),
 
-                      // Toggle Login/Signup
-                      if (!_showVerification) _buildAuthToggle(),
+                      // Toggle Login/Signup or Back button
+                      if (!_showVerification && !_showPasswordReset)
+                        _buildAuthToggle()
+                      else if (_showPasswordReset && _resetEmail == null || _resetEmail!.isEmpty)
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _showPasswordReset = false;
+                              _msg = '';
+                            });
+                          },
+                          child: Text(
+                            'Back to Login',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
 
                       const Spacer(flex: 3),
 
@@ -978,6 +963,194 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPasswordResetForm() {
+    final bool canResetPassword = _resetCodeC.text.trim().length == 6 &&
+        _isPasswordValid(_newPasswordC.text.trim());
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ColorFilter.mode(
+            Colors.white.withOpacity(0.1),
+            BlendMode.overlay,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.lock_reset,
+                  color: Colors.white.withOpacity(0.7),
+                  size: 48,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Reset Password',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w300,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                if (_resetEmail == null || _resetEmail!.isEmpty) ...[
+                  Text(
+                    'Enter your email to receive a reset code',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildTextField(
+                    controller: _emailC,
+                    hint: 'Email',
+                    icon: Icons.mail_outline,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 30),
+                  _buildPasswordResetButton(true),
+                ] else ...[
+                  Text(
+                    'Enter the 6-digit code sent to\n$_resetEmail',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildTextField(
+                    controller: _resetCodeC,
+                    hint: '000000',
+                    icon: Icons.lock_outline,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                  ),
+                  const SizedBox(height: 20),
+                  _buildTextField(
+                    controller: _newPasswordC,
+                    hint: 'New Password',
+                    icon: Icons.lock_outline,
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Password must contain at least 6 characters,\nan uppercase letter, and a special symbol',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.4),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildPasswordResetButton(false, canResetPassword),
+                  const SizedBox(height: 20),
+                  TextButton(
+                    onPressed: () async {
+                      await _sendPasswordResetCode();
+                      _showGlassySnackBar('New reset code sent', false);
+                    },
+                    child: Text(
+                      'Resend Code',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordResetButton(bool isSendCode, [bool enabled = true]) {
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: enabled ? [
+              BoxShadow(
+                color: Colors.white.withOpacity(_glowAnimation.value),
+                blurRadius: 20,
+                spreadRadius: 2,
+              ),
+            ] : [],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _loading ? null : () {
+                if (isSendCode) {
+                  _sendPasswordResetCode();
+                } else {
+                  if (!enabled) {
+                    setState(() => _msg = _getPasswordRequirements(_newPasswordC.text.trim()));
+                  } else {
+                    _resetPassword();
+                  }
+                }
+              },
+              borderRadius: BorderRadius.circular(15),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: enabled ? [
+                      Colors.white.withOpacity(0.9),
+                      Colors.white.withOpacity(0.7),
+                    ] : [
+                      Colors.white.withOpacity(0.3),
+                      Colors.white.withOpacity(0.2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Center(
+                  child: Text(
+                    isSendCode ? 'SEND RESET CODE' : 'RESET PASSWORD',
+                    style: TextStyle(
+                      color: enabled ? Colors.black : Colors.black.withOpacity(0.5),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

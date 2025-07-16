@@ -30,11 +30,12 @@ exports.syncMarketingConsent = onDocumentWritten({ document: 'users/{uid}', regi
   const after = e.data?.after?.data();
   const before = e.data?.before?.data();
   if (!after?.email || after.marketing_consent === before?.marketing_consent) return null;
+  
   const table = supabase.from('marketing_subscribers');
   try {
     if (after.marketing_consent) {
       const { error } = await table.upsert({
-        email: after.email,
+        email: after.email.trim().toLowerCase(),
         firebase_uid: e.params.uid,
         status: 'active',
         source: 'peakfit_app',
@@ -45,7 +46,7 @@ exports.syncMarketingConsent = onDocumentWritten({ document: 'users/{uid}', regi
       const { error } = await table.update({
         status: 'unsubscribed',
         unsubscribed_at: new Date().toISOString(),
-      }).eq('email', after.email);
+      }).eq('email', after.email.trim().toLowerCase());
       if (error) throw error;
     }
   } catch (err) {
@@ -68,18 +69,70 @@ exports.logPasswordResetCode = onDocumentWritten({ document: 'password_resets/{e
 
 exports.resetPasswordWithCode = onCall({ region: 'us-central1' }, async (req) => {
   const { email, code, newPassword } = req.data || {};
-  if (!email || !code || !newPassword) throw new HttpsError('invalid-argument', 'Missing fields');
+  
+  if (!email || !code || !newPassword) {
+    throw new HttpsError('invalid-argument', 'Missing required fields');
+  }
+  
+  // Normalize email (trim and lowercase)
+  const normalizedEmail = email.trim().toLowerCase();
+  
   try {
-    const snap = await admin.firestore().collection('password_resets').doc(email).get();
-    if (!snap.exists || snap.data().code !== code) throw new HttpsError('permission-denied', 'Bad code');
-    const user = await admin.auth().getUserByEmail(email);
+    // Check if the reset code is valid
+    const snap = await admin.firestore().collection('password_resets').doc(normalizedEmail).get();
+    
+    if (!snap.exists) {
+      throw new HttpsError('not-found', 'No password reset request found for this email');
+    }
+    
+    if (snap.data().code !== code.trim()) {
+      throw new HttpsError('permission-denied', 'Invalid reset code');
+    }
+    
+    // Try to get the user by email
+    let user;
+    try {
+      user = await admin.auth().getUserByEmail(normalizedEmail);
+    } catch (authError) {
+      console.error('Error getting user by email:', authError);
+      
+      // If user not found by email, try to find them in Firestore
+      const usersSnapshot = await admin.firestore()
+        .collection('users')
+        .where('email', '==', normalizedEmail)
+        .limit(1)
+        .get();
+      
+      if (usersSnapshot.empty) {
+        throw new HttpsError('not-found', 'No user account found with this email address');
+      }
+      
+      // Get the user ID from Firestore and try again
+      const userId = usersSnapshot.docs[0].id;
+      try {
+        user = await admin.auth().getUser(userId);
+      } catch (e) {
+        throw new HttpsError('not-found', 'User account not found in authentication system');
+      }
+    }
+    
+    // Update the user's password
     await admin.auth().updateUser(user.uid, { password: newPassword });
+    
+    // Delete the reset code
     await snap.ref.delete();
+    
+    console.log(`Password reset successful for user: ${normalizedEmail}`);
     return { success: true };
+    
   } catch (err) {
-    console.error('Reset error', err);
-    if (err instanceof HttpsError) throw err;
-    throw new HttpsError('internal', 'Reset failed');
+    console.error('Password reset error:', err);
+    
+    if (err instanceof HttpsError) {
+      throw err;
+    }
+    
+    throw new HttpsError('internal', 'Failed to reset password. Please try again.');
   }
 });
 
@@ -91,4 +144,5 @@ exports.cleanupOldVerificationCodes = onSchedule({ schedule: 'every 15 minutes',
   const batch = db.batch();
   [...v.docs, ...r.docs].forEach((doc) => batch.delete(doc.ref));
   await batch.commit();
+  console.log(`Cleaned up ${v.size + r.size} expired codes`);
 });

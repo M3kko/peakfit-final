@@ -13,3 +13,4 @@ Things to Add:
 - Make Error consistent and informative
 - Have it send email 
 - Fix supabase
+- dont allow duplicate emails in sign up

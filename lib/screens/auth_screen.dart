@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:video_player/video_player.dart';
 import 'questionnaire/questionnaire_screen.dart';
 import 'home_screen.dart';
@@ -93,6 +94,24 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  Future<bool> _checkQuestionnaireStatus(String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data();
+        return data?['questionnaire_completed'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('Error checking questionnaire status: $e');
+      return false;
+    }
+  }
+
   Future<void> _authAction() async {
     if (_emailC.text.trim().isEmpty || _passC.text.isEmpty) {
       setState(() => _msg = 'Fill in all fields');
@@ -111,6 +130,20 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           email: _emailC.text.trim(),
           password: _passC.text.trim(),
         );
+
+        // Create initial user document
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+            'email': user.email,
+            'created_at': FieldValue.serverTimestamp(),
+            'questionnaire_completed': false,
+          });
+        }
+
         _msg = 'Welcome to PeakFit';
 
         if (mounted) {
@@ -138,35 +171,77 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           );
         }
       } else {
-        // Sign In - Navigate to Home Screen
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
+        // Sign In - Check questionnaire status before navigating
+        final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailC.text.trim(),
           password: _passC.text.trim(),
         );
-        _msg = 'Welcome back';
 
-        // Show welcome message for 1 second before navigating
-        if (mounted) {
-          setState(() {});
+        // Check if questionnaire is completed
+        final isQuestionnaireCompleted = await _checkQuestionnaireStatus(credential.user!.uid);
 
-          // Wait 1 second
-          await Future.delayed(const Duration(seconds: 1));
+        if (!isQuestionnaireCompleted) {
+          // Questionnaire not completed, redirect to questionnaire
+          _msg = 'Please complete your profile';
 
           if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (context, animation, secondaryAnimation) =>
-                const HomeScreen(),
-                transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: child,
-                  );
-                },
-                transitionDuration: const Duration(milliseconds: 600),
-              ),
-            );
+            setState(() {});
+
+            // Wait briefly to show message
+            await Future.delayed(const Duration(milliseconds: 500));
+
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      QuestionnaireScreen(),
+                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    const begin = Offset(1.0, 0.0);
+                    const end = Offset.zero;
+                    const curve = Curves.easeOutExpo;
+
+                    var tween = Tween(begin: begin, end: end).chain(
+                      CurveTween(curve: curve),
+                    );
+
+                    return SlideTransition(
+                      position: animation.drive(tween),
+                      child: child,
+                    );
+                  },
+                  transitionDuration: const Duration(milliseconds: 500),
+                ),
+              );
+            }
+          }
+        } else {
+          // Questionnaire completed, go to home
+          _msg = 'Welcome back';
+
+          // Show welcome message for 1 second before navigating
+          if (mounted) {
+            setState(() {});
+
+            // Wait 1 second
+            await Future.delayed(const Duration(seconds: 1));
+
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                  const HomeScreen(),
+                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    );
+                  },
+                  transitionDuration: const Duration(milliseconds: 600),
+                ),
+              );
+            }
           }
         }
       }

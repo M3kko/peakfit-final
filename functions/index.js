@@ -1,9 +1,11 @@
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { onRequest } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { createClient } = require('@supabase/supabase-js');
 const functions = require('firebase-functions');
+const admin = require('firebase-admin');
 
 // Initialize Firebase Admin
 initializeApp();
@@ -111,19 +113,19 @@ exports.logVerificationCode = onDocumentWritten({
 });
 
 // Clean up verification codes older than 15 minutes
-exports.cleanupOldVerificationCodes = functions.pubsub.schedule('every 15 minutes').onRun(async (context) => {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    
-    const snapshot = await admin.firestore()
-      .collection('verifications')
-      .where('created_at', '<', fifteenMinutesAgo)
-      .get();
-    
-    const batch = admin.firestore().batch();
-    snapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-    
-    await batch.commit();
-    console.log(`Cleaned up ${snapshot.size} old verification codes`);
+exports.cleanupOldVerificationCodes = onSchedule('every 15 minutes', async (event) => {
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+  
+  const snapshot = await admin.firestore()
+    .collection('verifications')
+    .where('created_at', '<', fifteenMinutesAgo)
+    .get();
+  
+  const batch = admin.firestore().batch();
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
   });
+  
+  await batch.commit();
+  console.log(`Cleaned up ${snapshot.size} old verification codes`);
+});

@@ -91,7 +91,7 @@ exports.syncMarketingConsent = onDocumentWritten({
   return null;
 });
 
-exports.sendVerificationCode = onDocumentWritten({
+exports.onVerificationCodeCreated = onDocumentWritten({
   document: 'verifications/{email}',
   region: 'us-central1'
 }, async (event) => {
@@ -140,7 +140,7 @@ exports.sendVerificationCode = onDocumentWritten({
   return null;
 });
 
-exports.sendPasswordResetCode = onDocumentWritten({
+exports.onPasswordResetCodeCreated = onDocumentWritten({
   document: 'password_resets/{email}',
   region: 'us-central1'
 }, async (event) => {

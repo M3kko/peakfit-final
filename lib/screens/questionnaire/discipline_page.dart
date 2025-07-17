@@ -293,11 +293,11 @@ class _DisciplinePageState extends State<DisciplinePage> with TickerProviderStat
   Color _getGenderColor(String? gender) {
     switch (gender) {
       case 'Men':
-        return const Color(0xFFFFD700); // Luxurious gold
+        return const Color(0xFFD4AF37); // Darker, more luxurious gold
       case 'Women':
-        return const Color(0xFFFFD700); // Luxurious gold
+        return const Color(0xFFD4AF37); // Darker, more luxurious gold
       case 'Mixed':
-        return const Color(0xFFFFD700); // Luxurious gold
+        return const Color(0xFFD4AF37); // Darker, more luxurious gold
       default:
         return Colors.white;
     }

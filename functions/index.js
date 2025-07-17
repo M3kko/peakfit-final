@@ -190,7 +190,7 @@ exports.sendVerificationCode = onDocumentWritten({
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'PeakFit <noreply@yourverifieddomain.com>', // Replace with your verified domain
+      from: 'PeakFit <noreply.peakfit.ai', // Replace with your verified domain
       to: [d.email],
       subject: 'Your PeakFit Verification Code',
       html: `
@@ -236,7 +236,7 @@ exports.sendPasswordResetCode = onDocumentWritten({
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'PeakFit <noreply@yourverifieddomain.com>', // Replace with your verified domain
+      from: 'PeakFit <noreply.peakfit.ai', // Replace with your verified domain
       to: [d.email],
       subject: 'Reset Your PeakFit Password',
       html: `

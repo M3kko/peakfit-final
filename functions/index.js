@@ -168,3 +168,103 @@ exports.cleanupOldVerificationCodes = onSchedule({ schedule: 'every 15 minutes',
   await batch.commit();
   console.log(`Cleaned up ${v.size + r.size} expired codes`);
 });
+
+const { Resend } = require('resend');
+
+// Initialize Resend
+let resend = null;
+if (functions.config().resend?.key) {
+  resend = new Resend(functions.config().resend.key);
+}
+
+// Updated verification code function
+exports.sendVerificationCode = onDocumentWritten({ 
+  document: 'verifications/{email}', 
+  region: 'us-central1' 
+}, async (evt) => {
+  const d = evt.data?.after?.data();
+  if (!d || !resend) {
+    console.log(`Verification code ${d?.code} for ${d?.email} (Resend not configured)`);
+    return null;
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'PeakFit <noreply@yourverifieddomain.com>', // Replace with your verified domain
+      to: [d.email],
+      subject: 'Your PeakFit Verification Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 2px;">PEAKFIT</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Elite Fitness Awaits</p>
+          </div>
+          <div style="background: white; padding: 40px; border: 1px solid #e0e0e0; border-top: none;">
+            <h2 style="color: #333; margin-bottom: 20px;">Verify Your Email</h2>
+            <p style="color: #666; line-height: 1.6;">Your verification code is:</p>
+            <div style="background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0;">
+              <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #495057;">${d.code}</div>
+            </div>
+            <p style="color: #666; line-height: 1.6;">This code will expire in 15 minutes.</p>
+          </div>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('Failed to send verification email:', error);
+    } else {
+      console.log('Verification email sent:', data);
+    }
+  } catch (err) {
+    console.error('Resend error:', err);
+  }
+
+  return null;
+});
+
+// Updated password reset function
+exports.sendPasswordResetCode = onDocumentWritten({ 
+  document: 'password_resets/{email}', 
+  region: 'us-central1' 
+}, async (evt) => {
+  const d = evt.data?.after?.data();
+  if (!d || !resend) {
+    console.log(`Password reset code ${d?.code} for ${d?.email} (Resend not configured)`);
+    return null;
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'PeakFit <noreply@yourverifieddomain.com>', // Replace with your verified domain
+      to: [d.email],
+      subject: 'Reset Your PeakFit Password',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 2px;">PEAKFIT</h1>
+          </div>
+          <div style="background: white; padding: 40px; border: 1px solid #e0e0e0; border-top: none;">
+            <h2 style="color: #333; margin-bottom: 20px;">Password Reset</h2>
+            <p style="color: #666; line-height: 1.6;">Your password reset code is:</p>
+            <div style="background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0;">
+              <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #495057;">${d.code}</div>
+            </div>
+            <p style="color: #666; line-height: 1.6;">This code will expire in 15 minutes.</p>
+            <p style="color: #999; font-size: 14px; margin-top: 30px;">If you didn't request this, please ignore this email.</p>
+          </div>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('Failed to send password reset email:', error);
+    } else {
+      console.log('Password reset email sent:', data);
+    }
+  } catch (err) {
+    console.error('Resend error:', err);
+  }
+
+  return null;
+});

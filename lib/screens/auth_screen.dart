@@ -647,7 +647,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           _msg = 'Password reset successfully! Signing you in...';
         });
 
-        _showGlassySnackBar('Password reset successfully!', false);
+        // Don't show snackbar here since we already have _msg
 
         // Automatically sign in the user with their new password
         try {

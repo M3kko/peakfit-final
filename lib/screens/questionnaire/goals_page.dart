@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'sport_goals_data.dart';
 
 class GoalsPage extends StatefulWidget {
-  final Function(List<String>) onSelected;
-  final List<String>? selectedValue;
+  final Function(List<Map<String, dynamic>>) onSelected;
+  final List<Map<String, dynamic>>? selectedValue;
   final VoidCallback? onMaxGoalsExceeded;
+  final String selectedSport;
+  final List<Map<String, String>> selectedDisciplines;
 
   const GoalsPage({
     Key? key,
     required this.onSelected,
     this.selectedValue,
     this.onMaxGoalsExceeded,
+    required this.selectedSport,
+    required this.selectedDisciplines,
   }) : super(key: key);
 
   @override
@@ -18,55 +23,22 @@ class GoalsPage extends StatefulWidget {
 }
 
 class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
-  late List<String> selected;
+  late List<Map<String, dynamic>> selected;
   late List<AnimationController> _animationControllers;
   late List<Animation<double>> _animations;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  final List<Map<String, dynamic>> goals = [
-    {
-      'title': 'Increase Vertical Jump',
-      'icon': '🚀',
-      'description': 'Jump higher, reach further',
-      'gradient': [const Color(0xFF1A1A1A), const Color(0xFF2D2D2D)],
-    },
-    {
-      'title': 'Improve Agility/Speed',
-      'icon': '⚡',
-      'description': 'Move faster, react quicker',
-      'gradient': [const Color(0xFF1A1A1A), const Color(0xFF2D2D2D)],
-    },
-    {
-      'title': 'Build Sport-Specific Strength',
-      'icon': '💪',
-      'description': 'Targeted muscle development',
-      'gradient': [const Color(0xFF1A1A1A), const Color(0xFF2D2D2D)],
-    },
-    {
-      'title': 'Enhance Flexibility/Mobility',
-      'icon': '🧘',
-      'description': 'Greater range of motion',
-      'gradient': [const Color(0xFF1A1A1A), const Color(0xFF2D2D2D)],
-    },
-    {
-      'title': 'Improve Endurance/Stamina',
-      'icon': '🏃',
-      'description': 'Last longer, go further',
-      'gradient': [const Color(0xFF1A1A1A), const Color(0xFF2D2D2D)],
-    },
-    {
-      'title': 'Develop Power/Explosiveness',
-      'icon': '💥',
-      'description': 'Maximum force output',
-      'gradient': [const Color(0xFF1A1A1A), const Color(0xFF2D2D2D)],
-    },
-  ];
+  List<Map<String, dynamic>> sportSpecificGoals = [];
+  List<Map<String, dynamic>> generalGoals = [];
 
   @override
   void initState() {
     super.initState();
     selected = widget.selectedValue ?? [];
+
+    // Get sport-specific goals based on selected disciplines
+    _loadGoals();
 
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 600),
@@ -81,10 +53,11 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       curve: Curves.easeIn,
     ));
 
+    int totalGoals = sportSpecificGoals.length + generalGoals.length + 2; // +2 for section headers
     _animationControllers = List.generate(
-      goals.length,
+      totalGoals,
           (index) => AnimationController(
-        duration: Duration(milliseconds: 300 + (index * 100)),
+        duration: Duration(milliseconds: 300 + (index * 50)),
         vsync: this,
       ),
     );
@@ -103,6 +76,29 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     });
   }
 
+  void _loadGoals() {
+    // Get sport-specific goals for each selected discipline
+    Set<Map<String, dynamic>> uniqueSportGoals = {};
+
+    for (var discipline in widget.selectedDisciplines) {
+      String disciplineName = discipline['name'] ?? '';
+      String gender = discipline['gender'] ?? '';
+
+      // Try to get goals by the full discipline name first
+      var goals = SportGoals.getGoalsForDiscipline(widget.selectedSport, disciplineName);
+
+      // If no goals found and discipline has gender, try by gender
+      if (goals.isEmpty && gender.isNotEmpty && gender != 'Mixed') {
+        goals = SportGoals.getGoalsForDiscipline(widget.selectedSport, gender);
+      }
+
+      uniqueSportGoals.addAll(goals);
+    }
+
+    sportSpecificGoals = uniqueSportGoals.toList();
+    generalGoals = SportGoals.generalGoals;
+  }
+
   @override
   void dispose() {
     _fadeController.dispose();
@@ -112,10 +108,16 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void _toggleGoal(String goal) {
+  void _toggleGoal(Map<String, dynamic> goal) {
     setState(() {
-      if (selected.contains(goal)) {
-        selected.remove(goal);
+      bool isSelected = selected.any((g) =>
+      g['title'] == goal['title'] && g['icon'] == goal['icon']
+      );
+
+      if (isSelected) {
+        selected.removeWhere((g) =>
+        g['title'] == goal['title'] && g['icon'] == goal['icon']
+        );
       } else if (selected.length < 3) {
         selected.add(goal);
       } else {
@@ -133,19 +135,20 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       child: FadeTransition(
         opacity: _fadeAnimation,
         child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-            top: 20,  // Fixed: Changed from MediaQuery.of(context).padding.top + 100
+          padding: const EdgeInsets.only(
+            top: 20,
             bottom: 120,
             left: 24,
             right: 24,
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Description paragraph
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'Select up to 3 training goals. Every 6 weeks, you\'ll be prompted to review and adjust these goals, allowing PeakFit to continuously optimize your workouts. You can also update them anytime in settings.',
+                  'Select up to 3 training goals. Choose from sport-specific goals tailored to your ${widget.selectedSport} disciplines, or general fitness goals. You can update these anytime.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -157,62 +160,53 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
                 ),
               ),
 
-              const SizedBox(height: 24),  // Consistent spacing
+              const SizedBox(height: 24),
 
               // Selection indicator
-              Column(
-                children: [
-                  Text(
-                    '${selected.length}/3 goals selected',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.6),
-                      fontWeight: FontWeight.w300,
-                      letterSpacing: 1,
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      '${selected.length}/3 goals selected',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.6),
+                        fontWeight: FontWeight.w300,
+                        letterSpacing: 1,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(3, (index) {
-                      final isFilled = index < selected.length;
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isFilled
-                              ? Colors.white.withOpacity(0.8)
-                              : Colors.transparent,
-                          border: Border.all(
-                            color: Colors.white.withOpacity(isFilled ? 0.8 : 0.3),
-                            width: 1.5,
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(3, (index) {
+                        final isFilled = index < selected.length;
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isFilled
+                                ? const Color(0xFFD4AF37).withOpacity(0.8)
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: isFilled
+                                  ? const Color(0xFFD4AF37).withOpacity(0.8)
+                                  : Colors.white.withOpacity(0.3),
+                              width: 1.5,
+                            ),
                           ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
+                        );
+                      }),
+                    ),
+                  ],
+                ),
               ),
 
-              const SizedBox(height: 30),  // Consistent spacing
+              const SizedBox(height: 30),
 
-              // Goals list
-              ...List.generate(goals.length, (index) {
-                final goal = goals[index];
-                final isSelected = selected.contains(goal['title']);
-
-                return AnimatedBuilder(
-                  animation: _animations[index],
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _animations[index].value,
-                      child: _buildGoalCard(goal, isSelected),
-                    );
-                  },
-                );
-              }),
+              // Build the goals list with sections
+              ..._buildGoalsList(),
             ],
           ),
         ),
@@ -220,58 +214,159 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildGoalCard(Map<String, dynamic> goal, bool isSelected) {
+  List<Widget> _buildGoalsList() {
+    List<Widget> widgets = [];
+    int animationIndex = 0;
+
+    // Sport-specific section
+    if (sportSpecificGoals.isNotEmpty) {
+      widgets.add(
+        AnimatedBuilder(
+          animation: _animations[animationIndex++],
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _animations[animationIndex - 1].value,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16, left: 4),
+                child: Text(
+                  'SPORT SPECIFIC',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFD4AF37),
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+
+      for (var goal in sportSpecificGoals) {
+        final isSelected = selected.any((g) =>
+        g['title'] == goal['title'] && g['icon'] == goal['icon']
+        );
+
+        widgets.add(
+          AnimatedBuilder(
+            animation: _animations[animationIndex++],
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _animations[animationIndex - 1].value,
+                child: _buildGoalCard(goal, isSelected, true),
+              );
+            },
+          ),
+        );
+      }
+
+      widgets.add(const SizedBox(height: 24));
+    }
+
+    // General fitness section
+    widgets.add(
+      AnimatedBuilder(
+        animation: _animations[animationIndex++],
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _animations[animationIndex - 1].value,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16, left: 4),
+              child: Text(
+                'OTHER',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withOpacity(0.6),
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    for (var goal in generalGoals) {
+      final isSelected = selected.any((g) =>
+      g['title'] == goal['title'] && g['icon'] == goal['icon']
+      );
+
+      widgets.add(
+        AnimatedBuilder(
+          animation: _animations[animationIndex++],
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _animations[animationIndex - 1].value,
+              child: _buildGoalCard(goal, isSelected, false),
+            );
+          },
+        ),
+      );
+    }
+
+    return widgets;
+  }
+
+  Widget _buildGoalCard(Map<String, dynamic> goal, bool isSelected, bool isSportSpecific) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
-        onTap: () => _toggleGoal(goal['title']),
+        onTap: () => _toggleGoal(goal),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: isSelected
                 ? LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: goal['gradient'],
+              colors: [const Color(0xFF1A1A1A), const Color(0xFF2D2D2D)],
             )
                 : null,
             color: !isSelected ? Colors.white.withOpacity(0.05) : null,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(15),
             border: Border.all(
               color: isSelected
-                  ? Colors.white.withOpacity(0.3)
+                  ? isSportSpecific
+                  ? const Color(0xFFD4AF37).withOpacity(0.4)
+                  : Colors.white.withOpacity(0.3)
                   : Colors.white.withOpacity(0.1),
               width: isSelected ? 2 : 1,
             ),
-            boxShadow: isSelected ? [
+            boxShadow: isSelected
+                ? [
               BoxShadow(
-                color: Colors.white.withOpacity(0.2),
+                color: isSportSpecific
+                    ? const Color(0xFFD4AF37).withOpacity(0.2)
+                    : Colors.white.withOpacity(0.2),
                 blurRadius: 20,
                 spreadRadius: -5,
               ),
-            ] : [],
+            ]
+                : [],
           ),
           child: Row(
             children: [
               // Icon container
               Container(
-                width: 56,
-                height: 56,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Colors.white.withOpacity(0.2)
+                      ? Colors.white.withOpacity(0.15)
                       : Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
                   child: Text(
                     goal['icon'],
-                    style: const TextStyle(fontSize: 28),
+                    style: const TextStyle(fontSize: 24),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
 
               // Text content
               Expanded(
@@ -281,18 +376,18 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
                     Text(
                       goal['title'],
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: 15,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: Colors.white,
+                        color: Colors.white.withOpacity(isSelected ? 1 : 0.85),
                         height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       goal['description'],
                       style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.5),
                         fontWeight: FontWeight.w300,
                       ),
                     ),
@@ -303,25 +398,25 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
               // Checkbox
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                width: 28,
-                height: 28,
+                width: 24,
+                height: 24,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: isSelected
-                      ? Colors.white.withOpacity(0.2)
+                      ? Colors.white.withOpacity(0.15)
                       : Colors.transparent,
                   border: Border.all(
                     color: isSelected
-                        ? Colors.white.withOpacity(0.4)
-                        : Colors.white.withOpacity(0.3),
-                    width: 2,
+                        ? Colors.white.withOpacity(0.3)
+                        : Colors.white.withOpacity(0.2),
+                    width: 1.5,
                   ),
                 ),
                 child: isSelected
                     ? const Icon(
                   Icons.check,
                   color: Colors.white,
-                  size: 16,
+                  size: 14,
                 )
                     : null,
               ),

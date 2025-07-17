@@ -26,34 +26,56 @@ exports.helloWorld = onRequest({ region: 'us-central1' }, (req, res) => {
 });
 
 exports.syncMarketingConsent = onDocumentWritten({ document: 'users/{uid}', region: 'us-central1' }, async (e) => {
-  if (!supabase) return null;
-  const after = e.data?.after?.data();
-  const before = e.data?.before?.data();
-  if (!after?.email || after.marketing_consent === before?.marketing_consent) return null;
+    if (!supabase) return null;
+    const after = e.data?.after?.data();
+    const before = e.data?.before?.data();
+    if (!after?.email) return null;
+    
+    try {
+      // Check if we need to create or update the record
+      const { data: existing } = await supabase
+        .from('users_email')
+        .select('id')
+        .eq('email', after.email.trim().toLowerCase())
+        .single();
   
-  const table = supabase.from('marketing_subscribers');
-  try {
-    if (after.marketing_consent) {
-      const { error } = await table.upsert({
-        email: after.email.trim().toLowerCase(),
-        firebase_uid: e.params.uid,
-        status: 'active',
-        source: 'peakfit_app',
-        subscribed_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
-      if (error) throw error;
-    } else {
-      const { error } = await table.update({
-        status: 'unsubscribed',
-        unsubscribed_at: new Date().toISOString(),
-      }).eq('email', after.email.trim().toLowerCase());
-      if (error) throw error;
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from('users_email')
+          .update({
+            firebase_uid: e.params.uid,
+            marketing_consent: after.marketing_consent || false,
+            marketing_consent_date: after.marketing_consent ? new Date().toISOString() : null,
+            email_type: after.marketing_consent ? 'both' : 'user',
+            status: 'active',
+            email_verified: after.email_verified || false,
+          })
+          .eq('email', after.email.trim().toLowerCase());
+        
+        if (error) throw error;
+      } else {
+        // Create new record
+        const { error } = await supabase
+          .from('users_email')
+          .insert({
+            email: after.email.trim().toLowerCase(),
+            firebase_uid: e.params.uid,
+            marketing_consent: after.marketing_consent || false,
+            marketing_consent_date: after.marketing_consent ? new Date().toISOString() : null,
+            email_type: after.marketing_consent ? 'both' : 'user',
+            status: 'active',
+            source: 'peakfit_app',
+            email_verified: after.email_verified || false,
+          });
+        
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Supabase sync error', JSON.stringify(err));
     }
-  } catch (err) {
-    console.error('Supabase sync error', JSON.stringify(err));
-  }
-  return null;
-});
+    return null;
+  });
 
 exports.logVerificationCode = onDocumentWritten({ document: 'verifications/{email}', region: 'us-central1' }, (evt) => {
   const d = evt.data?.after?.data();

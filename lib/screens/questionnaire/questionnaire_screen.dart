@@ -173,6 +173,19 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
 
   void _previousPage() {
     if (_currentPage > 0) {
+      // Clear disciplines if going back from discipline page
+      if (_currentPage == 2) {
+        setState(() {
+          _responses.remove('disciplines');
+        });
+      }
+      // Clear goals if going back from goals page
+      if (_currentPage == 3) {
+        setState(() {
+          _responses.remove('goals');
+        });
+      }
+
       _pageController.previousPage(
         duration: Duration(milliseconds: 400),
         curve: Curves.easeInOut,

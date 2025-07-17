@@ -147,7 +147,7 @@ class _DisciplinePageState extends State<DisciplinePage> with TickerProviderStat
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'Select your discipline(s) in ${widget.selectedSport}. Choose all that apply to receive training tailored to your specific needs. Note: You can select multiple disciplines, but they must be from the same gender category.',
+                  'Select your discipline(s) in ${widget.selectedSport}. Choose all that apply to receive training tailored to your specific needs.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,

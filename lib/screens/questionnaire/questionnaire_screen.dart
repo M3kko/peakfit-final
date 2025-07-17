@@ -1,4 +1,4 @@
-import 'gender_page.dart';
+import 'discipline_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -39,8 +39,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
 
   final List<String> _pageNames = [
     'AGE',
-    'GENDER',
     'SPORT',
+    'DISCIPLINE',
     'GOALS',
     'EQUIPMENT',
     'INJURIES',
@@ -113,10 +113,10 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
     switch (_currentPage) {
       case 0: // Age page
         return _responses['age'] != null && _responses['age'].isNotEmpty;
-      case 1: // Gender page
-        return _responses['gender'] != null && _responses['gender'].isNotEmpty;
-      case 2: // Sport page
+      case 1: // Sport page
         return _responses['sport'] != null && _responses['sport'].isNotEmpty;
+      case 2: // Discipline page
+        return _responses['disciplines'] != null && (_responses['disciplines'] as List).isNotEmpty;
       case 3: // Goals page
         return _responses['goals'] != null && (_responses['goals'] as List).isNotEmpty;
       case 4: // Equipment page
@@ -137,9 +137,9 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
       case 0:
         return 'Please select your age';
       case 1:
-        return 'Please select your gender';
-      case 2:
         return 'Please select your sport';
+      case 2:
+        return 'Please select at least one discipline';
       case 3:
         return 'Please select at least one goal';
       case 4:
@@ -213,15 +213,35 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
     _showValidationError('Maximum 3 goals can be selected');
   }
 
+  void _showGenderConflictError() {
+    _showValidationError('Please select disciplines from the same gender category only');
+  }
+
   Future<void> _submitQuestionnaire() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        // Extract gender from selected disciplines
+        String? gender;
+        if (_responses['disciplines'] != null && (_responses['disciplines'] as List).isNotEmpty) {
+          final disciplines = _responses['disciplines'] as List<Map<String, String>>;
+          // Get the first non-mixed gender
+          for (var discipline in disciplines) {
+            if (discipline['gender'] != 'Mixed') {
+              gender = discipline['gender'];
+              break;
+            }
+          }
+        }
+
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .set({
-          'profile': _responses,
+          'profile': {
+            ..._responses,
+            'gender': gender, // Add extracted gender
+          },
           'questionnaire_completed': true,
           'completed_at': FieldValue.serverTimestamp(),
           'created_at': FieldValue.serverTimestamp(),
@@ -378,13 +398,15 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
                       onSelected: (value) => _updateResponse('age', value),
                       selectedValue: _responses['age'],
                     ),
-                    GenderPage(
-                      onSelected: (value) => _updateResponse('gender', value),
-                      selectedValue: _responses['gender'],
-                    ),
                     SportPage(
                       onSelected: (value) => _updateResponse('sport', value),
                       selectedValue: _responses['sport'],
+                    ),
+                    DisciplinePage(
+                      onSelected: (value) => _updateResponse('disciplines', value),
+                      selectedValue: _responses['disciplines'],
+                      selectedSport: _responses['sport'] ?? '',
+                      onGenderConflict: _showGenderConflictError,
                     ),
                     GoalsPage(
                       onSelected: (value) => _updateResponse('goals', value),

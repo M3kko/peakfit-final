@@ -412,6 +412,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
                       onSelected: (value) => _updateResponse('goals', value),
                       selectedValue: _responses['goals'],
                       onMaxGoalsExceeded: _showGoalsError,
+                      selectedSport: _responses['sport'] ?? '',
+                      selectedDisciplines: _responses['disciplines'] ?? [],
                     ),
                     EquipmentPage(
                       onSelected: (value) => _updateResponse('equipment', value),

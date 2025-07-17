@@ -30,6 +30,9 @@ exports.helloWorld = functions.https.onRequest((req, res) => {
   res.send('Hello from Firebase');
 });
 
+// Get the correct Firestore reference
+const db = admin.firestore();
+
 // Firestore triggers
 exports.syncMarketingConsent = functions.firestore
   .document('users/{uid}')
@@ -88,8 +91,10 @@ exports.sendVerificationCode = functions.firestore
     const data = change.after.data();
     if (!data) return null;
 
+    console.log(`Verification code ${data.code} for ${data.email}`);
+
     if (!resend) {
-      console.log(`Verification code ${data.code} for ${data.email} (Resend not configured)`);
+      console.log('Resend not configured');
       return null;
     }
 
@@ -134,8 +139,10 @@ exports.sendPasswordResetCode = functions.firestore
     const data = change.after.data();
     if (!data) return null;
 
+    console.log(`Password reset code ${data.code} for ${data.email}`);
+
     if (!resend) {
-      console.log(`Password reset code ${data.code} for ${data.email} (Resend not configured)`);
+      console.log('Resend not configured');
       return null;
     }
 
@@ -185,7 +192,7 @@ exports.resetPasswordWithCode = functions.https.onCall(async (data, context) => 
   const normalizedEmail = email.trim().toLowerCase();
   
   try {
-    const snap = await admin.firestore().collection('password_resets').doc(normalizedEmail).get();
+    const snap = await db.collection('password_resets').doc(normalizedEmail).get();
     
     if (!snap.exists) {
       throw new functions.https.HttpsError('not-found', 'No password reset request found for this email');
@@ -201,7 +208,7 @@ exports.resetPasswordWithCode = functions.https.onCall(async (data, context) => 
     } catch (authError) {
       console.error('Error getting user by email:', authError);
       
-      const usersSnapshot = await admin.firestore()
+      const usersSnapshot = await db
         .collection('users')
         .where('email', '==', normalizedEmail)
         .limit(1)
@@ -240,7 +247,6 @@ exports.resetPasswordWithCode = functions.https.onCall(async (data, context) => 
 exports.cleanupOldVerificationCodes = functions.pubsub
   .schedule('every 15 minutes')
   .onRun(async (context) => {
-    const db = admin.firestore();
     const expiry = new Date(Date.now() - 15 * 60 * 1000);
     
     const verifications = await db.collection('verifications')

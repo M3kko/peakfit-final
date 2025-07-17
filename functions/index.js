@@ -98,7 +98,7 @@ exports.onVerificationCodeCreated = onDocumentWritten({
 
   try {
     const { data: result, error } = await resend.emails.send({
-      from: 'PeakFit <verification@noreply.peakfit.ai>',
+      from: 'PeakFit <hello@peakfit.ai>',
       to: [data.email],
       subject: 'Your PeakFit Verification Code',
       html: `
@@ -146,7 +146,7 @@ exports.onPasswordResetCodeCreated = onDocumentWritten({
 
   try {
     const { data: result, error } = await resend.emails.send({
-      from: 'PeakFit <Verification@noreply.peakfit.ai>',
+      from: 'PeakFit <hello@peakfit.ai>',
       to: [data.email],
       subject: 'Reset Your PeakFit Password',
       html: `

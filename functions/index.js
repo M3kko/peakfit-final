@@ -4,6 +4,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
+const { defineSecret } = require('firebase-functions/params');
 const { createClient } = require('@supabase/supabase-js');
 const { Resend } = require('resend');
 
@@ -12,25 +13,10 @@ initializeApp();
 const auth = getAuth();
 const db = getFirestore();
 
-// Initialize Supabase
-let supabase = null;
-try {
-  // For v2 functions, use process.env instead of functions.config()
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
-    supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    console.log('Supabase ready');
-  } else {
-    console.log('Supabase env not set');
-  }
-} catch (e) {
-  console.error('Supabase init failed', e);
-}
-
-// Initialize Resend
-let resend = null;
-if (process.env.RESEND_API_KEY) {
-  resend = new Resend(process.env.RESEND_API_KEY);
-}
+// Define secrets
+const SUPABASE_URL = defineSecret('SUPABASE_URL');
+const SUPABASE_SERVICE_KEY = defineSecret('SUPABASE_SERVICE_KEY');
+const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 
 // HTTP function
 exports.helloWorld = onRequest({ region: 'us-central1' }, (req, res) => {
@@ -40,9 +26,14 @@ exports.helloWorld = onRequest({ region: 'us-central1' }, (req, res) => {
 // Firestore triggers
 exports.syncMarketingConsent = onDocumentWritten({
   document: 'users/{uid}',
-  region: 'us-central1'
+  region: 'us-central1',
+  secrets: [SUPABASE_URL, SUPABASE_SERVICE_KEY]
 }, async (event) => {
-  if (!supabase) return null;
+  // Initialize Supabase inside the function with secrets
+  const supabase = createClient(
+    SUPABASE_URL.value(),
+    SUPABASE_SERVICE_KEY.value()
+  );
   
   const after = event.data?.after?.data();
   const before = event.data?.before?.data();
@@ -85,6 +76,7 @@ exports.syncMarketingConsent = onDocumentWritten({
       
       if (error) throw error;
     }
+    console.log('Marketing consent synced for', after.email);
   } catch (err) {
     console.error('Supabase sync error', JSON.stringify(err));
   }
@@ -93,21 +85,20 @@ exports.syncMarketingConsent = onDocumentWritten({
 
 exports.onVerificationCodeCreated = onDocumentWritten({
   document: 'verifications/{email}',
-  region: 'us-central1'
+  region: 'us-central1',
+  secrets: [RESEND_API_KEY]
 }, async (event) => {
   const data = event.data?.after?.data();
   if (!data) return null;
 
   console.log(`Verification code ${data.code} for ${data.email}`);
 
-  if (!resend) {
-    console.log('Resend not configured');
-    return null;
-  }
+  // Initialize Resend inside the function
+  const resend = new Resend(RESEND_API_KEY.value());
 
   try {
     const { data: result, error } = await resend.emails.send({
-      from: 'PeakFit <noreply@yourverifieddomain.com>', // Replace with your domain
+      from: 'PeakFit <noreply@peakfit.ai>',
       to: [data.email],
       subject: 'Your PeakFit Verification Code',
       html: `
@@ -131,7 +122,7 @@ exports.onVerificationCodeCreated = onDocumentWritten({
     if (error) {
       console.error('Failed to send verification email:', error);
     } else {
-      console.log('Verification email sent:', result);
+      console.log('Verification email sent successfully to', data.email);
     }
   } catch (err) {
     console.error('Resend error:', err);
@@ -142,21 +133,20 @@ exports.onVerificationCodeCreated = onDocumentWritten({
 
 exports.onPasswordResetCodeCreated = onDocumentWritten({
   document: 'password_resets/{email}',
-  region: 'us-central1'
+  region: 'us-central1',
+  secrets: [RESEND_API_KEY]
 }, async (event) => {
   const data = event.data?.after?.data();
   if (!data) return null;
 
   console.log(`Password reset code ${data.code} for ${data.email}`);
 
-  if (!resend) {
-    console.log('Resend not configured');
-    return null;
-  }
+  // Initialize Resend inside the function
+  const resend = new Resend(RESEND_API_KEY.value());
 
   try {
     const { data: result, error } = await resend.emails.send({
-      from: 'PeakFit <noreply@yourverifieddomain.com>', // Replace with your domain
+      from: 'PeakFit <noreply@peakfit.ai>',
       to: [data.email],
       subject: 'Reset Your PeakFit Password',
       html: `
@@ -180,7 +170,7 @@ exports.onPasswordResetCodeCreated = onDocumentWritten({
     if (error) {
       console.error('Failed to send password reset email:', error);
     } else {
-      console.log('Password reset email sent:', result);
+      console.log('Password reset email sent successfully to', data.email);
     }
   } catch (err) {
     console.error('Resend error:', err);

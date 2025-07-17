@@ -147,7 +147,7 @@ class _DisciplinePageState extends State<DisciplinePage> with TickerProviderStat
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'Select your discipline(s) in ${widget.selectedSport}. Choose all that apply to receive training tailored to your specific needs.',
+                  'Select your discipline(s) in ${widget.selectedSport}. Choose all that apply to receive training tailored to your specific needs. Note: You can select multiple disciplines, but they must be from the same gender category.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -293,11 +293,11 @@ class _DisciplinePageState extends State<DisciplinePage> with TickerProviderStat
   Color _getGenderColor(String? gender) {
     switch (gender) {
       case 'Men':
-        return Colors.blue[400]!;
+        return const Color(0xFFFFD700); // Luxurious gold
       case 'Women':
-        return Colors.pink[400]!;
+        return const Color(0xFFFFD700); // Luxurious gold
       case 'Mixed':
-        return Colors.purple[400]!;
+        return const Color(0xFFFFD700); // Luxurious gold
       default:
         return Colors.white;
     }

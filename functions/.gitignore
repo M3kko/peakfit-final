@@ -1,2 +1,7 @@
 node_modules/
 *.local
+
+# Environment variables
+functions/.env
+.env
+*.env

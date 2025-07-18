@@ -98,6 +98,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       });
     } catch (e) {
       print('Error loading user data: $e');
+      _showGlassMessage('Error loading profile data', isError: true);
     }
   }
 
@@ -115,6 +116,13 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   Future<void> _pickImage() async {
     try {
+      // Check if image picker is available
+      final bool isAvailable = await _picker.supportsImageSource(ImageSource.gallery);
+      if (!isAvailable) {
+        _showGlassMessage('Image picker not available on this device', isError: true);
+        return;
+      }
+
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 512,
@@ -122,64 +130,156 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         imageQuality: 85,
       );
 
-      if (image != null && user != null) {
-        setState(() => _isUploading = true);
-
-        // Upload to Firebase Storage
-        final ref = FirebaseStorage.instance
-            .ref()
-            .child('profile_images')
-            .child('${user!.uid}.jpg');
-
-        await ref.putFile(File(image.path));
-        final url = await ref.getDownloadURL();
-
-        // Update Firestore
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user!.uid)
-            .update({'profileImageUrl': url});
-
-        setState(() {
-          _profileImageUrl = url;
-          _isUploading = false;
-        });
-
-        HapticFeedback.mediumImpact();
+      if (image == null) {
+        // User cancelled, don't show error
+        return;
       }
-    } catch (e) {
-      setState(() => _isUploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error uploading image: ${e.toString()}'),
-          backgroundColor: Colors.red.withOpacity(0.8),
+
+      if (user == null) {
+        _showGlassMessage('User not authenticated', isError: true);
+        return;
+      }
+
+      setState(() => _isUploading = true);
+
+      // Verify file exists and is readable
+      final file = File(image.path);
+      if (!await file.exists()) {
+        throw Exception('Selected image file not found');
+      }
+
+      // Check file size (limit to 5MB)
+      final fileSize = await file.length();
+      if (fileSize > 5 * 1024 * 1024) {
+        throw Exception('Image file too large (max 5MB)');
+      }
+
+      // Upload to Firebase Storage with better error handling
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child('${user!.uid}.jpg');
+
+      // Upload with metadata
+      final uploadTask = ref.putFile(
+        file,
+        SettableMetadata(
+          contentType: 'image/jpeg',
+          customMetadata: {
+            'uploadedBy': user!.uid,
+            'uploadedAt': DateTime.now().toIso8601String(),
+          },
         ),
       );
+
+      // Wait for upload to complete
+      final taskSnapshot = await uploadTask;
+      final url = await taskSnapshot.ref.getDownloadURL();
+
+      // Update Firestore with proper error handling
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .set({
+        'profileImageUrl': url,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      setState(() {
+        _profileImageUrl = url;
+        _isUploading = false;
+      });
+
+      HapticFeedback.mediumImpact();
+      _showGlassMessage('Profile picture updated successfully');
+
+    } catch (e) {
+      setState(() => _isUploading = false);
+      print('Error uploading image: $e');
+
+      String errorMessage = 'Error uploading image';
+      if (e.toString().contains('permission')) {
+        errorMessage = 'Permission denied. Check storage permissions.';
+      } else if (e.toString().contains('network')) {
+        errorMessage = 'Network error. Check your connection.';
+      } else if (e.toString().contains('too large')) {
+        errorMessage = 'Image file too large (max 5MB)';
+      } else if (e.toString().contains('not found')) {
+        errorMessage = 'Selected image file not found';
+      }
+
+      _showGlassMessage(errorMessage, isError: true);
+    }
+  }
+
+  Future<bool> _isUsernameAvailable(String username) async {
+    try {
+      // Simple query without complex filtering
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('username', isEqualTo: username)
+          .limit(1)
+          .get();
+
+      // If no documents found, username is available
+      if (querySnapshot.docs.isEmpty) {
+        return true;
+      }
+
+      // If documents found, check if any belong to a different user
+      for (var doc in querySnapshot.docs) {
+        if (doc.id != user!.uid) {
+          return false; // Username taken by another user
+        }
+      }
+
+      return true; // Username is available (or belongs to current user)
+    } catch (e) {
+      print('Error checking username availability: $e');
+      // Instead of throwing, return false to be safe
+      return false;
     }
   }
 
   Future<void> _updateUsername(String newUsername) async {
-    if (!canChangeUsername || user == null) return;
+    if (!canChangeUsername || user == null) {
+      _showGlassMessage('Username can only be changed once every 7 days', isError: true);
+      return;
+    }
 
     try {
-      // Check if username is available
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('username', isEqualTo: newUsername)
-          .get();
+      // Validate username format
+      if (newUsername.isEmpty) {
+        throw Exception('Username cannot be empty');
+      }
 
-      if (querySnapshot.docs.isNotEmpty) {
+      if (newUsername.length < 3) {
+        throw Exception('Username must be at least 3 characters');
+      }
+
+      if (newUsername.length > 20) {
+        throw Exception('Username must be less than 20 characters');
+      }
+
+      if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(newUsername)) {
+        throw Exception('Username can only contain letters, numbers, and underscores');
+      }
+
+      // Check if username is available
+      final isAvailable = await _isUsernameAvailable(newUsername);
+      if (!isAvailable) {
         throw Exception('Username already taken');
       }
 
-      // Update username
+      // Update username with proper merge
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
-          .update({
+          .set({
         'username': newUsername,
         'lastUsernameChange': FieldValue.serverTimestamp(),
-      });
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       setState(() {
         _username = newUsername;
@@ -187,20 +287,99 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       });
 
       HapticFeedback.mediumImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Username updated successfully'),
-          backgroundColor: Color(0xFF1A1A1A),
-        ),
-      );
+      _showGlassMessage('Username updated successfully');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red.withOpacity(0.8),
-        ),
-      );
+      print('Error updating username: $e');
+      _showGlassMessage(e.toString().replaceFirst('Exception: ', ''), isError: true);
     }
+  }
+
+  void _showGlassMessage(String message, {bool isError = false}) {
+    HapticFeedback.mediumImpact();
+
+    OverlayEntry? overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 80,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 300),
+            tween: Tween(begin: 0.0, end: 1.0),
+            builder: (context, value, child) {
+              return Transform.translate(
+                offset: Offset(0, -20 * (1 - value)),
+                child: Opacity(
+                  opacity: value,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: isError
+                          ? Colors.red.withOpacity(0.15)
+                          : Colors.green.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isError
+                            ? Colors.red.withOpacity(0.3)
+                            : Colors.green.withOpacity(0.3),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: isError
+                                ? Colors.red.withOpacity(0.2)
+                                : Colors.green.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isError ? Icons.error_outline : Icons.check,
+                            size: 16,
+                            color: isError ? Colors.red : Colors.green,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            message,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(overlayEntry);
+
+    // Remove the overlay after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      overlayEntry?.remove();
+    });
   }
 
   @override
@@ -391,7 +570,10 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               GestureDetector(
                 onTap: canChangeUsername
                     ? () => _showUsernameDialog()
-                    : null,
+                    : () => _showGlassMessage(
+                  'Username can be changed in $daysUntilUsernameChange days',
+                  isError: true,
+                ),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(

@@ -32,7 +32,6 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
   late PageController _pageController;
   int _currentPage = 0;
 
-  // Animation controllers
   late AnimationController _buttonController;
   late AnimationController _glowController;
   late Animation<double> _buttonAnimation;
@@ -44,7 +43,12 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
   @override
   void initState() {
     super.initState();
-    _tempData = Map.from(widget.profileData['profile'] ?? {});
+
+    // Initialize temp data from profile, handling null cases
+    if (widget.profileData['profile'] != null) {
+      _tempData = Map<String, dynamic>.from(widget.profileData['profile']);
+    }
+
     _pageController = PageController(initialPage: _getInitialPage());
     _currentPage = _getInitialPage();
 
@@ -80,101 +84,37 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
       case 'personal':
         return 0;
       case 'goals':
-        return 2;
+        return 0; // Goals is now the first page
       case 'equipment':
-        return 3;
+        return 0;
       case 'schedule':
-        return 4;
+        return 0;
       case 'condition':
-        return 5;
+        return 0;
       default:
         return 0;
     }
   }
 
   String _getPageTitle() {
-    switch (_currentPage) {
-      case 0:
-        return 'PERSONAL INFO';
-      case 1:
-        return 'DISCIPLINES';
-      case 2:
-        return 'FITNESS GOALS';
-      case 3:
-        return 'EQUIPMENT';
-      case 4:
-        return 'TRAINING HOURS';
-      case 5:
-        return 'INJURIES';
-      case 6:
-        return 'FLEXIBILITY';
-      default:
-        return 'EDIT PROFILE';
+    final pages = _getPages();
+    if (_currentPage >= 0 && _currentPage < pages.length) {
+      switch (widget.section) {
+        case 'personal':
+          return ['AGE', 'SPORT', 'DISCIPLINE'][_currentPage];
+        case 'goals':
+          return 'FITNESS GOALS';
+        case 'equipment':
+          return 'EQUIPMENT';
+        case 'schedule':
+          return 'TRAINING HOURS';
+        case 'condition':
+          return ['INJURIES', 'FLEXIBILITY'][_currentPage];
+        default:
+          return 'EDIT PROFILE';
+      }
     }
-  }
-
-  Widget _buildPage() {
-    switch (_currentPage) {
-      case 0:
-        return Column(
-          children: [
-            Expanded(
-              child: AgePage(
-                onSelected: (value) => _updateTempData('age', value),
-                selectedValue: _tempData['age'],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: SportPage(
-                onSelected: (value) {
-                  _updateTempData('sport', value);
-                  // Clear disciplines when sport changes
-                  _tempData.remove('disciplines');
-                },
-                selectedValue: _tempData['sport'],
-              ),
-            ),
-          ],
-        );
-      case 1:
-        return DisciplinePage(
-          onSelected: (value) => _updateTempData('disciplines', value),
-          selectedValue: _tempData['disciplines'],
-          selectedSport: _tempData['sport'] ?? '',
-          onGenderConflict: _showGenderConflictError,
-        );
-      case 2:
-        return GoalsPage(
-          onSelected: (value) => _updateTempData('goals', value),
-          selectedValue: _tempData['goals'],
-          selectedSport: _tempData['sport'] ?? '',
-          selectedDisciplines: _tempData['disciplines'] ?? [],
-          onMaxGoalsExceeded: _showMaxGoalsError,
-        );
-      case 3:
-        return EquipmentPage(
-          onSelected: (value) => _updateTempData('equipment', value),
-          selectedValue: _tempData['equipment'],
-        );
-      case 4:
-        return TrainingHoursPage(
-          onSelected: (value) => _updateTempData('training_hours', value),
-          selectedValue: _tempData['training_hours'],
-        );
-      case 5:
-        return InjuriesPage(
-          onSelected: (value) => _updateTempData('injuries', value),
-          selectedValue: _tempData['injuries'],
-        );
-      case 6:
-        return FlexibilityPage(
-          onSelected: (value) => _updateTempData('flexibility', value),
-          selectedValue: _tempData['flexibility'],
-        );
-      default:
-        return const SizedBox();
-    }
+    return 'EDIT PROFILE';
   }
 
   void _updateTempData(String key, dynamic value) {
@@ -182,14 +122,6 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
       _tempData[key] = value;
       _hasChanges = true;
     });
-  }
-
-  void _showGenderConflictError() {
-    _showError('Please select disciplines from the same gender category only');
-  }
-
-  void _showMaxGoalsError() {
-    _showError('Maximum 3 goals can be selected');
   }
 
   void _showError(String message) {
@@ -205,6 +137,14 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
         ),
       ),
     );
+  }
+
+  void _showGenderConflictError() {
+    _showError('Please select disciplines from the same gender category only');
+  }
+
+  void _showMaxGoalsError() {
+    _showError('Maximum 3 goals can be selected');
   }
 
   Future<void> _saveChanges() async {
@@ -223,6 +163,7 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
         }
       }
 
+      // Update user document
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
@@ -235,16 +176,97 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
       });
 
       widget.onUpdate();
-      Navigator.pop(context);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully'),
-          backgroundColor: Color(0xFF1A1A1A),
-        ),
-      );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Profile updated successfully'),
+            backgroundColor: Colors.green.withOpacity(0.8),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
     } catch (e) {
       _showError('Error updating profile: ${e.toString()}');
+    }
+  }
+
+  List<Widget> _getPages() {
+    switch (widget.section) {
+      case 'personal':
+        List<Widget> pages = [
+          AgePage(
+            onSelected: (value) => _updateTempData('age', value),
+            selectedValue: _tempData['age'],
+          ),
+          SportPage(
+            onSelected: (value) {
+              _updateTempData('sport', value);
+              _tempData.remove('disciplines');
+            },
+            selectedValue: _tempData['sport'],
+          ),
+        ];
+
+        // Only add discipline page if sport is selected
+        if (_tempData['sport'] != null && _tempData['sport'].toString().isNotEmpty) {
+          pages.add(
+            DisciplinePage(
+              onSelected: (value) => _updateTempData('disciplines', value),
+              selectedValue: _tempData['disciplines'],
+              selectedSport: _tempData['sport'] ?? '',
+              onGenderConflict: _showGenderConflictError,
+            ),
+          );
+        }
+        return pages;
+
+      case 'goals':
+        return [
+          GoalsPage(
+            onSelected: (value) => _updateTempData('goals', value),
+            selectedValue: _tempData['goals'],
+            selectedSport: _tempData['sport'] ?? '',
+            selectedDisciplines: _tempData['disciplines'] ?? [],
+            onMaxGoalsExceeded: _showMaxGoalsError,
+          ),
+        ];
+
+      case 'equipment':
+        return [
+          EquipmentPage(
+            onSelected: (value) => _updateTempData('equipment', value),
+            selectedValue: _tempData['equipment'],
+          ),
+        ];
+
+      case 'schedule':
+        return [
+          TrainingHoursPage(
+            onSelected: (value) => _updateTempData('training_hours', value),
+            selectedValue: _tempData['training_hours'],
+          ),
+        ];
+
+      case 'condition':
+        return [
+          InjuriesPage(
+            onSelected: (value) => _updateTempData('injuries', value),
+            selectedValue: _tempData['injuries'],
+          ),
+          FlexibilityPage(
+            onSelected: (value) => _updateTempData('flexibility', value),
+            selectedValue: _tempData['flexibility'],
+          ),
+        ];
+
+      default:
+        return [];
     }
   }
 
@@ -259,6 +281,21 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
   @override
   Widget build(BuildContext context) {
     final pages = _getPages();
+
+    if (pages.isEmpty) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            'No data to edit',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
+
+    final isLastPage = _currentPage == pages.length - 1;
+    final isFirstPage = _currentPage == 0;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -275,10 +312,10 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
                   });
                 },
                 physics: const NeverScrollableScrollPhysics(),
-                children: pages.map((page) => page).toList(),
+                children: pages,
               ),
             ),
-            _buildNavigationButtons(),
+            _buildNavigationButtons(isFirstPage, isLastPage, pages.length),
           ],
         ),
       ),
@@ -345,11 +382,7 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
     );
   }
 
-  Widget _buildNavigationButtons() {
-    final pages = _getPages();
-    final isLastPage = _currentPage == pages.length - 1;
-    final isFirstPage = _currentPage == 0;
-
+  Widget _buildNavigationButtons(bool isFirstPage, bool isLastPage, int totalPages) {
     return Container(
       padding: const EdgeInsets.all(24),
       child: Row(
@@ -495,74 +528,5 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
         ],
       ),
     );
-  }
-
-  List<Widget> _getPages() {
-    switch (widget.section) {
-      case 'personal':
-        return [
-          Column(
-            children: [
-              Expanded(
-                child: AgePage(
-                  onSelected: (value) => _updateTempData('age', value),
-                  selectedValue: _tempData['age'],
-                ),
-              ),
-            ],
-          ),
-          SportPage(
-            onSelected: (value) {
-              _updateTempData('sport', value);
-              _tempData.remove('disciplines');
-            },
-            selectedValue: _tempData['sport'],
-          ),
-          if (_tempData['sport'] != null)
-            DisciplinePage(
-              onSelected: (value) => _updateTempData('disciplines', value),
-              selectedValue: _tempData['disciplines'],
-              selectedSport: _tempData['sport'] ?? '',
-              onGenderConflict: _showGenderConflictError,
-            ),
-        ];
-      case 'goals':
-        return [
-          GoalsPage(
-            onSelected: (value) => _updateTempData('goals', value),
-            selectedValue: _tempData['goals'],
-            selectedSport: _tempData['sport'] ?? '',
-            selectedDisciplines: _tempData['disciplines'] ?? [],
-            onMaxGoalsExceeded: _showMaxGoalsError,
-          ),
-        ];
-      case 'equipment':
-        return [
-          EquipmentPage(
-            onSelected: (value) => _updateTempData('equipment', value),
-            selectedValue: _tempData['equipment'],
-          ),
-        ];
-      case 'schedule':
-        return [
-          TrainingHoursPage(
-            onSelected: (value) => _updateTempData('training_hours', value),
-            selectedValue: _tempData['training_hours'],
-          ),
-        ];
-      case 'condition':
-        return [
-          InjuriesPage(
-            onSelected: (value) => _updateTempData('injuries', value),
-            selectedValue: _tempData['injuries'],
-          ),
-          FlexibilityPage(
-            onSelected: (value) => _updateTempData('flexibility', value),
-            selectedValue: _tempData['flexibility'],
-          ),
-        ];
-      default:
-        return [];
-    }
   }
 }

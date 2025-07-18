@@ -18,6 +18,153 @@ const SUPABASE_URL = defineSecret('SUPABASE_URL');
 const SUPABASE_SERVICE_KEY = defineSecret('SUPABASE_SERVICE_KEY');
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 
+// Helper function to create email-compliant HTML
+function createEmailHTML(title, subtitle, content, code) {
+  return `<!DOCTYPE html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>${title}</title>
+  <!--[if mso]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <![endif]-->
+  <style type="text/css">
+    /* Client-specific Styles */
+    #outlook a { padding: 0; }
+    body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+    p { display: block; margin: 13px 0; }
+    
+    /* General Styles */
+    @media only screen and (min-width:480px) {
+      .mj-column-per-100 { width: 100% !important; max-width: 100%; }
+    }
+    
+    @media only screen and (max-width:480px) {
+      table.full-width-mobile { width: 100% !important; }
+      td.full-width-mobile { width: auto !important; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4;">
+  <div style="background-color: #f4f4f4;">
+    <!--[if mso | IE]>
+    <table align="center" border="0" cellpadding="0" cellspacing="0" style="width:600px;" width="600">
+      <tr>
+        <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+    <![endif]-->
+    
+    <div style="margin: 0 auto; max-width: 600px;">
+      <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%;">
+        <tbody>
+          <tr>
+            <td style="direction: ltr; font-size: 0px; padding: 20px 0; text-align: center;">
+              <!--[if mso | IE]>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:top;width:600px;">
+              <![endif]-->
+              
+              <div class="mj-column-per-100 outlook-group-fix" style="font-size: 0px; text-align: left; direction: ltr; display: inline-block; vertical-align: top; width: 100%;">
+                <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+                  <tbody>
+                    <tr>
+                      <td style="vertical-align: top; padding: 0;">
+                        <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+                          <!-- Header -->
+                          <tr>
+                            <td align="center" style="font-size: 0px; padding: 0; word-break: break-word;">
+                              <div style="background: #000000; background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%); padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                                <h1 style="margin: 0; font-family: Arial, sans-serif; font-size: 32px; font-weight: 300; letter-spacing: 2px; color: #D4AF37;">PEAKFIT</h1>
+                                ${subtitle ? `<p style="margin: 10px 0 0 0; font-family: Arial, sans-serif; font-size: 14px; color: #D4AF37; opacity: 0.8;">${subtitle}</p>` : ''}
+                              </div>
+                            </td>
+                          </tr>
+                          
+                          <!-- Body -->
+                          <tr>
+                            <td align="center" style="font-size: 0px; padding: 0; word-break: break-word;">
+                              <div style="background: #ffffff; padding: 40px 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+                                <h2 style="margin: 0 0 20px 0; font-family: Arial, sans-serif; font-size: 24px; font-weight: normal; color: #333333;">${title}</h2>
+                                <p style="margin: 0 0 20px 0; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #666666;">${content}</p>
+                                
+                                <!-- Code Box -->
+                                <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 30px auto;">
+                                  <tr>
+                                    <td style="background: #fafafa; border: 2px solid #D4AF37; border-radius: 8px; padding: 30px 40px; text-align: center;">
+                                      <div style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #000000;">${code}</div>
+                                    </td>
+                                  </tr>
+                                </table>
+                                
+                                <p style="margin: 20px 0 0 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #999999;">This code will expire in 15 minutes.</p>
+                              </div>
+                            </td>
+                          </tr>
+                          
+                          <!-- Footer -->
+                          <tr>
+                            <td align="center" style="font-size: 0px; padding: 20px 0 0 0; word-break: break-word;">
+                              <p style="margin: 0; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #999999;">
+                                © 2024 PeakFit. All rights reserved.<br>
+                                If you didn't request this email, please ignore it.
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              
+              <!--[if mso | IE]>
+                  </td>
+                </tr>
+              </table>
+              <![endif]-->
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!--[if mso | IE]>
+        </td>
+      </tr>
+    </table>
+    <![endif]-->
+  </div>
+</body>
+</html>`;
+}
+
+// Helper function to create plain text email
+function createEmailText(title, content, code) {
+  return `PEAKFIT
+
+${title}
+
+${content}
+
+Your code is: ${code}
+
+This code will expire in 15 minutes.
+
+---
+© 2024 PeakFit. All rights reserved.
+If you didn't request this email, please ignore it.`;
+}
+
 // HTTP function
 exports.helloWorld = onRequest({ region: 'us-central1' }, (req, res) => {
   res.send('Hello from Firebase');
@@ -97,32 +244,32 @@ exports.onVerificationCodeCreated = onDocumentWritten({
   const resend = new Resend(RESEND_API_KEY.value());
 
   try {
+    const title = 'Verify Your Email';
+    const subtitle = 'Elite Fitness Awaits';
+    const content = 'Thank you for joining PeakFit! Please use the verification code below to confirm your email address and unlock your personalized fitness journey.';
+    
     const { data: result, error } = await resend.emails.send({
       from: 'PeakFit <hello@peakfit.ai>',
       to: [data.email],
       subject: 'Your PeakFit Verification Code',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 2px;">PEAKFIT</h1>
-            <p style="margin: 10px 0 0 0; opacity: 0.9;">Elite Fitness Awaits</p>
-          </div>
-          <div style="background: white; padding: 40px; border: 1px solid #e0e0e0; border-top: none;">
-            <h2 style="color: #333; margin-bottom: 20px;">Verify Your Email</h2>
-            <p style="color: #666; line-height: 1.6;">Your verification code is:</p>
-            <div style="background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0;">
-              <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #495057;">${data.code}</div>
-            </div>
-            <p style="color: #666; line-height: 1.6;">This code will expire in 15 minutes.</p>
-          </div>
-        </div>
-      `
+      text: createEmailText(title, content, data.code),
+      html: createEmailHTML(title, subtitle, content, data.code),
+      headers: {
+        'X-Entity-Ref-ID': `verification-${data.email}-${Date.now()}`,
+        'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
+      },
+      tags: [
+        {
+          name: 'category',
+          value: 'verification'
+        }
+      ]
     });
 
     if (error) {
       console.error('Failed to send verification email:', error);
     } else {
-      console.log('Verification email sent successfully to', data.email);
+      console.log('Verification email sent successfully to', data.email, 'with ID:', result.id);
     }
   } catch (err) {
     console.error('Resend error:', err);
@@ -145,32 +292,32 @@ exports.onPasswordResetCodeCreated = onDocumentWritten({
   const resend = new Resend(RESEND_API_KEY.value());
 
   try {
+    const title = 'Reset Your Password';
+    const subtitle = null;
+    const content = 'We received a request to reset your PeakFit password. Use the code below to set a new password and get back to your fitness journey.';
+    
     const { data: result, error } = await resend.emails.send({
       from: 'PeakFit <hello@peakfit.ai>',
       to: [data.email],
       subject: 'Reset Your PeakFit Password',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 2px;">PEAKFIT</h1>
-          </div>
-          <div style="background: white; padding: 40px; border: 1px solid #e0e0e0; border-top: none;">
-            <h2 style="color: #333; margin-bottom: 20px;">Password Reset</h2>
-            <p style="color: #666; line-height: 1.6;">Your password reset code is:</p>
-            <div style="background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0;">
-              <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #495057;">${data.code}</div>
-            </div>
-            <p style="color: #666; line-height: 1.6;">This code will expire in 15 minutes.</p>
-            <p style="color: #999; font-size: 14px; margin-top: 30px;">If you didn't request this, please ignore this email.</p>
-          </div>
-        </div>
-      `
+      text: createEmailText(title, content, data.code),
+      html: createEmailHTML(title, subtitle, content, data.code),
+      headers: {
+        'X-Entity-Ref-ID': `password-reset-${data.email}-${Date.now()}`,
+        'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
+      },
+      tags: [
+        {
+          name: 'category',
+          value: 'password-reset'
+        }
+      ]
     });
 
     if (error) {
       console.error('Failed to send password reset email:', error);
     } else {
-      console.log('Password reset email sent successfully to', data.email);
+      console.log('Password reset email sent successfully to', data.email, 'with ID:', result.id);
     }
   } catch (err) {
     console.error('Resend error:', err);

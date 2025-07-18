@@ -116,13 +116,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   Future<void> _pickImage() async {
     try {
-      // Check if image picker is available
-      final bool isAvailable = await _picker.supportsImageSource(ImageSource.gallery);
-      if (!isAvailable) {
-        _showGlassMessage('Image picker not available on this device', isError: true);
-        return;
-      }
-
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 512,
@@ -130,10 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         imageQuality: 85,
       );
 
-      if (image == null) {
-        // User cancelled, don't show error
-        return;
-      }
+      if (image == null) return;
 
       if (user == null) {
         _showGlassMessage('User not authenticated', isError: true);
@@ -142,48 +132,30 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
       setState(() => _isUploading = true);
 
-      // Verify file exists and is readable
       final file = File(image.path);
-      if (!await file.exists()) {
-        throw Exception('Selected image file not found');
-      }
 
-      // Check file size (limit to 5MB)
-      final fileSize = await file.length();
-      if (fileSize > 5 * 1024 * 1024) {
-        throw Exception('Image file too large (max 5MB)');
-      }
-
-      // Upload to Firebase Storage with better error handling
+      // Upload to Firebase Storage
       final ref = FirebaseStorage.instance
           .ref()
           .child('profile_images')
           .child('${user!.uid}.jpg');
 
-      // Upload with metadata
       final uploadTask = ref.putFile(
         file,
-        SettableMetadata(
-          contentType: 'image/jpeg',
-          customMetadata: {
-            'uploadedBy': user!.uid,
-            'uploadedAt': DateTime.now().toIso8601String(),
-          },
-        ),
+        SettableMetadata(contentType: 'image/jpeg'),
       );
 
-      // Wait for upload to complete
       final taskSnapshot = await uploadTask;
       final url = await taskSnapshot.ref.getDownloadURL();
 
-      // Update Firestore with proper error handling
+      // Update Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
-          .set({
+          .update({
         'profileImageUrl': url,
         'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      });
 
       setState(() {
         _profileImageUrl = url;
@@ -196,47 +168,26 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     } catch (e) {
       setState(() => _isUploading = false);
       print('Error uploading image: $e');
-
-      String errorMessage = 'Error uploading image';
-      if (e.toString().contains('permission')) {
-        errorMessage = 'Permission denied. Check storage permissions.';
-      } else if (e.toString().contains('network')) {
-        errorMessage = 'Network error. Check your connection.';
-      } else if (e.toString().contains('too large')) {
-        errorMessage = 'Image file too large (max 5MB)';
-      } else if (e.toString().contains('not found')) {
-        errorMessage = 'Selected image file not found';
-      }
-
-      _showGlassMessage(errorMessage, isError: true);
+      _showGlassMessage('Error uploading image', isError: true);
     }
   }
 
   Future<bool> _isUsernameAvailable(String username) async {
     try {
-      // Simple query without complex filtering
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('username', isEqualTo: username)
-          .limit(1)
+      // Check in usernames collection
+      final usernameDoc = await FirebaseFirestore.instance
+          .collection('usernames')
+          .doc(username.toLowerCase())
           .get();
 
-      // If no documents found, username is available
-      if (querySnapshot.docs.isEmpty) {
+      if (!usernameDoc.exists) {
         return true;
       }
 
-      // If documents found, check if any belong to a different user
-      for (var doc in querySnapshot.docs) {
-        if (doc.id != user!.uid) {
-          return false; // Username taken by another user
-        }
-      }
-
-      return true; // Username is available (or belongs to current user)
+      final ownerId = usernameDoc.data()?['userId'];
+      return ownerId == user!.uid;
     } catch (e) {
       print('Error checking username availability: $e');
-      // Instead of throwing, return false to be safe
       return false;
     }
   }
@@ -248,7 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     }
 
     try {
-      // Validate username format
+      // Validate username
       if (newUsername.isEmpty) {
         throw Exception('Username cannot be empty');
       }
@@ -265,21 +216,45 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         throw Exception('Username can only contain letters, numbers, and underscores');
       }
 
-      // Check if username is available
+      // Check availability
       final isAvailable = await _isUsernameAvailable(newUsername);
       if (!isAvailable) {
         throw Exception('Username already taken');
       }
 
-      // Update username with proper merge
-      await FirebaseFirestore.instance
+      // Use batch write for atomic updates
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Delete old username if exists
+      if (_username != null && _username!.isNotEmpty) {
+        final oldUsernameRef = FirebaseFirestore.instance
+            .collection('usernames')
+            .doc(_username!.toLowerCase());
+        batch.delete(oldUsernameRef);
+      }
+
+      // Add new username
+      final newUsernameRef = FirebaseFirestore.instance
+          .collection('usernames')
+          .doc(newUsername.toLowerCase());
+      batch.set(newUsernameRef, {
+        'userId': user!.uid,
+        'username': newUsername,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update user document
+      final userRef = FirebaseFirestore.instance
           .collection('users')
-          .doc(user!.uid)
-          .set({
+          .doc(user!.uid);
+      batch.update(userRef, {
         'username': newUsername,
         'lastUsernameChange': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      });
+
+      // Commit batch
+      await batch.commit();
 
       setState(() {
         _username = newUsername;
@@ -295,91 +270,22 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   void _showGlassMessage(String message, {bool isError = false}) {
-    HapticFeedback.mediumImpact();
+    HapticFeedback.lightImpact();
 
-    OverlayEntry? overlayEntry;
-
-    overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 80,
-        left: 20,
-        right: 20,
-        child: Material(
-          color: Colors.transparent,
-          child: TweenAnimationBuilder<double>(
-            duration: const Duration(milliseconds: 300),
-            tween: Tween(begin: 0.0, end: 1.0),
-            builder: (context, value, child) {
-              return Transform.translate(
-                offset: Offset(0, -20 * (1 - value)),
-                child: Opacity(
-                  opacity: value,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    decoration: BoxDecoration(
-                      color: isError
-                          ? Colors.red.withOpacity(0.15)
-                          : Colors.green.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isError
-                            ? Colors.red.withOpacity(0.3)
-                            : Colors.green.withOpacity(0.3),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: isError
-                                ? Colors.red.withOpacity(0.2)
-                                : Colors.green.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            isError ? Icons.error_outline : Icons.check,
-                            size: 16,
-                            color: isError ? Colors.red : Colors.green,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            message,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError
+            ? Colors.red.withOpacity(0.8)
+            : Colors.green.withOpacity(0.8),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
         ),
+        duration: const Duration(seconds: 3),
       ),
     );
-
-    Overlay.of(context).insert(overlayEntry);
-
-    // Remove the overlay after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      overlayEntry?.remove();
-    });
   }
 
   @override
@@ -671,7 +577,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Start your first workout to begin earning achievements and unlock your full potential!',
+                    'Start your first workout to begin earning achievements!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,

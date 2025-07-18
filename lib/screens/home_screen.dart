@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'time_selection_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -27,11 +30,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   String? _selectedWorkout;
 
+  // User data
+  final user = FirebaseAuth.instance.currentUser;
+  String? _profileImageUrl;
+  String? _username;
+
   @override
   void initState() {
     super.initState();
     _initAnimations();
     _startAnimations();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get();
+
+      if (doc.exists && mounted) {
+        setState(() {
+          _profileImageUrl = doc.data()?['profileImageUrl'];
+          _username = doc.data()?['username'];
+        });
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+    }
   }
 
   void _initAnimations() {
@@ -281,25 +310,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ],
           ),
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.05),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-            child: const Center(
-              child: Text(
-                'JD',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
+          GestureDetector(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+              // Reload user data when returning from profile
+              _loadUserData();
+            },
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFD4AF37).withOpacity(0.5),
+                  width: 1.5,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFD4AF37).withOpacity(0.2),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: _profileImageUrl != null
+                    ? Image.network(
+                  _profileImageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => _buildInitialsAvatar(),
+                )
+                    : _buildInitialsAvatar(),
               ),
             ),
           ),
@@ -638,24 +682,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildInitialsAvatar() {
+    String initials = 'U';
+    if (_username != null && _username!.isNotEmpty) {
+      initials = _username![0].toUpperCase();
+    } else if (user?.email != null && user!.email!.isNotEmpty) {
+      initials = user!.email![0].toUpperCase();
+    }
+
+    return Container(
+      color: const Color(0xFF1A1A1A),
+      child: Center(
+        child: Text(
+          initials,
+          style: const TextStyle(
+            color: Color(0xFFD4AF37),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomNav() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(Icons.home, true),
-          _buildNavItem(Icons.calendar_today, false),
-          _buildNavItem(Icons.trending_up, false),
-          _buildNavItem(Icons.person, false),
+          _buildNavItem(Icons.home, true, 0),
+          _buildNavItem(Icons.calendar_today, false, 1),
+          _buildNavItem(Icons.trending_up, false, 2),
+          _buildNavItem(Icons.person, false, 3),
         ],
       ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, bool isActive) {
+  Widget _buildNavItem(IconData icon, bool isActive, int index) {
     return GestureDetector(
-      onTap: () => HapticFeedback.lightImpact(),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _handleNavigation(index);
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -669,5 +739,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  void _handleNavigation(int index) async {
+    switch (index) {
+      case 0:
+      // Already on home
+        break;
+      case 1:
+      // Navigate to calendar/schedule
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Schedule screen coming soon!'),
+            backgroundColor: Color(0xFF1A1A1A),
+          ),
+        );
+        break;
+      case 2:
+      // Navigate to stats/progress
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Stats screen coming soon!'),
+            backgroundColor: Color(0xFF1A1A1A),
+          ),
+        );
+        break;
+      case 3:
+      // Navigate to profile
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+        );
+        // Reload user data when returning
+        _loadUserData();
+        break;
+    }
   }
 }

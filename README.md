@@ -12,3 +12,5 @@ Things to Add:
 - Require strong password on signup
 - Add birthday 
 - Add Data center that prompts user to update information every now and then.
+- Add show password on sign in 
+- Figure out Notifications

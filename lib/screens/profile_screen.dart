@@ -20,8 +20,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   late AnimationController _fadeController;
   late AnimationController _slideController;
+  late AnimationController _notificationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  late Animation<double> _notificationSlideAnimation;
+  late Animation<double> _notificationFadeAnimation;
 
   bool _isUploading = false;
   String? _profileImageUrl;
@@ -29,6 +32,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   DateTime? _lastUsernameChange;
   Map<String, dynamic>? _profileData;
   List<Map<String, dynamic>> _achievements = [];
+
+  // Notification state
+  bool _showNotification = false;
+  String _notificationMessage = '';
+  bool _isError = false;
 
   @override
   void initState() {
@@ -48,6 +56,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       vsync: this,
     );
 
+    _notificationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeOut,
@@ -59,6 +72,22 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     ).animate(CurvedAnimation(
       parent: _slideController,
       curve: Curves.easeOutCubic,
+    ));
+
+    _notificationSlideAnimation = Tween<double>(
+      begin: -200.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _notificationController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _notificationFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _notificationController,
+      curve: Curves.easeIn,
     ));
 
     _fadeController.forward();
@@ -178,7 +207,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       setState(() => _isUploading = false);
       print('Error uploading image: $e');
       print('Error details: ${e.toString()}');
-      _showGlassMessage('Error uploading image: ${e.toString()}', isError: true);
+      _showGlassMessage('Error uploading image', isError: true);
     }
   }
 
@@ -280,53 +309,161 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   void _showGlassMessage(String message, {bool isError = false}) {
-    HapticFeedback.lightImpact();
+    setState(() {
+      _showNotification = true;
+      _notificationMessage = message;
+      _isError = isError;
+    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError
-            ? Colors.red.withOpacity(0.8)
-            : Colors.green.withOpacity(0.8),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    _notificationController.forward();
+    HapticFeedback.mediumImpact();
+
+    // Auto-hide after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _notificationController.reverse().then((_) {
+          if (mounted) {
+            setState(() {
+              _showNotification = false;
+            });
+          }
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _notificationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildHeader(),
-                  _buildProfileSection(),
-                  _buildAchievementsSection(),
-                  _buildSettingsSections(),
-                  const SizedBox(height: 100),
-                ],
+      body: Stack(
+        children: [
+          // Main content
+          SafeArea(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildHeader(),
+                      _buildProfileSection(),
+                      _buildAchievementsSection(),
+                      _buildSettingsSections(),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+
+          // Notification overlay - positioned absolutely at the top
+          if (_showNotification)
+            AnimatedBuilder(
+              animation: _notificationController,
+              builder: (context, child) {
+                return Positioned(
+                  top: _notificationSlideAnimation.value,
+                  left: 0,
+                  right: 0,
+                  child: FadeTransition(
+                    opacity: _notificationFadeAnimation,
+                    child: Container(
+                      margin: EdgeInsets.only(
+                        top: statusBarHeight + 8,
+                        left: 24,
+                        right: 24,
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: _isError
+                              ? [
+                            const Color(0xFF1A0000), // Very dark red
+                            const Color(0xFF2D0000),
+                          ]
+                              : [
+                            const Color(0xFF001A00), // Very dark green
+                            const Color(0xFF002D00),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                          color: _isError
+                              ? Colors.red.withOpacity(0.2)
+                              : Colors.green.withOpacity(0.2),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _isError
+                                ? Colors.red.withOpacity(0.2)
+                                : Colors.green.withOpacity(0.2),
+                            blurRadius: 20,
+                            spreadRadius: -5,
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: _isError
+                                  ? Colors.red.withOpacity(0.15)
+                                  : Colors.green.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              _isError
+                                  ? Icons.warning_rounded
+                                  : Icons.check_circle_rounded,
+                              color: _isError
+                                  ? Colors.red[400]
+                                  : Colors.green[400],
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _notificationMessage,
+                              style: TextStyle(
+                                color: _isError
+                                    ? Colors.red[300]
+                                    : Colors.green[300],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
     );
   }

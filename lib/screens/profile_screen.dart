@@ -130,15 +130,24 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         return;
       }
 
+      // Debug authentication
+      print('Current user UID: ${user?.uid}');
+      print('Is user authenticated: ${user != null}');
+
       setState(() => _isUploading = true);
 
       final file = File(image.path);
 
-      // Upload to Firebase Storage
+      // Updated path to use subfolder structure for secure rules
+      final storagePath = 'profile_images/${user!.uid}/profile.jpg';
+      print('Upload path: $storagePath');
+
+      // Upload to Firebase Storage with the new path structure
       final ref = FirebaseStorage.instance
           .ref()
           .child('profile_images')
-          .child('${user!.uid}.jpg');
+          .child(user!.uid)  // User-specific folder
+          .child('profile.jpg');  // Profile image file
 
       final uploadTask = ref.putFile(
         file,
@@ -168,7 +177,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     } catch (e) {
       setState(() => _isUploading = false);
       print('Error uploading image: $e');
-      _showGlassMessage('Error uploading image', isError: true);
+      print('Error details: ${e.toString()}');
+      _showGlassMessage('Error uploading image: ${e.toString()}', isError: true);
     }
   }
 
@@ -404,6 +414,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                   : null,
                               color: const Color(0xFFD4AF37),
                             ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.white.withOpacity(0.1),
+                          child: Icon(
+                            Icons.person,
+                            size: 60,
+                            color: Colors.white.withOpacity(0.5),
                           ),
                         );
                       },

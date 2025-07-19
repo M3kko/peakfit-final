@@ -122,6 +122,9 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
       if (doc.exists && doc.data()?['profile'] != null) {
         final profile = doc.data()!['profile'] as Map<String, dynamic>;
 
+        // Debug print to see the data structure
+        print('Loading profile data: $profile');
+
         setState(() {
           _responses = Map<String, dynamic>.from(profile);
           _originalResponses = Map<String, dynamic>.from(profile);
@@ -146,19 +149,21 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
     setState(() {
       _responses[key] = value;
 
-      // If sport changed, clear disciplines
+      // If sport changed, clear disciplines and goals
       if (key == 'sport' && value != _previousSport) {
         _responses.remove('disciplines');
-        _responses.remove('goals'); // Also clear goals as they depend on sport/discipline
+        _responses.remove('goals');
 
         // Navigate to discipline page if not already there
         if (_currentPage < 1) {
           Future.delayed(const Duration(milliseconds: 100), () {
-            _pageController.animateToPage(
-              1,
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeInOut,
-            );
+            if (mounted) {
+              _pageController.animateToPage(
+                1,
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOut,
+              );
+            }
           });
         }
       }
@@ -170,9 +175,32 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
   void _checkForChanges() {
     bool hasChanges = false;
 
-    // Check each field for changes
+    // Compare each field
     _responses.forEach((key, value) {
-      if (value != _originalResponses[key]) {
+      final originalValue = _originalResponses[key];
+
+      if (value == null && originalValue == null) {
+        // Both null, no change
+      } else if (value == null || originalValue == null) {
+        // One is null, there's a change
+        hasChanges = true;
+      } else if (key == 'goals') {
+        // Special handling for goals - they might be strings or maps
+        hasChanges = !_areGoalsEqual(value, originalValue);
+      } else if (value is List && originalValue is List) {
+        // Compare lists
+        if (value.length != originalValue.length) {
+          hasChanges = true;
+        } else {
+          // Deep compare list items
+          for (int i = 0; i < value.length; i++) {
+            if (value[i].toString() != originalValue[i].toString()) {
+              hasChanges = true;
+              break;
+            }
+          }
+        }
+      } else if (value.toString() != originalValue.toString()) {
         hasChanges = true;
       }
     });
@@ -187,6 +215,29 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
     setState(() {
       _hasChanges = hasChanges;
     });
+  }
+
+  bool _areGoalsEqual(dynamic goals1, dynamic goals2) {
+    if (goals1 == null && goals2 == null) return true;
+    if (goals1 == null || goals2 == null) return false;
+
+    final list1 = goals1 as List;
+    final list2 = goals2 as List;
+
+    if (list1.length != list2.length) return false;
+
+    for (int i = 0; i < list1.length; i++) {
+      final item1 = list1[i];
+      final item2 = list2[i];
+
+      // Get the title from either string or map format
+      final title1 = item1 is Map ? item1['title'] : item1.toString();
+      final title2 = item2 is Map ? item2['title'] : item2.toString();
+
+      if (title1 != title2) return false;
+    }
+
+    return true;
   }
 
   void _showGlassyNotification(String message, {bool isError = false}) {
@@ -225,13 +276,31 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
     if (!_hasChanges || user == null) return;
 
     try {
+      // Prepare data for saving
+      Map<String, dynamic> dataToSave = {};
+
+      // Process each field
+      _responses.forEach((key, value) {
+        if (key == 'goals' && value is List) {
+          // Convert goals to string format for storage
+          dataToSave[key] = value.map((goal) {
+            if (goal is Map) {
+              return goal['title'] ?? 'Unknown Goal';
+            }
+            return goal.toString();
+          }).toList();
+        } else {
+          dataToSave[key] = value;
+        }
+      });
+
       // Extract gender from disciplines if present
       String? gender;
-      final disciplines = _responses['disciplines'];
+      final disciplines = dataToSave['disciplines'];
       if (disciplines != null && disciplines is List && disciplines.isNotEmpty) {
         for (var discipline in disciplines) {
-          if (discipline is Map<String, dynamic> && discipline['gender'] != 'Mixed') {
-            gender = discipline['gender']?.toString();
+          if (discipline is Map && discipline['gender'] != null && discipline['gender'] != 'Mixed') {
+            gender = discipline['gender'].toString();
             break;
           }
         }
@@ -243,15 +312,15 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
           .doc(user!.uid)
           .update({
         'profile': {
-          ..._responses,
+          ...dataToSave,
           if (gender != null) 'gender': gender,
         },
         'updated_at': FieldValue.serverTimestamp(),
       });
 
       setState(() {
-        _originalResponses = Map<String, dynamic>.from(_responses);
-        _previousSport = _responses['sport'];
+        _originalResponses = Map<String, dynamic>.from(dataToSave);
+        _previousSport = dataToSave['sport'];
         _hasChanges = false;
       });
 
@@ -265,6 +334,7 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
       });
 
     } catch (e) {
+      print('Save error: $e');
       _showGlassyNotification('Error updating preferences: ${e.toString()}', isError: true);
     }
   }
@@ -275,24 +345,16 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
         return _responses['sport'] != null && _responses['sport'].toString().isNotEmpty;
       case 1: // Discipline
         final disciplines = _responses['disciplines'];
-        if (disciplines == null) return false;
-        if (disciplines is List) return disciplines.isNotEmpty;
-        return false;
+        return disciplines != null && disciplines is List && disciplines.isNotEmpty;
       case 2: // Goals
         final goals = _responses['goals'];
-        if (goals == null) return false;
-        if (goals is List) return goals.isNotEmpty;
-        return false;
+        return goals != null && goals is List && goals.isNotEmpty;
       case 3: // Equipment
         final equipment = _responses['equipment'];
-        if (equipment == null) return false;
-        if (equipment is List) return equipment.isNotEmpty;
-        return false;
+        return equipment != null && equipment is List && equipment.isNotEmpty;
       case 4: // Injuries
         final injuries = _responses['injuries'];
-        if (injuries == null) return false;
-        if (injuries is List) return injuries.isNotEmpty;
-        return false;
+        return injuries != null && injuries is List && injuries.isNotEmpty;
       case 5: // Training hours
         return _responses['training_hours'] != null && _responses['training_hours'].toString().isNotEmpty;
       case 6: // Flexibility
@@ -300,6 +362,90 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
       default:
         return true;
     }
+  }
+
+  bool _validateSection(int index) {
+    switch (index) {
+      case 0: // Sport
+        return _responses['sport'] != null && _responses['sport'].toString().isNotEmpty;
+      case 1: // Discipline
+        final disciplines = _responses['disciplines'];
+        return disciplines != null && disciplines is List && disciplines.isNotEmpty;
+      case 2: // Goals
+        final goals = _responses['goals'];
+        return goals != null && goals is List && goals.isNotEmpty;
+      case 3: // Equipment
+        final equipment = _responses['equipment'];
+        return equipment != null && equipment is List && equipment.isNotEmpty;
+      case 4: // Injuries
+        final injuries = _responses['injuries'];
+        return injuries != null && injuries is List && injuries.isNotEmpty;
+      case 5: // Training hours
+        return _responses['training_hours'] != null && _responses['training_hours'].toString().isNotEmpty;
+      case 6: // Flexibility
+        return _responses['flexibility'] != null && _responses['flexibility'].toString().isNotEmpty;
+      default:
+        return false;
+    }
+  }
+
+  // Helper method to safely get list values
+  List<T> _getListValue<T>(String key, List<T> defaultValue) {
+    final value = _responses[key];
+    if (value == null) return defaultValue;
+    if (value is List<T>) return value;
+    if (value is List) {
+      try {
+        return List<T>.from(value);
+      } catch (e) {
+        print('Error casting $key: $e');
+        return defaultValue;
+      }
+    }
+    return defaultValue;
+  }
+
+  // Helper method to safely get disciplines
+  List<Map<String, String>> _getDisciplines() {
+    final disciplines = _responses['disciplines'];
+    if (disciplines == null) return [];
+    if (disciplines is List) {
+      return disciplines.map((item) {
+        if (item is Map<String, String>) {
+          return item;
+        } else if (item is Map) {
+          // Convert Map<String, dynamic> to Map<String, String>
+          return item.map((key, value) => MapEntry(key.toString(), value.toString()));
+        }
+        return <String, String>{};
+      }).toList();
+    }
+    return [];
+  }
+
+  // Helper method to safely get goals
+  List<Map<String, dynamic>> _getGoals() {
+    final goals = _responses['goals'];
+    if (goals == null) return [];
+    if (goals is List) {
+      return goals.map((item) {
+        if (item is Map<String, dynamic>) {
+          return item;
+        } else if (item is String) {
+          // Convert string goals to map format
+          return {
+            'title': item,
+            'icon': '🎯',
+            'description': 'Custom goal',
+          };
+        } else if (item is Map) {
+          // Convert any Map to Map<String, dynamic>
+          return Map<String, dynamic>.from(item);
+        }
+        return <String, dynamic>{};
+      }).toList();
+    }
+    return [];
   }
 
   @override
@@ -348,36 +494,36 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
                     children: [
                       SportPage(
                         onSelected: (value) => _updateResponse('sport', value),
-                        selectedValue: _responses['sport'],
+                        selectedValue: _responses['sport']?.toString(),
                       ),
                       DisciplinePage(
                         onSelected: (value) => _updateResponse('disciplines', value),
-                        selectedValue: _responses['disciplines'],
-                        selectedSport: _responses['sport'] ?? '',
+                        selectedValue: _getDisciplines(),
+                        selectedSport: _responses['sport']?.toString() ?? '',
                         onGenderConflict: _showGenderConflictError,
                       ),
                       GoalsPage(
                         onSelected: (value) => _updateResponse('goals', value),
-                        selectedValue: _responses['goals'],
-                        selectedSport: _responses['sport'] ?? '',
-                        selectedDisciplines: _responses['disciplines'] ?? [],
+                        selectedValue: _getGoals(),
+                        selectedSport: _responses['sport']?.toString() ?? '',
+                        selectedDisciplines: _getDisciplines(),
                         onMaxGoalsExceeded: _showMaxGoalsError,
                       ),
                       EquipmentPage(
                         onSelected: (value) => _updateResponse('equipment', value),
-                        selectedValue: _responses['equipment'],
+                        selectedValue: _getListValue<String>('equipment', []),
                       ),
                       InjuriesPage(
                         onSelected: (value) => _updateResponse('injuries', value),
-                        selectedValue: _responses['injuries'],
+                        selectedValue: _getListValue<String>('injuries', []),
                       ),
                       TrainingHoursPage(
                         onSelected: (value) => _updateResponse('training_hours', value),
-                        selectedValue: _responses['training_hours'],
+                        selectedValue: _responses['training_hours']?.toString(),
                       ),
                       FlexibilityPage(
                         onSelected: (value) => _updateResponse('flexibility', value),
-                        selectedValue: _responses['flexibility'],
+                        selectedValue: _responses['flexibility']?.toString(),
                       ),
                     ],
                   ),
@@ -593,39 +739,6 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
         },
       ),
     );
-  }
-
-  bool _validateSection(int index) {
-    switch (index) {
-      case 0: // Sport
-        return _responses['sport'] != null && _responses['sport'].toString().isNotEmpty;
-      case 1: // Discipline
-        final disciplines = _responses['disciplines'];
-        if (disciplines == null) return false;
-        if (disciplines is List) return disciplines.isNotEmpty;
-        return false;
-      case 2: // Goals
-        final goals = _responses['goals'];
-        if (goals == null) return false;
-        if (goals is List) return goals.isNotEmpty;
-        return false;
-      case 3: // Equipment
-        final equipment = _responses['equipment'];
-        if (equipment == null) return false;
-        if (equipment is List) return equipment.isNotEmpty;
-        return false;
-      case 4: // Injuries
-        final injuries = _responses['injuries'];
-        if (injuries == null) return false;
-        if (injuries is List) return injuries.isNotEmpty;
-        return false;
-      case 5: // Training hours
-        return _responses['training_hours'] != null && _responses['training_hours'].toString().isNotEmpty;
-      case 6: // Flexibility
-        return _responses['flexibility'] != null && _responses['flexibility'].toString().isNotEmpty;
-      default:
-        return false;
-    }
   }
 
   Widget _buildSaveButton() {

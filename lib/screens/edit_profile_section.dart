@@ -34,11 +34,19 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
 
   late AnimationController _buttonController;
   late AnimationController _glowController;
+  late AnimationController _notificationController;
   late Animation<double> _buttonAnimation;
   late Animation<double> _glowAnimation;
+  late Animation<double> _notificationSlideAnimation;
+  late Animation<double> _notificationFadeAnimation;
 
   Map<String, dynamic> _tempData = {};
   bool _hasChanges = false;
+
+  // Notification state
+  bool _showNotification = false;
+  String _notificationMessage = '';
+  bool _isError = false;
 
   @override
   void initState() {
@@ -62,6 +70,11 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
       vsync: this,
     )..repeat(reverse: true);
 
+    _notificationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
     _buttonAnimation = Tween<double>(
       begin: 1.0,
       end: 0.95,
@@ -76,6 +89,22 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
     ).animate(CurvedAnimation(
       parent: _glowController,
       curve: Curves.easeInOut,
+    ));
+
+    _notificationSlideAnimation = Tween<double>(
+      begin: -200.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _notificationController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _notificationFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _notificationController,
+      curve: Curves.easeIn,
     ));
   }
 
@@ -125,18 +154,31 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
   }
 
   void _showError(String message) {
+    _showNotificationMessage(message, isError: true);
+  }
+
+  void _showNotificationMessage(String message, {bool isError = false}) {
+    setState(() {
+      _showNotification = true;
+      _notificationMessage = message;
+      _isError = isError;
+    });
+
+    _notificationController.forward();
     HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.withOpacity(0.8),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-      ),
-    );
+
+    // Auto-hide after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _notificationController.reverse().then((_) {
+          if (mounted) {
+            setState(() {
+              _showNotification = false;
+            });
+          }
+        });
+      }
+    });
   }
 
   void _showGenderConflictError() {
@@ -179,17 +221,7 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Profile updated successfully'),
-            backgroundColor: Colors.green.withOpacity(0.8),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(20),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+        // Show success message in parent screen if needed
       }
     } catch (e) {
       _showError('Error updating profile: ${e.toString()}');
@@ -275,11 +307,13 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
     _pageController.dispose();
     _buttonController.dispose();
     _glowController.dispose();
+    _notificationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final statusBarHeight = MediaQuery.of(context).padding.top;
     final pages = _getPages();
 
     if (pages.isEmpty) {
@@ -299,25 +333,125 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (page) {
-                  setState(() {
-                    _currentPage = page;
-                  });
-                },
-                physics: const NeverScrollableScrollPhysics(),
-                children: pages,
-              ),
+      body: Stack(
+        children: [
+          // Main content
+          SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    onPageChanged: (page) {
+                      setState(() {
+                        _currentPage = page;
+                      });
+                    },
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: pages,
+                  ),
+                ),
+                _buildNavigationButtons(isFirstPage, isLastPage, pages.length),
+              ],
             ),
-            _buildNavigationButtons(isFirstPage, isLastPage, pages.length),
-          ],
-        ),
+          ),
+
+          // Notification overlay - positioned absolutely at the top
+          if (_showNotification)
+            AnimatedBuilder(
+              animation: _notificationController,
+              builder: (context, child) {
+                return Positioned(
+                  top: _notificationSlideAnimation.value,
+                  left: 0,
+                  right: 0,
+                  child: FadeTransition(
+                    opacity: _notificationFadeAnimation,
+                    child: Container(
+                      margin: EdgeInsets.only(
+                        top: statusBarHeight + 8,
+                        left: 24,
+                        right: 24,
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: _isError
+                              ? [
+                            const Color(0xFF1A0000), // Very dark red
+                            const Color(0xFF2D0000),
+                          ]
+                              : [
+                            const Color(0xFF001A00), // Very dark green
+                            const Color(0xFF002D00),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                          color: _isError
+                              ? Colors.red.withOpacity(0.2)
+                              : Colors.green.withOpacity(0.2),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _isError
+                                ? Colors.red.withOpacity(0.2)
+                                : Colors.green.withOpacity(0.2),
+                            blurRadius: 20,
+                            spreadRadius: -5,
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: _isError
+                                  ? Colors.red.withOpacity(0.15)
+                                  : Colors.green.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              _isError
+                                  ? Icons.warning_rounded
+                                  : Icons.check_circle_rounded,
+                              color: _isError
+                                  ? Colors.red[400]
+                                  : Colors.green[400],
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _notificationMessage,
+                              style: TextStyle(
+                                color: _isError
+                                    ? Colors.red[300]
+                                    : Colors.green[300],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
     );
   }

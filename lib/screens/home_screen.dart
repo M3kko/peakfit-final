@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'time_selection_screen.dart';
 import 'profile_screen.dart';
+import 'stats_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -713,8 +714,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           _buildNavItem(Icons.home, true, 0),
           _buildNavItem(Icons.calendar_today, false, 1),
-          _buildNavItem(Icons.trending_up, false, 2),
-          _buildNavItem(Icons.person, false, 3),
+          _buildNavItem(Icons.bar_chart, false, 2), // Changed from trending_up to bar_chart
+          _buildNavItem(Icons.emoji_events_outlined, false, 3), // Changed from person to achievements
         ],
       ),
     );
@@ -756,22 +757,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
         break;
       case 2:
-      // Navigate to stats/progress
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Stats screen coming soon!'),
-            backgroundColor: Color(0xFF1A1A1A),
-          ),
+      // Navigate to stats screen
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const StatsScreen()),
         );
         break;
       case 3:
-      // Navigate to profile
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+      // Navigate to achievements
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Achievements screen coming soon!'),
+            backgroundColor: Color(0xFF1A1A1A),
+          ),
         );
-        // Reload user data when returning
-        _loadUserData();
         break;
     }
   }

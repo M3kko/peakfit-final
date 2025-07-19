@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:fl_chart/fl_chart.dart'; // You'll need to add fl_chart to pubspec.yaml
+import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 
 class StatsScreen extends StatefulWidget {

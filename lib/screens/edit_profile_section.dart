@@ -92,7 +92,7 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
     ));
 
     _notificationSlideAnimation = Tween<double>(
-      begin: -200.0,
+      begin: -100.0,
       end: 0.0,
     ).animate(CurvedAnimation(
       parent: _notificationController,
@@ -113,7 +113,7 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
       case 'personal':
         return 0;
       case 'goals':
-        return 0; // Goals is now the first page
+        return 0;
       case 'equipment':
         return 0;
       case 'schedule':
@@ -153,11 +153,7 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
     });
   }
 
-  void _showError(String message) {
-    _showNotificationMessage(message, isError: true);
-  }
-
-  void _showNotificationMessage(String message, {bool isError = false}) {
+  void _showGlassyNotification(String message, {bool isError = false}) {
     setState(() {
       _showNotification = true;
       _notificationMessage = message;
@@ -182,11 +178,11 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
   }
 
   void _showGenderConflictError() {
-    _showError('Please select disciplines from the same gender category only');
+    _showGlassyNotification('Please select disciplines from the same gender category only', isError: true);
   }
 
   void _showMaxGoalsError() {
-    _showError('Maximum 3 goals can be selected');
+    _showGlassyNotification('Maximum 3 goals can be selected', isError: true);
   }
 
   Future<void> _saveChanges() async {
@@ -224,7 +220,7 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
         // Show success message in parent screen if needed
       }
     } catch (e) {
-      _showError('Error updating profile: ${e.toString()}');
+      _showGlassyNotification('Error updating profile: ${e.toString()}', isError: true);
     }
   }
 
@@ -357,94 +353,75 @@ class _EditProfileSectionState extends State<EditProfileSection> with TickerProv
             ),
           ),
 
-          // Notification overlay - positioned absolutely at the top
+          // Glassy notification overlay
           if (_showNotification)
             AnimatedBuilder(
               animation: _notificationController,
               builder: (context, child) {
                 return Positioned(
-                  top: _notificationSlideAnimation.value,
-                  left: 0,
-                  right: 0,
+                  top: statusBarHeight + _notificationSlideAnimation.value,
+                  left: 24,
+                  right: 24,
                   child: FadeTransition(
                     opacity: _notificationFadeAnimation,
                     child: Container(
-                      margin: EdgeInsets.only(
-                        top: statusBarHeight + 8,
-                        left: 24,
-                        right: 24,
-                      ),
-                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: _isError
-                              ? [
-                            const Color(0xFF1A0000), // Very dark red
-                            const Color(0xFF2D0000),
-                          ]
-                              : [
-                            const Color(0xFF001A00), // Very dark green
-                            const Color(0xFF002D00),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(15),
+                        color: _isError
+                            ? Colors.red.withOpacity(0.05)
+                            : Colors.green.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: _isError
-                              ? Colors.red.withOpacity(0.2)
-                              : Colors.green.withOpacity(0.2),
-                          width: 1,
+                              ? Colors.red.withOpacity(0.1)
+                              : Colors.green.withOpacity(0.1),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: _isError
-                                ? Colors.red.withOpacity(0.2)
-                                : Colors.green.withOpacity(0.2),
+                            color: Colors.black.withOpacity(0.2),
                             blurRadius: 20,
-                            spreadRadius: -5,
-                          ),
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.5),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
+                            spreadRadius: 5,
                           ),
                         ],
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: _isError
-                                  ? Colors.red.withOpacity(0.15)
-                                  : Colors.green.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              _isError
-                                  ? Icons.warning_rounded
-                                  : Icons.check_circle_rounded,
-                              color: _isError
-                                  ? Colors.red[400]
-                                  : Colors.green[400],
-                              size: 20,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: BackdropFilter(
+                          filter: ColorFilter.mode(
+                            _isError
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.green.withOpacity(0.1),
+                            BlendMode.overlay,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _isError
+                                      ? Icons.error_outline
+                                      : Icons.check_circle_outline,
+                                  color: _isError
+                                      ? Colors.red[300]
+                                      : Colors.green[300],
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    _notificationMessage,
+                                    style: TextStyle(
+                                      color: _isError
+                                          ? Colors.red[300]
+                                          : Colors.green[300],
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _notificationMessage,
-                              style: TextStyle(
-                                color: _isError
-                                    ? Colors.red[300]
-                                    : Colors.green[300],
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),

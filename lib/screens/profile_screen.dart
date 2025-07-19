@@ -75,7 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     ));
 
     _notificationSlideAnimation = Tween<double>(
-      begin: -200.0,
+      begin: -100.0,
       end: 0.0,
     ).animate(CurvedAnimation(
       parent: _notificationController,
@@ -127,7 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       });
     } catch (e) {
       print('Error loading user data: $e');
-      _showGlassMessage('Error loading profile data', isError: true);
+      _showGlassyNotification('Error loading profile data', isError: true);
     }
   }
 
@@ -155,28 +155,20 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       if (image == null) return;
 
       if (user == null) {
-        _showGlassMessage('User not authenticated', isError: true);
+        _showGlassyNotification('User not authenticated', isError: true);
         return;
       }
-
-      // Debug authentication
-      print('Current user UID: ${user?.uid}');
-      print('Is user authenticated: ${user != null}');
 
       setState(() => _isUploading = true);
 
       final file = File(image.path);
 
-      // Updated path to use subfolder structure for secure rules
-      final storagePath = 'profile_images/${user!.uid}/profile.jpg';
-      print('Upload path: $storagePath');
-
       // Upload to Firebase Storage with the new path structure
       final ref = FirebaseStorage.instance
           .ref()
           .child('profile_images')
-          .child(user!.uid)  // User-specific folder
-          .child('profile.jpg');  // Profile image file
+          .child(user!.uid)
+          .child('profile.jpg');
 
       final uploadTask = ref.putFile(
         file,
@@ -201,13 +193,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       });
 
       HapticFeedback.mediumImpact();
-      _showGlassMessage('Profile picture updated successfully');
+      _showGlassyNotification('Profile picture updated successfully');
 
     } catch (e) {
       setState(() => _isUploading = false);
       print('Error uploading image: $e');
-      print('Error details: ${e.toString()}');
-      _showGlassMessage('Error uploading image', isError: true);
+      _showGlassyNotification('Error uploading image', isError: true);
     }
   }
 
@@ -233,7 +224,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   Future<void> _updateUsername(String newUsername) async {
     if (!canChangeUsername || user == null) {
-      _showGlassMessage('Username can only be changed once every 7 days', isError: true);
+      _showGlassyNotification('Username can only be changed once every 7 days', isError: true);
       return;
     }
 
@@ -301,14 +292,14 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       });
 
       HapticFeedback.mediumImpact();
-      _showGlassMessage('Username updated successfully');
+      _showGlassyNotification('Username updated successfully');
     } catch (e) {
       print('Error updating username: $e');
-      _showGlassMessage(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      _showGlassyNotification(e.toString().replaceFirst('Exception: ', ''), isError: true);
     }
   }
 
-  void _showGlassMessage(String message, {bool isError = false}) {
+  void _showGlassyNotification(String message, {bool isError = false}) {
     setState(() {
       _showNotification = true;
       _notificationMessage = message;
@@ -369,94 +360,75 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             ),
           ),
 
-          // Notification overlay - positioned absolutely at the top
+          // Glassy notification overlay
           if (_showNotification)
             AnimatedBuilder(
               animation: _notificationController,
               builder: (context, child) {
                 return Positioned(
-                  top: _notificationSlideAnimation.value,
-                  left: 0,
-                  right: 0,
+                  top: statusBarHeight + _notificationSlideAnimation.value,
+                  left: 24,
+                  right: 24,
                   child: FadeTransition(
                     opacity: _notificationFadeAnimation,
                     child: Container(
-                      margin: EdgeInsets.only(
-                        top: statusBarHeight + 8,
-                        left: 24,
-                        right: 24,
-                      ),
-                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: _isError
-                              ? [
-                            const Color(0xFF1A0000), // Very dark red
-                            const Color(0xFF2D0000),
-                          ]
-                              : [
-                            const Color(0xFF001A00), // Very dark green
-                            const Color(0xFF002D00),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(15),
+                        color: _isError
+                            ? Colors.red.withOpacity(0.05)
+                            : Colors.green.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: _isError
-                              ? Colors.red.withOpacity(0.2)
-                              : Colors.green.withOpacity(0.2),
-                          width: 1,
+                              ? Colors.red.withOpacity(0.1)
+                              : Colors.green.withOpacity(0.1),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: _isError
-                                ? Colors.red.withOpacity(0.2)
-                                : Colors.green.withOpacity(0.2),
+                            color: Colors.black.withOpacity(0.2),
                             blurRadius: 20,
-                            spreadRadius: -5,
-                          ),
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.5),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
+                            spreadRadius: 5,
                           ),
                         ],
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: _isError
-                                  ? Colors.red.withOpacity(0.15)
-                                  : Colors.green.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              _isError
-                                  ? Icons.warning_rounded
-                                  : Icons.check_circle_rounded,
-                              color: _isError
-                                  ? Colors.red[400]
-                                  : Colors.green[400],
-                              size: 20,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: BackdropFilter(
+                          filter: ColorFilter.mode(
+                            _isError
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.green.withOpacity(0.1),
+                            BlendMode.overlay,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _isError
+                                      ? Icons.error_outline
+                                      : Icons.check_circle_outline,
+                                  color: _isError
+                                      ? Colors.red[300]
+                                      : Colors.green[300],
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    _notificationMessage,
+                                    style: TextStyle(
+                                      color: _isError
+                                          ? Colors.red[300]
+                                          : Colors.green[300],
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _notificationMessage,
-                              style: TextStyle(
-                                color: _isError
-                                    ? Colors.red[300]
-                                    : Colors.green[300],
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -633,7 +605,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               GestureDetector(
                 onTap: canChangeUsername
                     ? () => _showUsernameDialog()
-                    : () => _showGlassMessage(
+                    : () => _showGlassyNotification(
                   'Username can be changed in $daysUntilUsernameChange days',
                   isError: true,
                 ),

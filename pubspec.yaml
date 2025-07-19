@@ -20,7 +20,7 @@ dependencies:
   # UI Components
   sleek_circular_slider: ^2.0.1
   cupertino_icons: ^1.0.8
-  fl_chart: ^0.50.1
+  fl_chart: ^1.0.0
 
   # Media
   video_player: ^2.8.1

@@ -227,11 +227,11 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
     try {
       // Extract gender from disciplines if present
       String? gender;
-      if (_responses['disciplines'] != null && (_responses['disciplines'] as List).isNotEmpty) {
-        final disciplines = _responses['disciplines'] as List<Map<String, String>>;
+      final disciplines = _responses['disciplines'];
+      if (disciplines != null && disciplines is List && disciplines.isNotEmpty) {
         for (var discipline in disciplines) {
-          if (discipline['gender'] != 'Mixed') {
-            gender = discipline['gender'];
+          if (discipline is Map<String, dynamic> && discipline['gender'] != 'Mixed') {
+            gender = discipline['gender']?.toString();
             break;
           }
         }
@@ -274,13 +274,25 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
       case 0: // Sport
         return _responses['sport'] != null && _responses['sport'].toString().isNotEmpty;
       case 1: // Discipline
-        return _responses['disciplines'] != null && (_responses['disciplines'] as List).isNotEmpty;
+        final disciplines = _responses['disciplines'];
+        if (disciplines == null) return false;
+        if (disciplines is List) return disciplines.isNotEmpty;
+        return false;
       case 2: // Goals
-        return _responses['goals'] != null && (_responses['goals'] as List).isNotEmpty;
+        final goals = _responses['goals'];
+        if (goals == null) return false;
+        if (goals is List) return goals.isNotEmpty;
+        return false;
       case 3: // Equipment
-        return _responses['equipment'] != null && (_responses['equipment'] as List).isNotEmpty;
+        final equipment = _responses['equipment'];
+        if (equipment == null) return false;
+        if (equipment is List) return equipment.isNotEmpty;
+        return false;
       case 4: // Injuries
-        return _responses['injuries'] != null && (_responses['injuries'] as List).isNotEmpty;
+        final injuries = _responses['injuries'];
+        if (injuries == null) return false;
+        if (injuries is List) return injuries.isNotEmpty;
+        return false;
       case 5: // Training hours
         return _responses['training_hours'] != null && _responses['training_hours'].toString().isNotEmpty;
       case 6: // Flexibility
@@ -588,13 +600,25 @@ class _TrainingPreferencesScreenState extends State<TrainingPreferencesScreen> w
       case 0: // Sport
         return _responses['sport'] != null && _responses['sport'].toString().isNotEmpty;
       case 1: // Discipline
-        return _responses['disciplines'] != null && (_responses['disciplines'] as List).isNotEmpty;
+        final disciplines = _responses['disciplines'];
+        if (disciplines == null) return false;
+        if (disciplines is List) return disciplines.isNotEmpty;
+        return false;
       case 2: // Goals
-        return _responses['goals'] != null && (_responses['goals'] as List).isNotEmpty;
+        final goals = _responses['goals'];
+        if (goals == null) return false;
+        if (goals is List) return goals.isNotEmpty;
+        return false;
       case 3: // Equipment
-        return _responses['equipment'] != null && (_responses['equipment'] as List).isNotEmpty;
+        final equipment = _responses['equipment'];
+        if (equipment == null) return false;
+        if (equipment is List) return equipment.isNotEmpty;
+        return false;
       case 4: // Injuries
-        return _responses['injuries'] != null && (_responses['injuries'] as List).isNotEmpty;
+        final injuries = _responses['injuries'];
+        if (injuries == null) return false;
+        if (injuries is List) return injuries.isNotEmpty;
+        return false;
       case 5: // Training hours
         return _responses['training_hours'] != null && _responses['training_hours'].toString().isNotEmpty;
       case 6: // Flexibility

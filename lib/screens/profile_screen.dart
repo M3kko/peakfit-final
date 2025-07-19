@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:math';
 import 'auth_screen.dart';
+import 'training_preferences_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -940,24 +941,10 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             'Update your equipment, sport, and training preferences',
             Icons.settings_outlined,
                 () {
-              // Navigate to blank screen for now
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => Scaffold(
-                    backgroundColor: Colors.black,
-                    appBar: AppBar(
-                      backgroundColor: Colors.black,
-                      title: const Text('Training Preferences'),
-                    ),
-                    body: const Center(
-                      child: Text(
-                        'Training preferences screen\nComing soon',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
+                  builder: (context) => const TrainingPreferencesScreen(),
                 ),
               );
             },

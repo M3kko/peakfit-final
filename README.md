@@ -19,3 +19,6 @@ Things to Add:
 - Make reps centered where the time is rather than a timer
 - Remove skip buttons
 - Add in an info screen that explains something idk.
+- Allow the uesr to go back on the post workout screen ratings
+- Change stats shown on the post workout screen
+- add in functioning code for reset data

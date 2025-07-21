@@ -11,3 +11,11 @@ Things to Add:
 - Require strong password on signup
 - Add show password on sign in 
 - Figure out Notifications
+- Make preworkout stuff expand on click
+- Make the timer a consistent spot on the screen for during the workout 
+- Make Post workout screen have functioning share button + explanation of ratings before rating
+- Progress wont save on exit, dont skip to end screen
+- Make rep ones a checkmark rather than a skip
+- Make reps centered where the time is rather than a timer
+- Remove skip buttons
+- Add in an info screen that explains something idk.

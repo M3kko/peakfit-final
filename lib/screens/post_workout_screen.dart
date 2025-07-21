@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
+import 'dart:math';
 
 class PostWorkoutScreen extends StatefulWidget {
   final String workoutType;
@@ -808,23 +809,23 @@ class _ConfettiPainter extends CustomPainter {
 
       if (i % 3 == 0) {
         // Draw circles
-        canvas.drawCircle(Offset.zero, particleSize, paint);
+        canvas.drawCircle(Offset.zero, particleSize.toDouble(), paint);
       } else if (i % 3 == 1) {
         // Draw rectangles
         canvas.drawRect(
           Rect.fromCenter(
             center: Offset.zero,
             width: particleSize * 2,
-            height: particleSize,
+            height: particleSize.toDouble(),
           ),
           paint,
         );
       } else {
         // Draw triangles
         final path = Path()
-          ..moveTo(0, -particleSize)
-          ..lineTo(particleSize, particleSize)
-          ..lineTo(-particleSize, particleSize)
+          ..moveTo(0, -particleSize.toDouble())
+          ..lineTo(particleSize.toDouble(), particleSize.toDouble())
+          ..lineTo(-particleSize.toDouble(), particleSize.toDouble())
           ..close();
         canvas.drawPath(path, paint);
       }

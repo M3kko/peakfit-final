@@ -328,6 +328,83 @@ exports.onPasswordResetCodeCreated = onDocumentWritten({
   return null;
 });
 
+// NEW: Account deletion email trigger
+exports.onDeleteRequestCreated = onDocumentWritten({
+  document: 'delete_requests/{uid}',
+  region: 'us-central1',
+  secrets: [RESEND_API_KEY]
+}, async (event) => {
+  const data = event.data?.after?.data();
+  if (!data) return null;
+
+  console.log(`Delete account code ${data.code} for ${data.email}`);
+
+  // Initialize Resend inside the function
+  const resend = new Resend(RESEND_API_KEY.value());
+
+  try {
+    const title = 'Confirm Account Deletion';
+    const subtitle = 'Important Security Verification';
+    const content = 'You have requested to permanently delete your PeakFit account. This action cannot be undone. All your data, including workouts, achievements, and progress will be permanently removed. Please use the verification code below to confirm this action.';
+    
+    const { data: result, error } = await resend.emails.send({
+      from: 'PeakFit <hello@peakfit.ai>',
+      to: [data.email],
+      subject: 'PeakFit Account Deletion Verification',
+      text: createEmailText(title, content, data.code),
+      html: createEmailHTML(title, subtitle, content, data.code),
+      headers: {
+        'X-Entity-Ref-ID': `account-deletion-${event.params.uid}-${Date.now()}`,
+        'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
+        'Importance': 'high',
+        'Priority': 'urgent'
+      },
+      tags: [
+        {
+          name: 'category',
+          value: 'account-deletion'
+        },
+        {
+          name: 'security',
+          value: 'high'
+        }
+      ]
+    });
+
+    if (error) {
+      console.error('Failed to send account deletion email:', error);
+      // Optionally, update the document to indicate email send failure
+      await event.data.after.ref.update({
+        email_sent: false,
+        email_error: error.message,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      console.log('Account deletion email sent successfully to', data.email, 'with ID:', result.id);
+      // Update the document to indicate successful email send
+      await event.data.after.ref.update({
+        email_sent: true,
+        email_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+        resend_id: result.id
+      });
+    }
+  } catch (err) {
+    console.error('Resend error:', err);
+    // Update the document to indicate email send failure
+    try {
+      await event.data.after.ref.update({
+        email_sent: false,
+        email_error: err.message || 'Unknown error',
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (updateErr) {
+      console.error('Failed to update document:', updateErr);
+    }
+  }
+
+  return null;
+});
+
 // Callable function
 exports.resetPasswordWithCode = onCall({ region: 'us-central1' }, async (request) => {
   const { email, code, newPassword } = request.data;
@@ -385,8 +462,134 @@ exports.resetPasswordWithCode = onCall({ region: 'us-central1' }, async (request
   }
 });
 
-// Scheduled function
-exports.cleanupOldVerificationCodes = onSchedule({
+// NEW: Delete account with code callable function
+exports.deleteAccountWithCode = onCall({ 
+  region: 'us-central1',
+  cors: true 
+}, async (request) => {
+  if (!request.auth) {
+    throw new Error('User must be authenticated');
+  }
+
+  const { code } = request.data;
+  const uid = request.auth.uid;
+
+  if (!code) {
+    throw new Error('Verification code is required');
+  }
+
+  try {
+    // Get the delete request document
+    const deleteRequestDoc = await db.collection('delete_requests').doc(uid).get();
+
+    if (!deleteRequestDoc.exists) {
+      throw new Error('No deletion request found');
+    }
+
+    const deleteRequest = deleteRequestDoc.data();
+
+    // Check if code matches
+    if (deleteRequest.code !== code.trim()) {
+      throw new Error('Invalid verification code');
+    }
+
+    // Check if code is expired (15 minutes)
+    const createdAt = deleteRequest.created_at.toDate();
+    const now = new Date();
+    const fifteenMinutes = 15 * 60 * 1000;
+    
+    if (now - createdAt > fifteenMinutes) {
+      throw new Error('Verification code has expired');
+    }
+
+    // Get user document first for cleanup
+    const userDoc = await db.collection('users').doc(uid).get();
+    const userData = userDoc.exists ? userDoc.data() : null;
+
+    // Proceed with account deletion
+    const batch = db.batch();
+
+    // Delete user document
+    batch.delete(db.collection('users').doc(uid));
+
+    // Delete username document if exists
+    if (userData && userData.username) {
+      const username = userData.username.toLowerCase();
+      batch.delete(db.collection('usernames').doc(username));
+    }
+
+    // Delete all user subcollections
+    const subcollections = ['achievements', 'workouts', 'programs'];
+    for (const subcollection of subcollections) {
+      const snapshot = await db.collection('users').doc(uid).collection(subcollection).get();
+      snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+    }
+
+    // Delete the delete request document
+    batch.delete(db.collection('delete_requests').doc(uid));
+
+    // Delete any verification documents
+    if (userData && userData.email) {
+      const email = userData.email.toLowerCase();
+      batch.delete(db.collection('verifications').doc(email));
+      batch.delete(db.collection('password_resets').doc(email));
+    }
+
+    // Commit all deletions
+    await batch.commit();
+
+    // Delete profile image from storage if exists
+    if (userData && userData.profileImageUrl) {
+      try {
+        const storage = admin.storage();
+        const bucket = storage.bucket();
+        const filePath = `profile_images/${uid}/profile.jpg`;
+        await bucket.file(filePath).delete();
+        console.log('Profile image deleted successfully');
+      } catch (storageError) {
+        console.error('Failed to delete profile image:', storageError);
+        // Don't throw - continue with deletion even if storage cleanup fails
+      }
+    }
+
+    // Optional: Mark user as deleted in Supabase if you're tracking deletions
+    if (userData && userData.email && SUPABASE_URL.value() && SUPABASE_SERVICE_KEY.value()) {
+      try {
+        const supabase = createClient(
+          SUPABASE_URL.value(),
+          SUPABASE_SERVICE_KEY.value()
+        );
+        
+        await supabase
+          .from('users_email')
+          .update({
+            status: 'deleted',
+            deleted_at: new Date().toISOString(),
+            firebase_uid: null
+          })
+          .eq('email', userData.email.toLowerCase());
+      } catch (supabaseError) {
+        console.error('Failed to update Supabase:', supabaseError);
+        // Don't throw - continue with deletion even if Supabase update fails
+      }
+    }
+
+    // Delete the user from Firebase Auth - do this last
+    await auth.deleteUser(uid);
+
+    console.log(`Successfully deleted account for user: ${uid}`);
+    return { success: true, message: 'Account successfully deleted' };
+
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    throw new Error(error.message || 'Failed to delete account');
+  }
+});
+
+// Scheduled function - updated to include delete requests cleanup
+exports.cleanupOldCodes = onSchedule({
   schedule: 'every 15 minutes',
   region: 'us-central1'
 }, async (event) => {
@@ -399,12 +602,16 @@ exports.cleanupOldVerificationCodes = onSchedule({
   const resets = await db.collection('password_resets')
     .where('created_at', '<', expiry)
     .get();
+    
+  const deleteRequests = await db.collection('delete_requests')
+    .where('created_at', '<', expiry)
+    .get();
   
   const batch = db.batch();
-  [...verifications.docs, ...resets.docs].forEach((doc) => batch.delete(doc.ref));
+  [...verifications.docs, ...resets.docs, ...deleteRequests.docs].forEach((doc) => batch.delete(doc.ref));
   
   await batch.commit();
-  console.log(`Cleaned up ${verifications.size + resets.size} expired codes`);
+  console.log(`Cleaned up ${verifications.size + resets.size + deleteRequests.size} expired codes`);
   
   return null;
 });

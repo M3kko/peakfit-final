@@ -1,5 +1,5 @@
 const { onCall, onRequest } = require('firebase-functions/v2/https');
-const { onCreate, onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const { createClient } = require('@supabase/supabase-js');
@@ -249,7 +249,7 @@ exports.syncMarketingConsent = onDocumentWritten({
 });
 
 // Send verification email when code is created
-exports.onVerificationCodeCreated = onCreate({
+exports.onVerificationCodeCreated = onDocumentCreated({
   document: 'verifications/{email}',
   region: 'us-central1',
   secrets: [RESEND_API_KEY]
@@ -299,7 +299,7 @@ exports.onVerificationCodeCreated = onCreate({
 });
 
 // Send password reset email when code is created
-exports.onPasswordResetCodeCreated = onCreate({
+exports.onPasswordResetCodeCreated = onDocumentCreated({
   document: 'password_resets/{email}',
   region: 'us-central1',
   secrets: [RESEND_API_KEY]
@@ -349,7 +349,7 @@ exports.onPasswordResetCodeCreated = onCreate({
 });
 
 // Send account deletion email when request is created
-exports.onDeleteRequestCreated = onCreate({
+exports.onDeleteRequestCreated = onDocumentCreated({
   document: 'delete_requests/{uid}',
   region: 'us-central1',
   secrets: [RESEND_API_KEY]
@@ -408,7 +408,7 @@ exports.onDeleteRequestCreated = onCreate({
 });
 
 // Send email change verification when request is created
-exports.onEmailChangeCodeCreated = onCreate({
+exports.onEmailChangeCodeCreated = onDocumentCreated({
   document: 'email_changes/{uid}',
   region: 'us-central1',
   secrets: [RESEND_API_KEY]

@@ -22,3 +22,7 @@ Things to Add:
 - Allow the uesr to go back on the post workout screen ratings
 - Change stats shown on the post workout screen
 - Fix glow problems on post workout screen
+- Add marketing preferences in settings
+- Fix Email changing 
+- Fix email of deletion
+- Make it delete from supabase and other folders

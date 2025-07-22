@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:math';
@@ -19,6 +20,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMixin {
   final user = FirebaseAuth.instance.currentUser;
   final ImagePicker _picker = ImagePicker();
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -390,7 +392,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     try {
       final code = _generateVerificationCode();
 
-      // Store code in Firestore
+      // Store code in Firestore - this will trigger the Cloud Function to send email
       await FirebaseFirestore.instance
           .collection('delete_requests')
           .doc(user!.uid)
@@ -400,8 +402,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         'email': user!.email,
       });
 
-      // In production, send email here
-      debugPrint('Delete account code: $code');
       _showGlassyNotification('Verification code sent to ${user!.email}');
     } catch (e) {
       _showGlassyNotification('Error sending verification code', isError: true);
@@ -410,52 +410,23 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   Future<void> _deleteAccount(String code) async {
     try {
-      // Verify code
-      final doc = await FirebaseFirestore.instance
-          .collection('delete_requests')
-          .doc(user!.uid)
-          .get();
+      // Call the Cloud Function to verify code and delete account
+      final callable = _functions.httpsCallable('deleteAccountWithCode');
+      final result = await callable.call({
+        'code': code,
+      });
 
-      if (!doc.exists || doc.data()?['code'] != code) {
-        throw Exception('Invalid verification code');
-      }
-
-      // Delete user data
-      final batch = FirebaseFirestore.instance.batch();
-
-      // Delete user document
-      batch.delete(FirebaseFirestore.instance.collection('users').doc(user!.uid));
-
-      // Delete username if exists
-      if (_username != null) {
-        batch.delete(FirebaseFirestore.instance.collection('usernames').doc(_username!.toLowerCase()));
-      }
-
-      // Delete verification entries
-      batch.delete(FirebaseFirestore.instance.collection('delete_requests').doc(user!.uid));
-
-      await batch.commit();
-
-      // Delete profile image from storage
-      if (_profileImageUrl != null) {
-        try {
-          final ref = FirebaseStorage.instance.refFromURL(_profileImageUrl!);
-          await ref.delete();
-        } catch (e) {
-          print('Error deleting profile image: $e');
+      if (result.data['success'] == true) {
+        // Navigate to auth screen
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const AuthScreen()),
+                (route) => false,
+          );
         }
       }
-
-      // Delete Firebase Auth account
-      await user!.delete();
-
-      // Navigate to auth screen
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const AuthScreen()),
-              (route) => false,
-        );
-      }
+    } on FirebaseFunctionsException catch (e) {
+      _showGlassyNotification(e.message ?? 'Error deleting account', isError: true);
     } catch (e) {
       _showGlassyNotification('Error deleting account: ${e.toString()}', isError: true);
     }

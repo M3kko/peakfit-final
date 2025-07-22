@@ -21,5 +21,4 @@ Things to Add:
 - Add in an info screen that explains something idk.
 - Allow the uesr to go back on the post workout screen ratings
 - Change stats shown on the post workout screen
-- add in functioning code for reset data
 - Fix glow problems on post workout screen

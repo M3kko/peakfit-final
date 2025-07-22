@@ -588,7 +588,163 @@ exports.deleteAccountWithCode = onCall({
   }
 });
 
-// Scheduled function - updated to include delete requests cleanup
+// Add this new function for email change verification
+exports.onEmailChangeCodeCreated = onDocumentWritten({
+  document: 'email_changes/{uid}',
+  region: 'us-central1',
+  secrets: [RESEND_API_KEY]
+}, async (event) => {
+  const data = event.data?.after?.data();
+  if (!data) return null;
+
+  console.log(`Email change code ${data.code} for ${data.newEmail}`);
+
+  // Initialize Resend inside the function
+  const resend = new Resend(RESEND_API_KEY.value());
+
+  try {
+    const title = 'Verify Your New Email';
+    const subtitle = 'Email Change Request';
+    const content = 'You have requested to change your PeakFit email address. Please use the verification code below to confirm your new email address.';
+    
+    const { data: result, error } = await resend.emails.send({
+      from: 'PeakFit <hello@peakfit.ai>',
+      to: [data.newEmail],
+      subject: 'Verify Your New PeakFit Email',
+      text: createEmailText(title, content, data.code),
+      html: createEmailHTML(title, subtitle, content, data.code),
+      headers: {
+        'X-Entity-Ref-ID': `email-change-${event.params.uid}-${Date.now()}`,
+        'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
+      },
+      tags: [
+        {
+          name: 'category',
+          value: 'email-change'
+        }
+      ]
+    });
+
+    if (error) {
+      console.error('Failed to send email change verification:', error);
+      await event.data.after.ref.update({
+        email_sent: false,
+        email_error: error.message,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      console.log('Email change verification sent successfully to', data.newEmail, 'with ID:', result.id);
+      await event.data.after.ref.update({
+        email_sent: true,
+        email_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+        resend_id: result.id
+      });
+    }
+  } catch (err) {
+    console.error('Resend error:', err);
+    try {
+      await event.data.after.ref.update({
+        email_sent: false,
+        email_error: err.message || 'Unknown error',
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (updateErr) {
+      console.error('Failed to update document:', updateErr);
+    }
+  }
+
+  return null;
+});
+
+// Callable function to verify email change code
+exports.changeEmailWithCode = onCall({ 
+  region: 'us-central1',
+  cors: true 
+}, async (request) => {
+  if (!request.auth) {
+    throw new Error('User must be authenticated');
+  }
+
+  const { code } = request.data;
+  const uid = request.auth.uid;
+
+  if (!code) {
+    throw new Error('Verification code is required');
+  }
+
+  try {
+    // Get the email change request document
+    const emailChangeDoc = await db.collection('email_changes').doc(uid).get();
+
+    if (!emailChangeDoc.exists) {
+      throw new Error('No email change request found');
+    }
+
+    const emailChangeData = emailChangeDoc.data();
+
+    // Check if code matches
+    if (emailChangeData.code !== code.trim()) {
+      throw new Error('Invalid verification code');
+    }
+
+    // Check if code is expired (15 minutes)
+    const createdAt = emailChangeData.created_at.toDate();
+    const now = new Date();
+    const fifteenMinutes = 15 * 60 * 1000;
+    
+    if (now - createdAt > fifteenMinutes) {
+      throw new Error('Verification code has expired');
+    }
+
+    const newEmail = emailChangeData.newEmail;
+
+    // Update Firebase Auth email
+    await auth.updateUser(uid, { email: newEmail });
+
+    // Update Firestore user document
+    await db.collection('users').doc(uid).update({
+      email: newEmail,
+      email_verified: true,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Delete the email change request
+    await emailChangeDoc.ref.delete();
+
+    console.log(`Email successfully changed for user: ${uid} to ${newEmail}`);
+    return { success: true, newEmail: newEmail };
+
+  } catch (error) {
+    console.error('Email change error:', error);
+    throw new Error(error.message || 'Failed to change email');
+  }
+});
+
+// Original scheduled function - kept for backward compatibility
+exports.cleanupOldVerificationCodes = onSchedule({
+  schedule: 'every 15 minutes',
+  region: 'us-central1'
+}, async (event) => {
+  const expiry = new Date(Date.now() - 15 * 60 * 1000);
+  
+  const verifications = await db.collection('verifications')
+    .where('created_at', '<', expiry)
+    .get();
+  
+  const resets = await db.collection('password_resets')
+    .where('created_at', '<', expiry)
+    .get();
+  
+  const batch = db.batch();
+  [...verifications.docs, ...resets.docs].forEach((doc) => batch.delete(doc.ref));
+  
+  await batch.commit();
+  console.log(`Cleaned up ${verifications.size + resets.size} expired codes`);
+  
+  return null;
+});
+
+// New scheduled function - updated to include delete requests and email changes cleanup
 exports.cleanupOldCodes = onSchedule({
   schedule: 'every 15 minutes',
   region: 'us-central1'
@@ -606,12 +762,16 @@ exports.cleanupOldCodes = onSchedule({
   const deleteRequests = await db.collection('delete_requests')
     .where('created_at', '<', expiry)
     .get();
+    
+  const emailChanges = await db.collection('email_changes')
+    .where('created_at', '<', expiry)
+    .get();
   
   const batch = db.batch();
-  [...verifications.docs, ...resets.docs, ...deleteRequests.docs].forEach((doc) => batch.delete(doc.ref));
+  [...verifications.docs, ...resets.docs, ...deleteRequests.docs, ...emailChanges.docs].forEach((doc) => batch.delete(doc.ref));
   
   await batch.commit();
-  console.log(`Cleaned up ${verifications.size + resets.size + deleteRequests.size} expired codes`);
+  console.log(`Cleaned up ${verifications.size + resets.size + deleteRequests.size + emailChanges.size} expired codes`);
   
   return null;
 });

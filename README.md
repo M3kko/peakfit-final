@@ -21,7 +21,7 @@ PeakFit TRUST
 - Allow the uesr to go back on the post workout screen ratings
 - Change stats shown on the post workout screen
 - Fix glow problems on post workout screen
-- Add marketing preferences in settings
-- Fix Email changing 
+- Add marketing preferences in settings 
 - Fix email of deletion
 - Make it delete from supabase and other folders
+- Make email change in all folders + supabase + display update immediately

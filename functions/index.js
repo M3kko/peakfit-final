@@ -1,20 +1,19 @@
 const { onCall, onRequest } = require('firebase-functions/v2/https');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { initializeApp } = require('firebase-admin/app');
-const { getAuth } = require('firebase-admin/auth');
-const { getFirestore } = require('firebase-admin/firestore');
 const { defineSecret } = require('firebase-functions/params');
 const { createClient } = require('@supabase/supabase-js');
 const { Resend } = require('resend');
 
+// Import admin from admin.js (which handles initialization)
+const admin = require('./admin');
+
 // Import exercise database
 const ExerciseDatabase = require('./exercises_crud');
 
-initializeApp();
-
-const auth = getAuth();
-const db = getFirestore();
+// Get auth and firestore from the already initialized admin
+const auth = admin.auth();
+const db = admin.firestore();
 
 // Define secrets
 const SUPABASE_URL = defineSecret('SUPABASE_URL');

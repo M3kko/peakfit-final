@@ -22,6 +22,16 @@ const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 
 // Helper function to create email-compliant HTML
 function createEmailHTML(title, subtitle, content, code) {
+  // Escape HTML entities for security
+  const escapeHtml = (str) => {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
   return `<!DOCTYPE html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -29,8 +39,11 @@ function createEmailHTML(title, subtitle, content, code) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="x-apple-disable-message-reformatting">
-  <title>${title}</title>
-  <!--[if mso]>
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>${escapeHtml(title)}</title>
+  <!--[if gte mso 9]>
   <xml>
     <o:OfficeDocumentSettings>
       <o:AllowPNG/>
@@ -38,111 +51,163 @@ function createEmailHTML(title, subtitle, content, code) {
     </o:OfficeDocumentSettings>
   </xml>
   <![endif]-->
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
   <style type="text/css">
-    /* Client-specific Styles */
-    #outlook a { padding: 0; }
-    body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
-    table, td { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
-    p { display: block; margin: 13px 0; }
-    
-    /* General Styles */
-    @media only screen and (min-width:480px) {
-      .mj-column-per-100 { width: 100% !important; max-width: 100%; }
+    /* Reset styles */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; }
+
+    /* Remove default styling */
+    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    table { border-collapse: collapse !important; }
+    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+
+    /* Mobile styles */
+    @media screen and (max-width: 600px) {
+      .mobile-hide { display: none !important; }
+      .mobile-center { text-align: center !important; }
+      .mobile-padding { padding: 20px !important; }
+      table.responsive-table { width: 100% !important; }
+      td.responsive-td { font-size: 16px !important; line-height: 24px !important; }
     }
-    
-    @media only screen and (max-width:480px) {
-      table.full-width-mobile { width: 100% !important; }
-      td.full-width-mobile { width: auto !important; }
+
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+      .dark-mode-bg { background-color: #1a1a1a !important; }
+      .dark-mode-text { color: #ffffff !important; }
     }
+
+    /* Outlook-specific styles */
+    <!--[if mso]>
+    table { border-collapse: collapse; border-spacing: 0; margin: 0; }
+    div, td { font-family: Arial, sans-serif; }
+    <![endif]-->
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f4f4f4;">
-  <div style="background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; word-spacing: normal; background-color: #f4f4f4;">
+  <div role="article" aria-roledescription="email" lang="en" style="text-size-adjust: 100%; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
     <!--[if mso | IE]>
-    <table align="center" border="0" cellpadding="0" cellspacing="0" style="width:600px;" width="600">
-      <tr>
-        <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
+    <tr>
+    <td>
     <![endif]-->
     
-    <div style="margin: 0 auto; max-width: 600px;">
-      <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%;">
-        <tbody>
-          <tr>
-            <td style="direction: ltr; font-size: 0px; padding: 20px 0; text-align: center;">
-              <!--[if mso | IE]>
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+    <table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: auto;" class="responsive-table">
+      <tr>
+        <td style="padding: 20px 0;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <!-- Preheader text for email clients -->
+            <tr>
+              <td>
+                <div style="display: none; font-size: 1px; color: #f4f4f4; line-height: 1px; font-family: Arial, sans-serif; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+                  Your PeakFit verification code: ${code}
+                </div>
+              </td>
+            </tr>
+            
+            <!-- Header -->
+            <tr>
+              <td style="background-color: #000000; border-radius: 10px 10px 0 0; padding: 40px 20px; text-align: center;">
+                <!--[if mso]>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td style="vertical-align:top;width:600px;">
-              <![endif]-->
-              
-              <div class="mj-column-per-100 outlook-group-fix" style="font-size: 0px; text-align: left; direction: ltr; display: inline-block; vertical-align: top; width: 100%;">
-                <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
-                  <tbody>
-                    <tr>
-                      <td style="vertical-align: top; padding: 0;">
-                        <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
-                          <!-- Header -->
-                          <tr>
-                            <td align="center" style="font-size: 0px; padding: 0; word-break: break-word;">
-                              <div style="background: #000000; background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%); padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0;">
-                                <h1 style="margin: 0; font-family: Arial, sans-serif; font-size: 32px; font-weight: 300; letter-spacing: 2px; color: #D4AF37;">PEAKFIT</h1>
-                                ${subtitle ? `<p style="margin: 10px 0 0 0; font-family: Arial, sans-serif; font-size: 14px; color: #D4AF37; opacity: 0.8;">${subtitle}</p>` : ''}
-                              </div>
-                            </td>
-                          </tr>
-                          
-                          <!-- Body -->
-                          <tr>
-                            <td align="center" style="font-size: 0px; padding: 0; word-break: break-word;">
-                              <div style="background: #ffffff; padding: 40px 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-                                <h2 style="margin: 0 0 20px 0; font-family: Arial, sans-serif; font-size: 24px; font-weight: normal; color: #333333;">${title}</h2>
-                                <p style="margin: 0 0 20px 0; font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #666666;">${content}</p>
-                                
-                                <!-- Code Box -->
-                                <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 30px auto;">
-                                  <tr>
-                                    <td style="background: #fafafa; border: 2px solid #D4AF37; border-radius: 8px; padding: 30px 40px; text-align: center;">
-                                      <div style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #000000;">${code}</div>
-                                    </td>
-                                  </tr>
-                                </table>
-                                
-                                <p style="margin: 20px 0 0 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #999999;">This code will expire in 15 minutes.</p>
-                              </div>
-                            </td>
-                          </tr>
-                          
-                          <!-- Footer -->
-                          <tr>
-                            <td align="center" style="font-size: 0px; padding: 20px 0 0 0; word-break: break-word;">
-                              <p style="margin: 0; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #999999;">
-                                © 2025 PeakFit. All rights reserved.<br>
-                                If you didn't request this email, please ignore it.
-                              </p>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              
-              <!--[if mso | IE]>
-                  </td>
+                <td style="text-align: center;">
+                <![endif]-->
+                <h1 style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 32px; font-weight: 300; letter-spacing: 2px; color: #D4AF37; line-height: 36px;">PEAKFIT</h1>
+                ${subtitle ? `<p style="margin: 10px 0 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #D4AF37; line-height: 20px;">${escapeHtml(subtitle)}</p>` : ''}
+                <!--[if mso]>
+                </td>
                 </tr>
-              </table>
-              <![endif]-->
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    
-    <!--[if mso | IE]>
+                </table>
+                <![endif]-->
+              </td>
+            </tr>
+            
+            <!-- Body -->
+            <tr>
+              <td style="background-color: #ffffff; border-left: 1px solid #e0e0e0; border-right: 1px solid #e0e0e0; padding: 40px 20px;" class="mobile-padding">
+                <!--[if mso]>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                <td>
+                <![endif]-->
+                <h2 style="margin: 0 0 20px 0; font-family: Arial, Helvetica, sans-serif; font-size: 24px; font-weight: normal; color: #333333; line-height: 32px;" class="responsive-td">${escapeHtml(title)}</h2>
+                <p style="margin: 0 0 30px 0; font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 24px; color: #666666;" class="responsive-td">${escapeHtml(content)}</p>
+                
+                <!-- Code Box -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 0 auto;">
+                  <tr>
+                    <td style="background-color: #fafafa; border: 2px solid #D4AF37; border-radius: 8px; padding: 30px 40px; text-align: center;">
+                      <p style="margin: 0; font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #000000; line-height: 36px;">
+                        ${escapeHtml(code)}
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                
+                <p style="margin: 30px 0 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 20px; color: #999999; text-align: center;">This code will expire in 15 minutes.</p>
+                
+                <!-- Security notice for account deletion -->
+                ${title === 'Confirm Account Deletion' ? `
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 30px;">
+                  <tr>
+                    <td style="background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 4px; padding: 15px;">
+                      <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 20px; color: #856404;">
+                        <strong>Warning:</strong> This action cannot be undone. All your data will be permanently deleted.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                ` : ''}
+                <!--[if mso]>
+                </td>
+                </tr>
+                </table>
+                <![endif]-->
+              </td>
+            </tr>
+            
+            <!-- Footer -->
+            <tr>
+              <td style="background-color: #f8f8f8; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; padding: 20px; text-align: center;">
+                <!--[if mso]>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                <td style="text-align: center;">
+                <![endif]-->
+                <p style="margin: 0 0 10px 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 18px; color: #999999;">
+                  © 2025 PeakFit. All rights reserved.
+                </p>
+                <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 18px; color: #999999;">
+                  If you didn't request this email, please ignore it.
+                </p>
+                <p style="margin: 10px 0 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 16px; color: #999999;">
+                  <a href="mailto:support@peakfit.ai" style="color: #D4AF37; text-decoration: none;">Contact Support</a>
+                </p>
+                <!--[if mso]>
+                </td>
+                </tr>
+                </table>
+                <![endif]-->
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
+    </table>
+    
+    <!--[if mso | IE]>
+    </td>
+    </tr>
     </table>
     <![endif]-->
   </div>
@@ -150,21 +215,42 @@ function createEmailHTML(title, subtitle, content, code) {
 </html>`;
 }
 
-// Helper function to create plain text email
-function createEmailText(title, content, code) {
-  return `PEAKFIT
+// Helper function to create plain text email with better formatting
+function createEmailText(title, content, code, isAccountDeletion = false) {
+  const divider = '='.repeat(60);
+  const codeDivider = '-'.repeat(20);
+  
+  let emailText = `PEAKFIT
+${divider}
 
-${title}
+${title.toUpperCase()}
 
 ${content}
 
-Your code is: ${code}
+${codeDivider}
+VERIFICATION CODE: ${code}
+${codeDivider}
 
 This code will expire in 15 minutes.
 
----
+`;
+
+  if (isAccountDeletion) {
+    emailText += `
+WARNING: This action cannot be undone. All your data will be permanently deleted.
+
+`;
+  }
+
+  emailText += `${divider}
 © 2025 PeakFit. All rights reserved.
-If you didn't request this email, please ignore it.`;
+
+If you didn't request this email, please ignore it.
+
+Need help? Contact us at support@peakfit.ai
+`;
+
+  return emailText;
 }
 
 // ============================================
@@ -275,13 +361,25 @@ exports.onVerificationCodeCreated = onDocumentCreated({
       headers: {
         'X-Entity-Ref-ID': `verification-${data.email}-${Date.now()}`,
         'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'X-Priority': '3',
+        'X-MSMail-Priority': 'Normal',
+        'Importance': 'normal',
+        'X-Mailer': 'PeakFit-Mailer/1.0',
+        'MIME-Version': '1.0',
+        'Content-Type': 'multipart/alternative; boundary="boundary-string"'
       },
       tags: [
         {
           name: 'category',
           value: 'verification'
+        },
+        {
+          name: 'transactional',
+          value: 'true'
         }
-      ]
+      ],
+      replyTo: 'support@peakfit.ai'
     });
 
     if (error) {
@@ -313,7 +411,7 @@ exports.onPasswordResetCodeCreated = onDocumentCreated({
 
   try {
     const title = 'Reset Your Password';
-    const subtitle = null;
+    const subtitle = 'Password Recovery';
     const content = 'We received a request to reset your PeakFit password. Use the code below to set a new password and get back to your fitness journey.';
     
     const { data: result, error } = await resend.emails.send({
@@ -325,13 +423,29 @@ exports.onPasswordResetCodeCreated = onDocumentCreated({
       headers: {
         'X-Entity-Ref-ID': `password-reset-${data.email}-${Date.now()}`,
         'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high',
+        'X-Mailer': 'PeakFit-Mailer/1.0',
+        'MIME-Version': '1.0',
+        'Content-Type': 'multipart/alternative; boundary="boundary-string"'
       },
       tags: [
         {
           name: 'category',
           value: 'password-reset'
+        },
+        {
+          name: 'transactional',
+          value: 'true'
+        },
+        {
+          name: 'security',
+          value: 'true'
         }
-      ]
+      ],
+      replyTo: 'support@peakfit.ai'
     });
 
     if (error) {
@@ -372,14 +486,20 @@ exports.onDeleteRequestCreated = onDocumentCreated({
     const { data: result, error } = await resend.emails.send({
       from: 'PeakFit <hello@peakfit.ai>',
       to: [data.email],
-      subject: 'PeakFit Account Deletion Verification',
-      text: createEmailText(title, content, data.code),
+      subject: '⚠️ PeakFit Account Deletion Verification',
+      text: createEmailText(title, content, data.code, true),
       html: createEmailHTML(title, subtitle, content, data.code),
       headers: {
         'X-Entity-Ref-ID': `account-deletion-${event.params.uid}-${timestamp}`,
         'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
         'Importance': 'high',
-        'Priority': 'urgent'
+        'X-Mailer': 'PeakFit-Mailer/1.0',
+        'MIME-Version': '1.0',
+        'Content-Type': 'multipart/alternative; boundary="boundary-string"',
+        'X-Account-Deletion': 'true'
       },
       tags: [
         {
@@ -389,8 +509,17 @@ exports.onDeleteRequestCreated = onDocumentCreated({
         {
           name: 'security',
           value: 'high'
+        },
+        {
+          name: 'transactional',
+          value: 'true'
+        },
+        {
+          name: 'critical',
+          value: 'true'
         }
-      ]
+      ],
+      replyTo: 'support@peakfit.ai'
     });
 
     if (error) {
@@ -437,13 +566,30 @@ exports.onEmailChangeCodeCreated = onDocumentCreated({
       headers: {
         'X-Entity-Ref-ID': `email-change-${event.params.uid}-${timestamp}`,
         'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'X-Priority': '2',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high',
+        'X-Mailer': 'PeakFit-Mailer/1.0',
+        'MIME-Version': '1.0',
+        'Content-Type': 'multipart/alternative; boundary="boundary-string"',
+        'X-Previous-Email': data.currentEmail || 'unknown'
       },
       tags: [
         {
           name: 'category',
           value: 'email-change'
+        },
+        {
+          name: 'transactional',
+          value: 'true'
+        },
+        {
+          name: 'security',
+          value: 'true'
         }
-      ]
+      ],
+      replyTo: 'support@peakfit.ai'
     });
 
     if (error) {

@@ -1,9 +1,12 @@
 // admin.js - Shared admin instance
-const admin = require('firebase-admin');
+const { initializeApp, getApps } = require('firebase-admin/app');
 
-// Initialize admin only once
-if (!admin.apps.length) {
-  admin.initializeApp();
+// Initialize admin only if no apps exist
+let admin;
+if (!getApps().length) {
+  admin = initializeApp();
+} else {
+  admin = getApps()[0];
 }
 
-module.exports = admin;
+module.exports = require('firebase-admin');

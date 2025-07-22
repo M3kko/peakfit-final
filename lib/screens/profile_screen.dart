@@ -404,7 +404,50 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
       _showGlassyNotification('Verification code sent to ${user!.email}');
     } catch (e) {
-      _showGlassyNotification('Error sending verification code', isError: true);
+      print('Error sending delete account code: $e');
+      _showGlassyNotification('Error sending verification code. Please try again.', isError: true);
+    }
+  }
+
+  Future<void> _sendEmailChangeCode(String newEmail) async {
+    try {
+      final code = _generateVerificationCode();
+
+      // Store code in Firestore - this will trigger the Cloud Function to send email
+      await FirebaseFirestore.instance
+          .collection('email_changes')
+          .doc(user!.uid)
+          .set({
+        'code': code,
+        'created_at': FieldValue.serverTimestamp(),
+        'currentEmail': user!.email,
+        'newEmail': newEmail,
+      });
+
+      _showGlassyNotification('Verification code sent to $newEmail');
+    } catch (e) {
+      print('Error sending email change code: $e');
+      _showGlassyNotification('Error sending verification code. Please try again.', isError: true);
+    }
+  }
+
+  Future<void> _verifyEmailChange(String code) async {
+    try {
+      // Call the Cloud Function to verify code and change email
+      final callable = _functions.httpsCallable('changeEmailWithCode');
+      final result = await callable.call({
+        'code': code,
+      });
+
+      if (result.data['success'] == true) {
+        _showGlassyNotification('Email updated successfully to ${result.data['newEmail']}');
+        // Refresh user data
+        await _loadUserData();
+      }
+    } on FirebaseFunctionsException catch (e) {
+      _showGlassyNotification(e.message ?? 'Error changing email', isError: true);
+    } catch (e) {
+      _showGlassyNotification('Error changing email: ${e.toString()}', isError: true);
     }
   }
 
@@ -1276,101 +1319,151 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   void _showEmailUpdateDialog() {
     final controller = TextEditingController(text: user?.email);
+    final codeController = TextEditingController();
+    bool codeSent = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: Colors.white.withOpacity(0.1),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Colors.white.withOpacity(0.1),
+            ),
           ),
-        ),
-        title: const Text(
-          'Update Email',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
+          title: const Text(
+            'Update Email',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: controller,
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                hintText: 'Enter new email',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Colors.white.withOpacity(0.1),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!codeSent) ...[
+                TextField(
+                  controller: controller,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    hintText: 'Enter new email',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD4AF37),
+                      ),
+                    ),
                   ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Colors.white.withOpacity(0.1),
+                const SizedBox(height: 12),
+                Text(
+                  'A verification code will be sent to your new email address',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.4),
                   ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: Color(0xFFD4AF37),
+              ] else ...[
+                TextField(
+                  controller: codeController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: InputDecoration(
+                    hintText: 'Enter 6-digit code',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    counterText: '',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD4AF37),
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  'Verification code sent to ${controller.text}',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white.withOpacity(0.5)),
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'You will need to verify your new email address',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white.withOpacity(0.4),
+            TextButton(
+              onPressed: () async {
+                if (!codeSent) {
+                  final newEmail = controller.text.trim();
+                  if (newEmail.isNotEmpty && newEmail != user?.email) {
+                    // Validate email format
+                    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                    if (!emailRegex.hasMatch(newEmail)) {
+                      _showGlassyNotification('Please enter a valid email address', isError: true);
+                      return;
+                    }
+                    await _sendEmailChangeCode(newEmail);
+                    setState(() {
+                      codeSent = true;
+                    });
+                  }
+                } else {
+                  final code = codeController.text.trim();
+                  if (code.length == 6) {
+                    Navigator.pop(context);
+                    await _verifyEmailChange(code);
+                  }
+                }
+              },
+              child: Text(
+                codeSent ? 'Verify' : 'Send Code',
+                style: const TextStyle(color: Color(0xFFD4AF37)),
               ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white.withOpacity(0.5)),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              final newEmail = controller.text.trim();
-              if (newEmail.isNotEmpty && newEmail != user?.email) {
-                Navigator.pop(context);
-                try {
-                  await user!.updateEmail(newEmail);
-                  await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(user!.uid)
-                      .update({
-                    'email': newEmail,
-                    'updated_at': FieldValue.serverTimestamp(),
-                  });
-                  _showGlassyNotification('Email updated successfully');
-                } catch (e) {
-                  _showGlassyNotification('Error updating email. You may need to sign in again.', isError: true);
-                }
-              }
-            },
-            child: const Text(
-              'Update',
-              style: TextStyle(color: Color(0xFFD4AF37)),
-            ),
-          ),
-        ],
       ),
     );
   }

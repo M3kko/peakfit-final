@@ -117,7 +117,7 @@ function createEmailHTML(title, subtitle, content, code) {
                           <tr>
                             <td align="center" style="font-size: 0px; padding: 20px 0 0 0; word-break: break-word;">
                               <p style="margin: 0; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #999999;">
-                                © 2024 PeakFit. All rights reserved.<br>
+                                © 2025 PeakFit. All rights reserved.<br>
                                 If you didn't request this email, please ignore it.
                               </p>
                             </td>

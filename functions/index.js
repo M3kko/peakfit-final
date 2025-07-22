@@ -8,6 +8,9 @@ const { defineSecret } = require('firebase-functions/params');
 const { createClient } = require('@supabase/supabase-js');
 const { Resend } = require('resend');
 
+// Import exercise database
+const ExerciseDatabase = require('./exercises_crud');
+
 initializeApp();
 
 const auth = getAuth();
@@ -405,4 +408,161 @@ exports.cleanupOldVerificationCodes = onSchedule({
   console.log(`Cleaned up ${verifications.size + resets.size} expired codes`);
   
   return null;
+});
+
+// ============================================
+// EXERCISE DATABASE FUNCTIONS
+// ============================================
+
+// Get all exercises
+exports.getAllExercises = onCall({ 
+  region: 'us-central1',
+  cors: true 
+}, async (request) => {
+  if (!request.auth) {
+    throw new Error('User must be authenticated');
+  }
+  
+  const exerciseDB = new ExerciseDatabase();
+  try {
+    const includeVideos = request.data.includeVideos || false;
+    const exercises = await exerciseDB.getAllExercises(includeVideos);
+    return { exercises };
+  } catch (error) {
+    console.error('Error getting exercises:', error);
+    throw new Error(error.message);
+  }
+});
+
+// Get exercise by ID
+exports.getExercise = onCall({ 
+  region: 'us-central1',
+  cors: true 
+}, async (request) => {
+  if (!request.auth) {
+    throw new Error('User must be authenticated');
+  }
+  
+  const { exerciseId } = request.data;
+  if (!exerciseId) {
+    throw new Error('Exercise ID is required');
+  }
+  
+  const exerciseDB = new ExerciseDatabase();
+  try {
+    const exercise = await exerciseDB.getExercise(exerciseId);
+    return { exercise };
+  } catch (error) {
+    console.error('Error getting exercise:', error);
+    throw new Error(error.message);
+  }
+});
+
+// Get exercises by equipment
+exports.getExercisesByEquipment = onCall({ 
+  region: 'us-central1',
+  cors: true 
+}, async (request) => {
+  if (!request.auth) {
+    throw new Error('User must be authenticated');
+  }
+  
+  const { equipment, includeVideos } = request.data;
+  if (!equipment || !Array.isArray(equipment)) {
+    throw new Error('Equipment array is required');
+  }
+  
+  const exerciseDB = new ExerciseDatabase();
+  try {
+    const exercises = await exerciseDB.getExercisesByEquipment(equipment, includeVideos || false);
+    return { exercises };
+  } catch (error) {
+    console.error('Error getting exercises by equipment:', error);
+    throw new Error(error.message);
+  }
+});
+
+// Admin function to create exercise
+exports.createExercise = onCall({ 
+  region: 'us-central1',
+  cors: true 
+}, async (request) => {
+  if (!request.auth) {
+    throw new Error('User must be authenticated');
+  }
+  
+  // Optional: Check for admin role
+  // const isAdmin = request.auth.token.admin === true;
+  // if (!isAdmin) {
+  //   throw new Error('Admin access required');
+  // }
+  
+  const exerciseDB = new ExerciseDatabase();
+  try {
+    const result = await exerciseDB.createExercise(request.data);
+    return { exercise: result };
+  } catch (error) {
+    console.error('Error creating exercise:', error);
+    throw new Error(error.message);
+  }
+});
+
+// Admin function to update exercise
+exports.updateExercise = onCall({ 
+  region: 'us-central1',
+  cors: true 
+}, async (request) => {
+  if (!request.auth) {
+    throw new Error('User must be authenticated');
+  }
+  
+  // Optional: Check for admin role
+  // const isAdmin = request.auth.token.admin === true;
+  // if (!isAdmin) {
+  //   throw new Error('Admin access required');
+  // }
+  
+  const { exerciseId, updates } = request.data;
+  if (!exerciseId) {
+    throw new Error('Exercise ID is required');
+  }
+  
+  const exerciseDB = new ExerciseDatabase();
+  try {
+    const result = await exerciseDB.updateExercise(exerciseId, updates);
+    return { exercise: result };
+  } catch (error) {
+    console.error('Error updating exercise:', error);
+    throw new Error(error.message);
+  }
+});
+
+// Admin function to delete exercise (soft delete)
+exports.deleteExercise = onCall({ 
+  region: 'us-central1',
+  cors: true 
+}, async (request) => {
+  if (!request.auth) {
+    throw new Error('User must be authenticated');
+  }
+  
+  // Optional: Check for admin role
+  // const isAdmin = request.auth.token.admin === true;
+  // if (!isAdmin) {
+  //   throw new Error('Admin access required');
+  // }
+  
+  const { exerciseId } = request.data;
+  if (!exerciseId) {
+    throw new Error('Exercise ID is required');
+  }
+  
+  const exerciseDB = new ExerciseDatabase();
+  try {
+    const result = await exerciseDB.deleteExercise(exerciseId);
+    return result;
+  } catch (error) {
+    console.error('Error deleting exercise:', error);
+    throw new Error(error.message);
+  }
 });

@@ -1,5 +1,5 @@
 const { onCall, onRequest } = require('firebase-functions/v2/https');
-const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onCreate, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const { createClient } = require('@supabase/supabase-js');
@@ -163,22 +163,35 @@ Your code is: ${code}
 This code will expire in 15 minutes.
 
 ---
-© 2024 PeakFit. All rights reserved.
+© 2025 PeakFit. All rights reserved.
 If you didn't request this email, please ignore it.`;
 }
 
-// HTTP function
+// ============================================
+// HTTP FUNCTIONS
+// ============================================
+
+// Simple hello world endpoint for testing
 exports.helloWorld = onRequest({ region: 'us-central1' }, (req, res) => {
   res.send('Hello from Firebase');
 });
 
-// Firestore triggers
+// ============================================
+// FIRESTORE TRIGGERS
+// ============================================
+
+// Sync marketing consent to Supabase
 exports.syncMarketingConsent = onDocumentWritten({
   document: 'users/{uid}',
   region: 'us-central1',
   secrets: [SUPABASE_URL, SUPABASE_SERVICE_KEY]
 }, async (event) => {
-  // Initialize Supabase inside the function with secrets
+  // Only process if we have Supabase credentials
+  if (!SUPABASE_URL.value() || !SUPABASE_SERVICE_KEY.value()) {
+    console.log('Supabase credentials not configured, skipping sync');
+    return null;
+  }
+
   const supabase = createClient(
     SUPABASE_URL.value(),
     SUPABASE_SERVICE_KEY.value()
@@ -186,7 +199,10 @@ exports.syncMarketingConsent = onDocumentWritten({
   
   const after = event.data?.after?.data();
   const before = event.data?.before?.data();
+  
+  // Skip if no email or if email hasn't changed and marketing_consent hasn't changed
   if (!after?.email) return null;
+  if (before?.email === after.email && before?.marketing_consent === after.marketing_consent) return null;
   
   try {
     const { data: existing } = await supabase
@@ -232,17 +248,17 @@ exports.syncMarketingConsent = onDocumentWritten({
   return null;
 });
 
-exports.onVerificationCodeCreated = onDocumentWritten({
+// Send verification email when code is created
+exports.onVerificationCodeCreated = onCreate({
   document: 'verifications/{email}',
   region: 'us-central1',
   secrets: [RESEND_API_KEY]
 }, async (event) => {
-  const data = event.data?.after?.data();
+  const data = event.data.data();
   if (!data) return null;
 
-  console.log(`Verification code ${data.code} for ${data.email}`);
+  console.log(`Sending verification code ${data.code} to ${data.email}`);
 
-  // Initialize Resend inside the function
   const resend = new Resend(RESEND_API_KEY.value());
 
   try {
@@ -270,27 +286,29 @@ exports.onVerificationCodeCreated = onDocumentWritten({
 
     if (error) {
       console.error('Failed to send verification email:', error);
+      throw new Error(error.message);
     } else {
       console.log('Verification email sent successfully to', data.email, 'with ID:', result.id);
     }
   } catch (err) {
     console.error('Resend error:', err);
+    throw err;
   }
 
   return null;
 });
 
-exports.onPasswordResetCodeCreated = onDocumentWritten({
+// Send password reset email when code is created
+exports.onPasswordResetCodeCreated = onCreate({
   document: 'password_resets/{email}',
   region: 'us-central1',
   secrets: [RESEND_API_KEY]
 }, async (event) => {
-  const data = event.data?.after?.data();
+  const data = event.data.data();
   if (!data) return null;
 
-  console.log(`Password reset code ${data.code} for ${data.email}`);
+  console.log(`Sending password reset code ${data.code} to ${data.email}`);
 
-  // Initialize Resend inside the function
   const resend = new Resend(RESEND_API_KEY.value());
 
   try {
@@ -318,34 +336,38 @@ exports.onPasswordResetCodeCreated = onDocumentWritten({
 
     if (error) {
       console.error('Failed to send password reset email:', error);
+      throw new Error(error.message);
     } else {
       console.log('Password reset email sent successfully to', data.email, 'with ID:', result.id);
     }
   } catch (err) {
     console.error('Resend error:', err);
+    throw err;
   }
 
   return null;
 });
 
-// NEW: Account deletion email trigger
-exports.onDeleteRequestCreated = onDocumentWritten({
+// Send account deletion email when request is created
+exports.onDeleteRequestCreated = onCreate({
   document: 'delete_requests/{uid}',
   region: 'us-central1',
   secrets: [RESEND_API_KEY]
 }, async (event) => {
-  const data = event.data?.after?.data();
+  const data = event.data.data();
   if (!data) return null;
 
-  console.log(`Delete account code ${data.code} for ${data.email}`);
+  console.log(`Sending delete account code ${data.code} to ${data.email}`);
 
-  // Initialize Resend inside the function
   const resend = new Resend(RESEND_API_KEY.value());
 
   try {
     const title = 'Confirm Account Deletion';
     const subtitle = 'Important Security Verification';
     const content = 'You have requested to permanently delete your PeakFit account. This action cannot be undone. All your data, including workouts, achievements, and progress will be permanently removed. Please use the verification code below to confirm this action.';
+    
+    // Generate a unique ID based on UID and timestamp to prevent duplicates
+    const timestamp = data.created_at ? data.created_at._seconds * 1000 : Date.now();
     
     const { data: result, error } = await resend.emails.send({
       from: 'PeakFit <hello@peakfit.ai>',
@@ -354,7 +376,7 @@ exports.onDeleteRequestCreated = onDocumentWritten({
       text: createEmailText(title, content, data.code),
       html: createEmailHTML(title, subtitle, content, data.code),
       headers: {
-        'X-Entity-Ref-ID': `account-deletion-${event.params.uid}-${Date.now()}`,
+        'X-Entity-Ref-ID': `account-deletion-${event.params.uid}-${timestamp}`,
         'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
         'Importance': 'high',
         'Priority': 'urgent'
@@ -373,39 +395,76 @@ exports.onDeleteRequestCreated = onDocumentWritten({
 
     if (error) {
       console.error('Failed to send account deletion email:', error);
-      // Optionally, update the document to indicate email send failure
-      await event.data.after.ref.update({
-        email_sent: false,
-        email_error: error.message,
-        updated_at: admin.firestore.FieldValue.serverTimestamp()
-      });
+      throw new Error(error.message);
     } else {
       console.log('Account deletion email sent successfully to', data.email, 'with ID:', result.id);
-      // Update the document to indicate successful email send
-      await event.data.after.ref.update({
-        email_sent: true,
-        email_sent_at: admin.firestore.FieldValue.serverTimestamp(),
-        resend_id: result.id
-      });
     }
   } catch (err) {
     console.error('Resend error:', err);
-    // Update the document to indicate email send failure
-    try {
-      await event.data.after.ref.update({
-        email_sent: false,
-        email_error: err.message || 'Unknown error',
-        updated_at: admin.firestore.FieldValue.serverTimestamp()
-      });
-    } catch (updateErr) {
-      console.error('Failed to update document:', updateErr);
-    }
+    throw err;
   }
 
   return null;
 });
 
-// Callable function
+// Send email change verification when request is created
+exports.onEmailChangeCodeCreated = onCreate({
+  document: 'email_changes/{uid}',
+  region: 'us-central1',
+  secrets: [RESEND_API_KEY]
+}, async (event) => {
+  const data = event.data.data();
+  if (!data) return null;
+
+  console.log(`Sending email change code ${data.code} to ${data.newEmail}`);
+
+  const resend = new Resend(RESEND_API_KEY.value());
+
+  try {
+    const title = 'Verify Your New Email';
+    const subtitle = 'Email Change Request';
+    const content = 'You have requested to change your PeakFit email address. Please use the verification code below to confirm your new email address.';
+    
+    // Generate a unique ID based on UID and timestamp to prevent duplicates
+    const timestamp = data.created_at ? data.created_at._seconds * 1000 : Date.now();
+    
+    const { data: result, error } = await resend.emails.send({
+      from: 'PeakFit <hello@peakfit.ai>',
+      to: [data.newEmail],
+      subject: 'Verify Your New PeakFit Email',
+      text: createEmailText(title, content, data.code),
+      html: createEmailHTML(title, subtitle, content, data.code),
+      headers: {
+        'X-Entity-Ref-ID': `email-change-${event.params.uid}-${timestamp}`,
+        'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
+      },
+      tags: [
+        {
+          name: 'category',
+          value: 'email-change'
+        }
+      ]
+    });
+
+    if (error) {
+      console.error('Failed to send email change verification:', error);
+      throw new Error(error.message);
+    } else {
+      console.log('Email change verification sent successfully to', data.newEmail, 'with ID:', result.id);
+    }
+  } catch (err) {
+    console.error('Resend error:', err);
+    throw err;
+  }
+
+  return null;
+});
+
+// ============================================
+// CALLABLE FUNCTIONS
+// ============================================
+
+// Reset password with verification code
 exports.resetPasswordWithCode = onCall({ region: 'us-central1' }, async (request) => {
   const { email, code, newPassword } = request.data;
   
@@ -462,7 +521,7 @@ exports.resetPasswordWithCode = onCall({ region: 'us-central1' }, async (request
   }
 });
 
-// NEW: Delete account with code callable function
+// Delete account with verification code
 exports.deleteAccountWithCode = onCall({ 
   region: 'us-central1',
   cors: true 
@@ -535,6 +594,7 @@ exports.deleteAccountWithCode = onCall({
       const email = userData.email.toLowerCase();
       batch.delete(db.collection('verifications').doc(email));
       batch.delete(db.collection('password_resets').doc(email));
+      batch.delete(db.collection('email_changes').doc(uid));
     }
 
     // Commit all deletions
@@ -588,75 +648,7 @@ exports.deleteAccountWithCode = onCall({
   }
 });
 
-// Add this new function for email change verification
-exports.onEmailChangeCodeCreated = onDocumentWritten({
-  document: 'email_changes/{uid}',
-  region: 'us-central1',
-  secrets: [RESEND_API_KEY]
-}, async (event) => {
-  const data = event.data?.after?.data();
-  if (!data) return null;
-
-  console.log(`Email change code ${data.code} for ${data.newEmail}`);
-
-  // Initialize Resend inside the function
-  const resend = new Resend(RESEND_API_KEY.value());
-
-  try {
-    const title = 'Verify Your New Email';
-    const subtitle = 'Email Change Request';
-    const content = 'You have requested to change your PeakFit email address. Please use the verification code below to confirm your new email address.';
-    
-    const { data: result, error } = await resend.emails.send({
-      from: 'PeakFit <hello@peakfit.ai>',
-      to: [data.newEmail],
-      subject: 'Verify Your New PeakFit Email',
-      text: createEmailText(title, content, data.code),
-      html: createEmailHTML(title, subtitle, content, data.code),
-      headers: {
-        'X-Entity-Ref-ID': `email-change-${event.params.uid}-${Date.now()}`,
-        'List-Unsubscribe': '<mailto:unsubscribe@peakfit.ai>',
-      },
-      tags: [
-        {
-          name: 'category',
-          value: 'email-change'
-        }
-      ]
-    });
-
-    if (error) {
-      console.error('Failed to send email change verification:', error);
-      await event.data.after.ref.update({
-        email_sent: false,
-        email_error: error.message,
-        updated_at: admin.firestore.FieldValue.serverTimestamp()
-      });
-    } else {
-      console.log('Email change verification sent successfully to', data.newEmail, 'with ID:', result.id);
-      await event.data.after.ref.update({
-        email_sent: true,
-        email_sent_at: admin.firestore.FieldValue.serverTimestamp(),
-        resend_id: result.id
-      });
-    }
-  } catch (err) {
-    console.error('Resend error:', err);
-    try {
-      await event.data.after.ref.update({
-        email_sent: false,
-        email_error: err.message || 'Unknown error',
-        updated_at: admin.firestore.FieldValue.serverTimestamp()
-      });
-    } catch (updateErr) {
-      console.error('Failed to update document:', updateErr);
-    }
-  }
-
-  return null;
-});
-
-// Callable function to verify email change code
+// Change email with verification code
 exports.changeEmailWithCode = onCall({ 
   region: 'us-central1',
   cors: true 
@@ -720,59 +712,40 @@ exports.changeEmailWithCode = onCall({
   }
 });
 
-// Original scheduled function - kept for backward compatibility
-exports.cleanupOldVerificationCodes = onSchedule({
-  schedule: 'every 15 minutes',
-  region: 'us-central1'
-}, async (event) => {
-  const expiry = new Date(Date.now() - 15 * 60 * 1000);
-  
-  const verifications = await db.collection('verifications')
-    .where('created_at', '<', expiry)
-    .get();
-  
-  const resets = await db.collection('password_resets')
-    .where('created_at', '<', expiry)
-    .get();
-  
-  const batch = db.batch();
-  [...verifications.docs, ...resets.docs].forEach((doc) => batch.delete(doc.ref));
-  
-  await batch.commit();
-  console.log(`Cleaned up ${verifications.size + resets.size} expired codes`);
-  
-  return null;
-});
+// ============================================
+// SCHEDULED FUNCTIONS
+// ============================================
 
-// New scheduled function - updated to include delete requests and email changes cleanup
-exports.cleanupOldCodes = onSchedule({
+// Clean up expired verification codes
+exports.cleanupExpiredCodes = onSchedule({
   schedule: 'every 15 minutes',
   region: 'us-central1'
 }, async (event) => {
   const expiry = new Date(Date.now() - 15 * 60 * 1000);
   
-  const verifications = await db.collection('verifications')
-    .where('created_at', '<', expiry)
-    .get();
+  const collections = ['verifications', 'password_resets', 'delete_requests', 'email_changes'];
+  let totalDeleted = 0;
+
+  for (const collection of collections) {
+    try {
+      const snapshot = await db.collection(collection)
+        .where('created_at', '<', expiry)
+        .get();
+      
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+      
+      if (snapshot.size > 0) {
+        await batch.commit();
+        totalDeleted += snapshot.size;
+        console.log(`Deleted ${snapshot.size} expired documents from ${collection}`);
+      }
+    } catch (error) {
+      console.error(`Error cleaning up ${collection}:`, error);
+    }
+  }
   
-  const resets = await db.collection('password_resets')
-    .where('created_at', '<', expiry)
-    .get();
-    
-  const deleteRequests = await db.collection('delete_requests')
-    .where('created_at', '<', expiry)
-    .get();
-    
-  const emailChanges = await db.collection('email_changes')
-    .where('created_at', '<', expiry)
-    .get();
-  
-  const batch = db.batch();
-  [...verifications.docs, ...resets.docs, ...deleteRequests.docs, ...emailChanges.docs].forEach((doc) => batch.delete(doc.ref));
-  
-  await batch.commit();
-  console.log(`Cleaned up ${verifications.size + resets.size + deleteRequests.size + emailChanges.size} expired codes`);
-  
+  console.log(`Total cleanup: ${totalDeleted} expired codes deleted`);
   return null;
 });
 

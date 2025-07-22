@@ -50,3 +50,7 @@ ios/Runner/GoogleService-Info.plist
 
 node_modules/
 firestore.rules
+
+# exercises
+functions/exercise*.js
+functions/exercises_*.js

@@ -5,10 +5,7 @@ PeakFit TRUST
 
 ## Things to Add:
 - Come up with better tagline
-- Put 20s cooldown on email codes 
-- Dont let email success messages overlap, make 1 dissapear
-- Require strong password on signup
-- Add show password on sign in 
+- Put 20s cooldown on email codes
 - Figure out Notifications
 - Make preworkout stuff expand on click
 - Make the timer a consistent spot on the screen for during the workout 

@@ -189,7 +189,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
   // Updated method to set message and clear any snackbars
   void _setMessage(String message) {
-    setState(() => _msg = message);
+    // Don't set the message state anymore, only use snackbars
     // Clear any existing snackbars when setting a new message
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -199,6 +199,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   bool _isPasswordValid(String password) {
     if (password.length < 6) return false;
     if (!password.contains(RegExp(r'[A-Z]'))) return false;
+    if (!password.contains(RegExp(r'[0-9]'))) return false;
     if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) return false;
     return true;
   }
@@ -207,6 +208,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     List<String> missing = [];
     if (password.length < 6) missing.add('at least 6 characters');
     if (!password.contains(RegExp(r'[A-Z]'))) missing.add('an uppercase letter');
+    if (!password.contains(RegExp(r'[0-9]'))) missing.add('a number');
     if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) missing.add('a special symbol');
 
     if (missing.isEmpty) return '';
@@ -310,7 +312,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     if (_showVerification) {
       // Handle verification
       if (_verificationCodeC.text.trim().isEmpty) {
-        _setMessage('Please enter the verification code');
         _showGlassySnackBar('Please enter the verification code', true);
         return;
       }
@@ -322,7 +323,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         setState(() {
           _loading = false;
         });
-        _setMessage('Invalid verification code. Please try again.');
         _showGlassySnackBar('Invalid verification code. Please try again.', true);
         return;
       }
@@ -373,7 +373,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
               .delete();
         }
 
-        _setMessage('Welcome to PeakFit!');
+        _showGlassySnackBar('Welcome to PeakFit!', false);
 
         if (mounted) {
           // Clear any snackbars before navigation
@@ -409,14 +409,12 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         setState(() {
           _loading = false;
         });
-        _setMessage('Failed to create account. Please try again.');
         _showGlassySnackBar('Failed to create account. Please try again.', true);
       }
       return;
     }
 
     if (email.isEmpty || password.isEmpty) {
-      _setMessage('Please fill in all fields');
       _showGlassySnackBar('Please fill in all fields', true);
       return;
     }
@@ -424,7 +422,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     // Check password requirements for signup
     if (!_isLogin && !_isPasswordValid(password)) {
       final requirements = _getPasswordRequirements(password);
-      _setMessage(requirements);
       _showGlassySnackBar(requirements, true);
       return;
     }
@@ -444,7 +441,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             setState(() {
               _loading = false;
             });
-            _setMessage('This email is already registered. Please sign in instead.');
+            _showGlassySnackBar('This email is already registered. Please sign in instead.', true);
             return;
           }
 
@@ -454,7 +451,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             setState(() {
               _loading = false;
             });
-            _setMessage('This email is already registered. Please sign in instead.');
+            _showGlassySnackBar('This email is already registered. Please sign in instead.', true);
             return;
           }
 
@@ -464,13 +461,13 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             _showVerification = true;
             _loading = false;
           });
-          _setMessage('Enter the 6-digit code sent to your email');
+          _showGlassySnackBar('Enter the 6-digit code sent to your email', false);
         } catch (e) {
           print('Sign up error: $e');
           setState(() {
             _loading = false;
           });
-          _setMessage('An error occurred. Please try again.');
+          _showGlassySnackBar('An error occurred. Please try again.', true);
         }
       } else {
         // Sign In
@@ -482,7 +479,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         final isQuestionnaireCompleted = await _checkQuestionnaireStatus(credential.user!.uid);
 
         if (!isQuestionnaireCompleted) {
-          _setMessage('Welcome back! Please complete your profile.');
+          _showGlassySnackBar('Welcome back! Please complete your profile.', false);
 
           if (mounted) {
             setState(() {});
@@ -518,7 +515,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             }
           }
         } else {
-          _setMessage('Welcome back to PeakFit!');
+          _showGlassySnackBar('Welcome back to PeakFit!', false);
 
           if (mounted) {
             setState(() {});
@@ -550,29 +547,29 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
         case 'email-already-in-use':
-          _setMessage('This email is already registered. Please sign in instead.');
+          _showGlassySnackBar('This email is already registered. Please sign in instead.', true);
           break;
         case 'weak-password':
-          _setMessage('Password should be at least 6 characters long.');
+          _showGlassySnackBar('Password should be at least 6 characters long.', true);
           break;
         case 'user-not-found':
-          _setMessage('No account found with this email. Please sign up first.');
+          _showGlassySnackBar('No account found with this email. Please sign up first.', true);
           break;
         case 'wrong-password':
-          _setMessage('Incorrect password. Please try again.');
+          _showGlassySnackBar('Incorrect password. Please try again.', true);
           break;
         case 'invalid-email':
-          _setMessage('Please enter a valid email address.');
+          _showGlassySnackBar('Please enter a valid email address.', true);
           break;
         case 'too-many-requests':
-          _setMessage('Too many failed attempts. Please try again later.');
+          _showGlassySnackBar('Too many failed attempts. Please try again later.', true);
           break;
         default:
-          _setMessage('An error occurred. Please try again.');
+          _showGlassySnackBar('An error occurred. Please try again.', true);
       }
     } catch (e) {
       print('Auth error: $e');
-      _setMessage('An unexpected error occurred. Please try again.');
+      _showGlassySnackBar('An unexpected error occurred. Please try again.', true);
     }
 
     if (!mounted) return;
@@ -594,7 +591,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     final email = _emailC.text.trim().toLowerCase();
 
     if (email.isEmpty) {
-      _setMessage('Please enter your email address');
       _showGlassySnackBar('Please enter your email address', true);
       return;
     }
@@ -608,7 +604,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         setState(() {
           _loading = false;
         });
-        _setMessage('No account found with this email address');
         _showGlassySnackBar('No account found with this email address', true);
         return;
       }
@@ -638,27 +633,23 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         _resetEmail = email;
         _loading = false;
       });
-      _setMessage('Reset code sent to $email');
       _showGlassySnackBar('Reset code sent to $email', false);
     } catch (e) {
       setState(() {
         _loading = false;
       });
-      _setMessage('Failed to send reset code. Please try again.');
       _showGlassySnackBar('Failed to send reset code. Please try again.', true);
     }
   }
 
   Future<void> _resetPassword() async {
     if (_resetCodeC.text.trim().isEmpty) {
-      _setMessage('Please enter the reset code');
       _showGlassySnackBar('Please enter the reset code', true);
       return;
     }
 
     if (!_isPasswordValid(_newPasswordC.text.trim())) {
       final requirements = _getPasswordRequirements(_newPasswordC.text.trim());
-      _setMessage(requirements);
       _showGlassySnackBar(requirements, true);
       return;
     }
@@ -683,7 +674,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             .doc(_resetEmail!)
             .delete();
 
-        _setMessage('Password reset successfully! Signing you in...');
         _showGlassySnackBar('Password reset successfully! Signing you in...', false);
 
         // Automatically sign in the user with their new password
@@ -760,7 +750,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             _emailC.text = _resetEmail ?? '';
             _showNewPassword = false;
           });
-          _setMessage('Password reset! Please sign in with your new password.');
           _showGlassySnackBar('Password reset! Please sign in with your new password.', false);
         }
       } else {
@@ -770,7 +759,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       setState(() {
         _loading = false;
       });
-      _setMessage('Invalid reset code or error occurred');
       _showGlassySnackBar('Invalid reset code or error occurred', true);
     }
   }
@@ -860,12 +848,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                         ),
 
                       const Spacer(flex: 2),
-
-                      // Message
-                      if (_msg.isNotEmpty) ...[
-                        _buildMessage(),
-                        const SizedBox(height: 20),
-                      ],
                     ],
                   ),
                 ),
@@ -992,7 +974,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                 if (!_isLogin) ...[
                   const SizedBox(height: 10),
                   Text(
-                    'Password must contain at least 6 characters,\nan uppercase letter, and a special symbol',
+                    'Password must contain at least 6 characters,\nan uppercase letter, a number, and a special symbol',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.4),
@@ -1195,7 +1177,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Password must contain at least 6 characters,\nan uppercase letter, and a special symbol',
+                    'Password must contain at least 6 characters,\nan uppercase letter, a number, and a special symbol',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.4),
@@ -1253,7 +1235,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                 } else {
                   if (!enabled) {
                     final requirements = _getPasswordRequirements(_newPasswordC.text.trim());
-                    _setMessage(requirements);
                     _showGlassySnackBar(requirements, true);
                   } else {
                     _resetPassword();
@@ -1406,10 +1387,10 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: _loading || !enabled ? null : () {
-                if (!enabled && !_isLogin) {
+              onTap: _loading ? null : () {
+                // Check if it's signup and button is disabled
+                if (!_isLogin && !enabled) {
                   final requirements = _getPasswordRequirements(_passC.text.trim());
-                  _setMessage(requirements);
                   _showGlassySnackBar(requirements, true);
                 } else {
                   _authAction();
@@ -1485,45 +1466,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMessage() {
-    final isError = _msg.toLowerCase().contains('error') ||
-        _msg.toLowerCase().contains('invalid') ||
-        _msg.toLowerCase().contains('incorrect') ||
-        _msg.toLowerCase().contains('failed') ||
-        _msg.toLowerCase().contains('wrong') ||
-        _msg.toLowerCase().contains('weak') ||
-        _msg.toLowerCase().contains('fill') ||
-        _msg.toLowerCase().contains('no account') ||
-        _msg.toLowerCase().contains('already') ||
-        _msg.toLowerCase().contains('must contain') ||
-        _msg.toLowerCase().contains('at least') ||
-        _msg.toLowerCase().contains('characters') ||
-        _msg.toLowerCase().contains('uppercase') ||
-        _msg.toLowerCase().contains('symbol');
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: isError
-            ? Colors.red.withOpacity(0.1)
-            : Colors.green.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isError
-              ? Colors.red.withOpacity(0.3)
-              : Colors.green.withOpacity(0.3),
-        ),
-      ),
-      child: Text(
-        _msg,
-        style: TextStyle(
-          color: isError ? Colors.red[300] : Colors.green[300],
-          fontSize: 14,
-        ),
-      ),
     );
   }
 }

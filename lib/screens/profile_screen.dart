@@ -411,10 +411,83 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     _notificationController.forward();
     HapticFeedback.mediumImpact();
 
+    // Show notification as an overlay to ensure it's on top of everything
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 20,
+        left: 24,
+        right: 24,
+        child: Material(
+          color: Colors.transparent,
+          child: AnimatedBuilder(
+            animation: _notificationController,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, _notificationSlideAnimation.value),
+                child: FadeTransition(
+                  opacity: _notificationFadeAnimation,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _isError
+                          ? Colors.red.withOpacity(0.95) // Much more opaque
+                          : Colors.green.withOpacity(0.95), // Much more opaque
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _isError
+                            ? Colors.red.withOpacity(0.5)
+                            : Colors.green.withOpacity(0.5),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.8),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _isError
+                                ? Icons.error_outline
+                                : Icons.check_circle_outline,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _notificationMessage,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+
     // Auto-hide after 3 seconds
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         _notificationController.reverse().then((_) {
+          overlayEntry.remove();
           if (mounted) {
             setState(() {
               _showNotification = false;
@@ -455,6 +528,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     try {
       final code = _generateVerificationCode();
 
+      print('Sending email change code: $code to $newEmail'); // Debug log
+
       // Store code in Firestore - this will trigger the Cloud Function to send email
       await FirebaseFirestore.instance
           .collection('email_changes')
@@ -466,6 +541,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         'newEmail': newEmail,
       });
 
+      print('Email change document created successfully'); // Debug log
       _showGlassyNotification('Verification code sent to $newEmail');
     } catch (e) {
       print('Error sending email change code: $e');
@@ -537,132 +613,25 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Main content
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildHeader(),
-                      _buildProfileSection(),
-                      _buildAchievementsSection(),
-                      _buildTrainingPreferences(),
-                      _buildAccountSettings(),
-                      const SizedBox(height: 100),
-                    ],
-                  ),
-                ),
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildHeader(),
+                  _buildProfileSection(),
+                  _buildAchievementsSection(),
+                  _buildTrainingPreferences(),
+                  _buildAccountSettings(),
+                  const SizedBox(height: 100),
+                ],
               ),
             ),
           ),
-
-          // Glassy notification overlay - Now with higher z-index and more opacity
-          if (_showNotification)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: IgnorePointer(
-                ignoring: true,
-                child: AnimatedBuilder(
-                  animation: _notificationController,
-                  builder: (context, child) {
-                    return Container(
-                      padding: EdgeInsets.only(top: statusBarHeight),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            top: _notificationSlideAnimation.value,
-                            left: 24,
-                            right: 24,
-                            child: FadeTransition(
-                              opacity: _notificationFadeAnimation,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _isError
-                                      ? Colors.red.withOpacity(0.15) // Increased opacity
-                                      : Colors.green.withOpacity(0.15), // Increased opacity
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: _isError
-                                        ? Colors.red.withOpacity(0.3) // Increased opacity
-                                        : Colors.green.withOpacity(0.3), // Increased opacity
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.5), // Increased shadow opacity
-                                      blurRadius: 20,
-                                      spreadRadius: 5,
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: BackdropFilter(
-                                    filter: ColorFilter.mode(
-                                      _isError
-                                          ? Colors.red.withOpacity(0.2) // Increased opacity
-                                          : Colors.green.withOpacity(0.2), // Increased opacity
-                                      BlendMode.overlay,
-                                    ),
-                                    child: Container(
-                                      color: Colors.black.withOpacity(0.3), // Added solid background for better readability
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              _isError
-                                                  ? Icons.error_outline
-                                                  : Icons.check_circle_outline,
-                                              color: _isError
-                                                  ? Colors.red[300]
-                                                  : Colors.green[300],
-                                              size: 24,
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                _notificationMessage,
-                                                style: TextStyle(
-                                                  color: _isError
-                                                      ? Colors.red[300]
-                                                      : Colors.green[300],
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600, // Increased font weight
-                                                  shadows: [
-                                                    Shadow(
-                                                      offset: const Offset(0, 1),
-                                                      blurRadius: 3.0,
-                                                      color: Colors.black.withOpacity(0.8),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -1461,7 +1430,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   void _showEmailUpdateDialog() {
-    final controller = TextEditingController(text: user?.email);
+    final controller = TextEditingController(); // Removed email prefill
     final codeController = TextEditingController();
     bool codeSent = false;
 

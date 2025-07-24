@@ -23,3 +23,4 @@ PeakFit TRUST
 - Make it delete from supabase and other folders
 - Make email change in all folders + supabase + display update immediately
 - Add 20s delay in between codes
+- Make exercises auto named in firebase

@@ -7,7 +7,6 @@ PeakFit TRUST
 - Come up with better tagline
 - Put 20s cooldown on email codes
 - Figure out Notifications
-- Make preworkout stuff expand on click
 - Make Post workout screen have functioning share button + explanation of ratings before rating
 - Allow the uesr to go back on the post workout screen ratings
 - Change stats shown on the post workout screen

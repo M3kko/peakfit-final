@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'time_selection_screen.dart';
 import 'profile_screen.dart';
 import 'stats_screen.dart';
+import 'schedule_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -714,8 +715,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           _buildNavItem(Icons.home, true, 0),
           _buildNavItem(Icons.calendar_today, false, 1),
-          _buildNavItem(Icons.bar_chart, false, 2), // Changed from trending_up to bar_chart
-          _buildNavItem(Icons.emoji_events_outlined, false, 3), // Changed from person to achievements
+          _buildNavItem(Icons.bar_chart, false, 2),
         ],
       ),
     );
@@ -748,12 +748,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Already on home
         break;
       case 1:
-      // Navigate to calendar/schedule
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Schedule screen coming soon!'),
-            backgroundColor: Color(0xFF1A1A1A),
-          ),
+      // Navigate to schedule screen
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ScheduleScreen()),
         );
         break;
       case 2:
@@ -761,15 +759,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const StatsScreen()),
-        );
-        break;
-      case 3:
-      // Navigate to achievements
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Achievements screen coming soon!'),
-            backgroundColor: Color(0xFF1A1A1A),
-          ),
         );
         break;
     }

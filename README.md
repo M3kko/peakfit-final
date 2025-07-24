@@ -24,3 +24,4 @@ PeakFit TRUST
 - Make email change in all folders + supabase + display update immediately
 - Add 20s delay in between codes
 - Make exercises auto named in firebase
+- Make success + errors in profile more opaque 

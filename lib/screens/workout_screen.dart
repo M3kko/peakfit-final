@@ -337,8 +337,6 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                                 _buildExerciseInfo(currentExercise),
                                 const SizedBox(height: 30),
                                 _buildTimerOrReps(currentExercise),
-                                const SizedBox(height: 40),
-                                if (_isRepBased) _buildCheckmarkButton(),
                                 const SizedBox(height: 30),
                                 _buildWorkoutStats(),
                                 const SizedBox(height: 20),
@@ -537,10 +535,18 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   Widget _buildTimerOrReps(Map<String, dynamic> exercise) {
     return Container(
       height: 160, // Fixed height to prevent jumping
-      child: Center(
-        child: _isRepBased
-            ? _buildRepsDisplay(exercise)
-            : _buildTimer(),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (_isRepBased) const SizedBox(width: 80), // Balance spacing
+          _isRepBased
+              ? _buildRepsDisplay(exercise)
+              : _buildTimer(),
+          if (_isRepBased) ...[
+            const SizedBox(width: 40),
+            _buildCheckmarkButton(),
+          ],
+        ],
       ),
     );
   }

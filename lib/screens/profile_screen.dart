@@ -43,6 +43,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   DateTime? _birthDate;
   int? _currentAge;
 
+  // Email tracking
+  String? _currentEmail;
+
   // Notification state
   bool _showNotification = false;
   String _notificationMessage = '';
@@ -53,6 +56,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     super.initState();
     _initAnimations();
     _loadUserData();
+    // Initialize current email from Firebase Auth
+    _currentEmail = user?.email;
   }
 
   void _initAnimations() {
@@ -122,6 +127,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           _lastUsernameChange = (data?['lastUsernameChange'] as Timestamp?)?.toDate();
           _marketingConsent = data?['marketing_consent'] ?? false;
           _marketingConsentDate = (data?['marketing_consent_date'] as Timestamp?)?.toDate();
+          // Update current email from Firestore
+          _currentEmail = data?['email'] ?? user!.email;
 
           // Load birthday and calculate age
           if (data?['birthDate'] != null) {
@@ -475,8 +482,14 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       });
 
       if (result.data['success'] == true) {
+        // Update local email state immediately
+        setState(() {
+          _currentEmail = result.data['newEmail'];
+        });
+
         _showGlassyNotification('Email updated successfully to ${result.data['newEmail']}');
-        // Refresh user data
+
+        // Reload user data to ensure everything is in sync
         await _loadUserData();
       }
     } on FirebaseFunctionsException catch (e) {
@@ -548,80 +561,106 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             ),
           ),
 
-          // Glassy notification overlay
+          // Glassy notification overlay - Now with higher z-index and more opacity
           if (_showNotification)
-            AnimatedBuilder(
-              animation: _notificationController,
-              builder: (context, child) {
-                return Positioned(
-                  top: statusBarHeight + _notificationSlideAnimation.value,
-                  left: 24,
-                  right: 24,
-                  child: FadeTransition(
-                    opacity: _notificationFadeAnimation,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: _isError
-                            ? Colors.red.withOpacity(0.05)
-                            : Colors.green.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _isError
-                              ? Colors.red.withOpacity(0.1)
-                              : Colors.green.withOpacity(0.1),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: BackdropFilter(
-                          filter: ColorFilter.mode(
-                            _isError
-                                ? Colors.red.withOpacity(0.1)
-                                : Colors.green.withOpacity(0.1),
-                            BlendMode.overlay,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _isError
-                                      ? Icons.error_outline
-                                      : Icons.check_circle_outline,
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                ignoring: true,
+                child: AnimatedBuilder(
+                  animation: _notificationController,
+                  builder: (context, child) {
+                    return Container(
+                      padding: EdgeInsets.only(top: statusBarHeight),
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            top: _notificationSlideAnimation.value,
+                            left: 24,
+                            right: 24,
+                            child: FadeTransition(
+                              opacity: _notificationFadeAnimation,
+                              child: Container(
+                                decoration: BoxDecoration(
                                   color: _isError
-                                      ? Colors.red[300]
-                                      : Colors.green[300],
-                                  size: 24,
+                                      ? Colors.red.withOpacity(0.15) // Increased opacity
+                                      : Colors.green.withOpacity(0.15), // Increased opacity
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: _isError
+                                        ? Colors.red.withOpacity(0.3) // Increased opacity
+                                        : Colors.green.withOpacity(0.3), // Increased opacity
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.5), // Increased shadow opacity
+                                      blurRadius: 20,
+                                      spreadRadius: 5,
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    _notificationMessage,
-                                    style: TextStyle(
-                                      color: _isError
-                                          ? Colors.red[300]
-                                          : Colors.green[300],
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: BackdropFilter(
+                                    filter: ColorFilter.mode(
+                                      _isError
+                                          ? Colors.red.withOpacity(0.2) // Increased opacity
+                                          : Colors.green.withOpacity(0.2), // Increased opacity
+                                      BlendMode.overlay,
+                                    ),
+                                    child: Container(
+                                      color: Colors.black.withOpacity(0.3), // Added solid background for better readability
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              _isError
+                                                  ? Icons.error_outline
+                                                  : Icons.check_circle_outline,
+                                              color: _isError
+                                                  ? Colors.red[300]
+                                                  : Colors.green[300],
+                                              size: 24,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                _notificationMessage,
+                                                style: TextStyle(
+                                                  color: _isError
+                                                      ? Colors.red[300]
+                                                      : Colors.green[300],
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600, // Increased font weight
+                                                  shadows: [
+                                                    Shadow(
+                                                      offset: const Offset(0, 1),
+                                                      blurRadius: 3.0,
+                                                      color: Colors.black.withOpacity(0.8),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ),
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
         ],
       ),
@@ -828,7 +867,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           ),
           const SizedBox(height: 8),
           Text(
-            user?.email ?? '',
+            _currentEmail ?? '',
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withOpacity(0.5),
@@ -1030,7 +1069,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           ),
           _buildSettingCard(
             'Email Address',
-            user?.email ?? '',
+            _currentEmail ?? '',
             Icons.email_outlined,
                 () => _showEmailUpdateDialog(),
           ),
@@ -1109,16 +1148,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     color: Colors.white.withOpacity(0.5),
                   ),
                 ),
-                if (_marketingConsentDate != null && _marketingConsent) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Opted in on ${_marketingConsentDate!.day}/${_marketingConsentDate!.month}/${_marketingConsentDate!.year}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white.withOpacity(0.3),
-                    ),
-                  ),
-                ],
+                // Removed opt-in date display
               ],
             ),
           ),

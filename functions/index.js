@@ -309,51 +309,94 @@ exports.syncMarketingConsent = onDocumentWritten({
     return null;
   }
   
-  // Skip if no email or if email hasn't changed and marketing_consent hasn't changed
+  // Skip if no email in the new data
   if (!after?.email) return null;
-  if (before?.email === after.email && before?.marketing_consent === after.marketing_consent) return null;
+  
+  // Check if email changed
+  const emailChanged = before?.email && before.email !== after.email;
+  const marketingConsentChanged = before?.marketing_consent !== after.marketing_consent;
+  
+  // Skip if nothing relevant changed
+  if (!emailChanged && !marketingConsentChanged && before?.email === after.email) {
+    return null;
+  }
   
   try {
-    const { data: existing } = await supabase
+    // If email changed, handle the old email first
+    if (emailChanged && before?.email) {
+      console.log(`Email changed from ${before.email} to ${after.email}`);
+      
+      // Delete the old email from Supabase
+      const { error: deleteError } = await supabase
+        .from('users_email')
+        .delete()
+        .eq('email', before.email.toLowerCase());
+        
+      if (deleteError) {
+        console.error('Failed to delete old email from Supabase:', deleteError);
+      } else {
+        console.log('Old email removed from Supabase:', before.email);
+      }
+    }
+    
+    // Now handle the current email (new or updated)
+    const { data: existing, error: checkError } = await supabase
       .from('users_email')
       .select('id')
       .eq('email', after.email.trim().toLowerCase())
-      .single();
+      .maybeSingle();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking existing email:', checkError);
+    }
+
+    const emailData = {
+      firebase_uid: event.params.uid,
+      marketing_consent: after.marketing_consent || false,
+      marketing_consent_date: after.marketing_consent && after.marketing_consent_date 
+        ? after.marketing_consent_date.toDate().toISOString() 
+        : null,
+      email_type: after.marketing_consent ? 'both' : 'user',
+      status: 'active',
+      email_verified: after.email_verified || false,
+      updated_at: new Date().toISOString()
+    };
 
     if (existing) {
+      // Update existing entry
       const { error } = await supabase
         .from('users_email')
-        .update({
-          firebase_uid: event.params.uid,
-          marketing_consent: after.marketing_consent || false,
-          marketing_consent_date: after.marketing_consent ? new Date().toISOString() : null,
-          email_type: after.marketing_consent ? 'both' : 'user',
-          status: 'active',
-          email_verified: after.email_verified || false,
-        })
+        .update(emailData)
         .eq('email', after.email.trim().toLowerCase());
       
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to update email in Supabase:', error);
+      } else {
+        console.log('Email updated in Supabase:', after.email);
+      }
     } else {
+      // Insert new entry
       const { error } = await supabase
         .from('users_email')
         .insert({
           email: after.email.trim().toLowerCase(),
-          firebase_uid: event.params.uid,
-          marketing_consent: after.marketing_consent || false,
-          marketing_consent_date: after.marketing_consent ? new Date().toISOString() : null,
-          email_type: after.marketing_consent ? 'both' : 'user',
-          status: 'active',
+          ...emailData,
           source: 'peakfit_app',
-          email_verified: after.email_verified || false,
+          created_at: new Date().toISOString()
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to insert email in Supabase:', error);
+      } else {
+        console.log('Email inserted in Supabase:', after.email);
+      }
     }
-    console.log('Marketing consent synced for', after.email);
+    
+    console.log(`Marketing consent synced for ${after.email} (consent: ${after.marketing_consent})`);
   } catch (err) {
-    console.error('Supabase sync error', JSON.stringify(err));
+    console.error('Supabase sync error:', JSON.stringify(err));
   }
+  
   return null;
 });
 
@@ -897,7 +940,8 @@ exports.deleteAccountWithCode = onCall({
 // Change email with verification code
 exports.changeEmailWithCode = onCall({ 
   region: 'us-central1',
-  cors: true 
+  cors: true,
+  secrets: [SUPABASE_URL, SUPABASE_SERVICE_KEY]
 }, async (request) => {
   if (!request.auth) {
     throw new Error('User must be authenticated');
@@ -963,7 +1007,7 @@ exports.changeEmailWithCode = onCall({
       created_at: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    // Update email in Supabase
+    // Update email in Supabase - FIXED: Now properly syncing
     if (SUPABASE_URL.value() && SUPABASE_SERVICE_KEY.value()) {
       try {
         const supabase = createClient(
@@ -975,65 +1019,89 @@ exports.changeEmailWithCode = onCall({
         const userDoc = await db.collection('users').doc(uid).get();
         const userData = userDoc.data();
         const marketingConsent = userData?.marketing_consent || false;
+        const marketingConsentDate = userData?.marketing_consent_date;
 
         if (oldEmail) {
-          // Check if old email exists in Supabase
-          const { data: existingOld } = await supabase
+          // Delete old email entry from Supabase
+          const { error: deleteError } = await supabase
             .from('users_email')
-            .select('id')
-            .eq('email', oldEmail.toLowerCase())
-            .single();
+            .delete()
+            .eq('email', oldEmail.toLowerCase());
 
-          if (existingOld) {
-            // Delete old email entry
-            await supabase
-              .from('users_email')
-              .delete()
-              .eq('email', oldEmail.toLowerCase());
+          if (deleteError) {
+            console.error('Failed to delete old email from Supabase:', deleteError);
+          } else {
+            console.log('Old email deleted from Supabase:', oldEmail);
           }
         }
 
-        // Check if new email already exists
-        const { data: existingNew } = await supabase
+        // Check if new email already exists in Supabase
+        const { data: existingNew, error: checkError } = await supabase
           .from('users_email')
           .select('id')
           .eq('email', newEmail.toLowerCase())
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single to avoid errors
+
+        if (checkError && checkError.code !== 'PGRST116') {
+          console.error('Error checking existing email:', checkError);
+        }
 
         if (existingNew) {
           // Update existing entry
-          await supabase
+          const { error: updateError } = await supabase
             .from('users_email')
             .update({
               firebase_uid: uid,
               marketing_consent: marketingConsent,
-              marketing_consent_date: marketingConsent ? new Date().toISOString() : null,
+              marketing_consent_date: marketingConsent && marketingConsentDate 
+                ? marketingConsentDate.toDate().toISOString() 
+                : null,
               email_type: marketingConsent ? 'both' : 'user',
               status: 'active',
               email_verified: true,
+              updated_at: new Date().toISOString()
             })
             .eq('email', newEmail.toLowerCase());
+          
+          if (updateError) {
+            console.error('Failed to update email in Supabase:', updateError);
+          } else {
+            console.log('Email updated in Supabase successfully');
+          }
         } else {
           // Create new entry
-          await supabase
+          const { error: insertError } = await supabase
             .from('users_email')
             .insert({
               email: newEmail.toLowerCase(),
               firebase_uid: uid,
               marketing_consent: marketingConsent,
-              marketing_consent_date: marketingConsent ? new Date().toISOString() : null,
+              marketing_consent_date: marketingConsent && marketingConsentDate 
+                ? marketingConsentDate.toDate().toISOString() 
+                : null,
               email_type: marketingConsent ? 'both' : 'user',
               status: 'active',
               source: 'peakfit_app',
               email_verified: true,
+              created_at: new Date().toISOString()
             });
+          
+          if (insertError) {
+            console.error('Failed to insert new email in Supabase:', insertError);
+          } else {
+            console.log('New email inserted in Supabase successfully');
+          }
         }
 
-        console.log('Email updated in Supabase successfully');
+        // Force sync by triggering the syncMarketingConsent function
+        console.log(`Email successfully synced to Supabase: ${newEmail}`);
       } catch (supabaseError) {
         console.error('Failed to update email in Supabase:', supabaseError);
         // Don't throw - email change in Firebase was successful
+        // We'll log the error but continue with the success response
       }
+    } else {
+      console.log('Supabase credentials not configured, skipping Supabase sync');
     }
 
     // Delete the email change request

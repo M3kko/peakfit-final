@@ -438,73 +438,77 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 child: FadeTransition(
                   opacity: _notificationFadeAnimation,
                   child: Container(
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: _isError
-                          ? Colors.red.withOpacity(0.1)
-                          : Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: _isError
+                            ? [
+                          Color(0xFF1A0000).withOpacity(0.95),
+                          Color(0xFF2D0000).withOpacity(0.95),
+                        ]
+                            : [
+                          Color(0xFF001A00).withOpacity(0.95),
+                          Color(0xFF002D00).withOpacity(0.95),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
                       border: Border.all(
                         color: _isError
-                            ? Colors.red.withOpacity(0.3)
-                            : Colors.green.withOpacity(0.3),
+                            ? Colors.red.withOpacity(0.2)
+                            : Colors.green.withOpacity(0.2),
+                        width: 1,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
-                          blurRadius: 20,
-                          spreadRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: BackdropFilter(
-                        filter: ColorFilter.mode(
-                          _isError
-                              ? Colors.red.withOpacity(0.1)
-                              : Colors.green.withOpacity(0.1),
-                          BlendMode.overlay,
-                        ),
-                        child: Container(
                           color: _isError
                               ? Colors.red.withOpacity(0.2)
                               : Colors.green.withOpacity(0.2),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _isError
-                                    ? Icons.error_outline
-                                    : Icons.check_circle_outline,
-                                color: _isError
-                                    ? Colors.red[300]
-                                    : Colors.green[300],
-                                size: 24,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  _notificationMessage,
-                                  style: TextStyle(
-                                    color: _isError
-                                        ? Colors.red[300]
-                                        : Colors.green[300],
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    shadows: [
-                                      Shadow(
-                                        offset: const Offset(0, 1),
-                                        blurRadius: 3.0,
-                                        color: Colors.black.withOpacity(0.8),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
+                          blurRadius: 20,
+                          spreadRadius: -5,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _isError
+                                ? Colors.red.withOpacity(0.15)
+                                : Colors.green.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            _isError
+                                ? Icons.warning_rounded
+                                : Icons.check_circle_rounded,
+                            color: _isError
+                                ? Colors.red[400]
+                                : Colors.green[400],
+                            size: 20,
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _notificationMessage,
+                            style: TextStyle(
+                              color: _isError
+                                  ? Colors.red[300]
+                                  : Colors.green[300],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1527,172 +1531,273 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     final codeController = TextEditingController();
     bool codeSent = false;
     String? newEmailAddress;
+    Timer? dialogTimer;
+    int localCooldown = 0;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: Colors.white.withOpacity(0.1),
+        builder: (context, setDialogState) {
+          // Initialize timer when cooldown starts
+          if (localCooldown == 0 && _emailCooldownSeconds > 0) {
+            localCooldown = _emailCooldownSeconds;
+            dialogTimer?.cancel();
+            dialogTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+              if (localCooldown > 0) {
+                setDialogState(() {
+                  localCooldown--;
+                });
+              } else {
+                timer.cancel();
+              }
+            });
+          }
+
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: Colors.white.withOpacity(0.1),
+              ),
             ),
-          ),
-          title: const Text(
-            'Update Email',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
+            title: const Text(
+              'Update Email',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!codeSent) ...[
-                TextField(
-                  controller: controller,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    hintText: 'Enter new email',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.white.withOpacity(0.1),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!codeSent) ...[
+                  TextField(
+                    controller: controller,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      hintText: 'Enter new email',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
                       ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.white.withOpacity(0.1),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
                       ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: Color(0xFFD4AF37),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'A verification code will be sent to your new email address',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withOpacity(0.4),
-                  ),
-                ),
-              ] else ...[
-                TextField(
-                  controller: codeController,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                    hintText: 'Enter 6-digit code',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    counterText: '',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.white.withOpacity(0.1),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.white.withOpacity(0.1),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: Color(0xFFD4AF37),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFD4AF37),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Verification code sent to $newEmailAddress',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
-                    fontSize: 12,
-                  ),
-                ),
-                if (_emailCooldownSeconds > 0) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Text(
-                    'Resend code in $_emailCooldownSeconds seconds',
+                    'A verification code will be sent to your new email address',
                     style: TextStyle(
-                      color: Colors.orange.withOpacity(0.6),
                       fontSize: 12,
+                      color: Colors.white.withOpacity(0.4),
                     ),
                   ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.email_outlined,
+                          color: const Color(0xFFD4AF37).withOpacity(0.7),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Code sent to $newEmailAddress',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: codeController,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      letterSpacing: 8,
+                    ),
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: InputDecoration(
+                      hintText: '------',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.2),
+                        letterSpacing: 8,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      counterText: '',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFD4AF37),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (localCooldown > 0) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.orange.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            color: Colors.orange.withOpacity(0.7),
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Resend in $localCooldown seconds',
+                            style: TextStyle(
+                              color: Colors.orange.withOpacity(0.7),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white.withOpacity(0.5)),
-              ),
             ),
-            if (codeSent && _emailCooldownSeconds <= 0)
+            actions: [
               TextButton(
-                onPressed: () async {
-                  await _sendEmailChangeCode(newEmailAddress!);
+                onPressed: () {
+                  dialogTimer?.cancel();
+                  Navigator.pop(context);
                 },
-                child: const Text(
-                  'Resend',
-                  style: TextStyle(color: Color(0xFFD4AF37)),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.white.withOpacity(0.5)),
                 ),
               ),
-            TextButton(
-              onPressed: () async {
-                if (!codeSent) {
-                  final newEmail = controller.text.trim();
-                  if (newEmail.isNotEmpty && newEmail != user?.email) {
-                    // Validate email format
-                    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                    if (!emailRegex.hasMatch(newEmail)) {
-                      _showGlassyNotification('Please enter a valid email address', isError: true);
-                      return;
-                    }
-                    newEmailAddress = newEmail;
-                    await _sendEmailChangeCode(newEmail);
-                    setState(() {
-                      codeSent = true;
+              if (codeSent && localCooldown <= 0)
+                TextButton(
+                  onPressed: () async {
+                    await _sendEmailChangeCode(newEmailAddress!);
+                    setDialogState(() {
+                      localCooldown = 20;
                     });
+                    dialogTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+                      if (localCooldown > 0) {
+                        setDialogState(() {
+                          localCooldown--;
+                        });
+                      } else {
+                        timer.cancel();
+                      }
+                    });
+                  },
+                  child: const Text(
+                    'Resend',
+                    style: TextStyle(color: Color(0xFFD4AF37)),
+                  ),
+                ),
+              TextButton(
+                onPressed: () async {
+                  if (!codeSent) {
+                    final newEmail = controller.text.trim();
+                    if (newEmail.isNotEmpty && newEmail != user?.email) {
+                      final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                      if (!emailRegex.hasMatch(newEmail)) {
+                        _showGlassyNotification('Please enter a valid email address', isError: true);
+                        return;
+                      }
+                      newEmailAddress = newEmail;
+                      await _sendEmailChangeCode(newEmail);
+                      setDialogState(() {
+                        codeSent = true;
+                        localCooldown = 20;
+                      });
+                      dialogTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+                        if (localCooldown > 0) {
+                          setDialogState(() {
+                            localCooldown--;
+                          });
+                        } else {
+                          timer.cancel();
+                        }
+                      });
+                    }
+                  } else {
+                    final code = codeController.text.trim();
+                    if (code.length == 6) {
+                      dialogTimer?.cancel();
+                      Navigator.pop(context);
+                      await _verifyEmailChange(code);
+                    } else {
+                      _showGlassyNotification('Please enter a 6-digit code', isError: true);
+                    }
                   }
-                } else {
-                  final code = codeController.text.trim();
-                  if (code.length == 6) {
-                    Navigator.pop(context);
-                    await _verifyEmailChange(code);
-                  }
-                }
-              },
-              child: Text(
-                codeSent ? 'Verify' : 'Send Code',
-                style: const TextStyle(color: Color(0xFFD4AF37)),
+                },
+                child: Text(
+                  codeSent ? 'Verify' : 'Send Code',
+                  style: const TextStyle(color: Color(0xFFD4AF37)),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
-    );
+    ).then((_) {
+      dialogTimer?.cancel();
+    });
   }
 
   void _showPasswordUpdateDialog() {
@@ -1891,142 +1996,244 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   void _showDeleteAccountDialog() {
     final codeController = TextEditingController();
     bool codeSent = false;
+    Timer? dialogTimer;
+    int localCooldown = 0;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: Colors.red.withOpacity(0.3),
+        builder: (context, setDialogState) {
+          // Initialize timer when cooldown starts
+          if (localCooldown == 0 && _deleteCooldownSeconds > 0) {
+            localCooldown = _deleteCooldownSeconds;
+            dialogTimer?.cancel();
+            dialogTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+              if (localCooldown > 0) {
+                setDialogState(() {
+                  localCooldown--;
+                });
+              } else {
+                timer.cancel();
+              }
+            });
+          }
+
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: Colors.red.withOpacity(0.3),
+              ),
             ),
-          ),
-          title: Row(
-            children: [
-              Icon(
-                Icons.warning,
-                color: Colors.red[300],
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Delete Account',
-                style: TextStyle(
+            title: Row(
+              children: [
+                Icon(
+                  Icons.warning,
                   color: Colors.red[300],
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
+                  size: 28,
                 ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'This action cannot be undone. All your data will be permanently deleted.',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 14,
-                ),
-              ),
-              if (codeSent) ...[
-                const SizedBox(height: 20),
-                TextField(
-                  controller: codeController,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                    hintText: 'Enter 6-digit code',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    counterText: '',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.red.withOpacity(0.3),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.red.withOpacity(0.3),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.red.withOpacity(0.5),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(width: 12),
                 Text(
-                  'A verification code was sent to ${user?.email}',
+                  'Delete Account',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
-                    fontSize: 12,
+                    color: Colors.red[300],
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (_deleteCooldownSeconds > 0) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Resend code in $_deleteCooldownSeconds seconds',
-                    style: TextStyle(
-                      color: Colors.orange.withOpacity(0.6),
-                      fontSize: 12,
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'This action cannot be undone. All your data will be permanently deleted.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 14,
+                  ),
+                ),
+                if (codeSent) ...[
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.red.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.email_outlined,
+                          color: Colors.red.withOpacity(0.7),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Code sent to ${user?.email}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: codeController,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      letterSpacing: 8,
+                    ),
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: InputDecoration(
+                      hintText: '------',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.2),
+                        letterSpacing: 8,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.05),
+                      counterText: '',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.red.withOpacity(0.3),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.red.withOpacity(0.3),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.red.withOpacity(0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (localCooldown > 0) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.orange.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            color: Colors.orange.withOpacity(0.7),
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Resend in $localCooldown seconds',
+                            style: TextStyle(
+                              color: Colors.orange.withOpacity(0.7),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white.withOpacity(0.5)),
-              ),
             ),
-            if (codeSent && _deleteCooldownSeconds <= 0)
+            actions: [
               TextButton(
-                onPressed: () async {
-                  await _sendDeleteAccountCode();
+                onPressed: () {
+                  dialogTimer?.cancel();
+                  Navigator.pop(context);
                 },
                 child: Text(
-                  'Resend',
+                  'Cancel',
+                  style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                ),
+              ),
+              if (codeSent && localCooldown <= 0)
+                TextButton(
+                  onPressed: () async {
+                    await _sendDeleteAccountCode();
+                    setDialogState(() {
+                      localCooldown = 20;
+                    });
+                    dialogTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+                      if (localCooldown > 0) {
+                        setDialogState(() {
+                          localCooldown--;
+                        });
+                      } else {
+                        timer.cancel();
+                      }
+                    });
+                  },
+                  child: Text(
+                    'Resend',
+                    style: TextStyle(color: Colors.red[300]),
+                  ),
+                ),
+              TextButton(
+                onPressed: () async {
+                  if (!codeSent) {
+                    await _sendDeleteAccountCode();
+                    setDialogState(() {
+                      codeSent = true;
+                      localCooldown = 20;
+                    });
+                    dialogTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+                      if (localCooldown > 0) {
+                        setDialogState(() {
+                          localCooldown--;
+                        });
+                      } else {
+                        timer.cancel();
+                      }
+                    });
+                  } else {
+                    final code = codeController.text.trim();
+                    if (code.length == 6) {
+                      dialogTimer?.cancel();
+                      Navigator.pop(context);
+                      await _deleteAccount(code);
+                    } else {
+                      _showGlassyNotification('Please enter a 6-digit code', isError: true);
+                    }
+                  }
+                },
+                child: Text(
+                  codeSent ? 'Delete Account' : 'Send Code',
                   style: TextStyle(color: Colors.red[300]),
                 ),
               ),
-            TextButton(
-              onPressed: () async {
-                if (!codeSent) {
-                  await _sendDeleteAccountCode();
-                  setState(() {
-                    codeSent = true;
-                  });
-                } else {
-                  final code = codeController.text.trim();
-                  if (code.length == 6) {
-                    Navigator.pop(context);
-                    await _deleteAccount(code);
-                  }
-                }
-              },
-              child: Text(
-                codeSent ? 'Delete Account' : 'Send Code',
-                style: TextStyle(color: Colors.red[300]),
-              ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
-    );
+    ).then((_) {
+      dialogTimer?.cancel();
+    });
   }
 }

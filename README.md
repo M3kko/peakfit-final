@@ -22,3 +22,4 @@ PeakFit TRUST
 - Fix email of deletion
 - Make it delete from supabase and other folders
 - Make email change in all folders + supabase + display update immediately
+- Add 20s delay in between codes

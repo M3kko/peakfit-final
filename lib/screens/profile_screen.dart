@@ -36,6 +36,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   DateTime? _lastUsernameChange;
   Map<String, dynamic>? _profileData;
   List<Map<String, dynamic>> _achievements = [];
+  bool _marketingConsent = false;
+  DateTime? _marketingConsentDate;
 
   // For birthday tracking
   DateTime? _birthDate;
@@ -118,6 +120,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           _profileImageUrl = data?['profileImageUrl'];
           _username = data?['username'];
           _lastUsernameChange = (data?['lastUsernameChange'] as Timestamp?)?.toDate();
+          _marketingConsent = data?['marketing_consent'] ?? false;
+          _marketingConsentDate = (data?['marketing_consent_date'] as Timestamp?)?.toDate();
 
           // Load birthday and calculate age
           if (data?['birthDate'] != null) {
@@ -201,6 +205,37 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     if (_lastUsernameChange == null) return 0;
     final daysSinceLastChange = DateTime.now().difference(_lastUsernameChange!).inDays;
     return (7 - daysSinceLastChange).clamp(0, 7);
+  }
+
+  Future<void> _updateMarketingConsent(bool consent) async {
+    if (user == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .update({
+        'marketing_consent': consent,
+        'marketing_consent_date': consent ? FieldValue.serverTimestamp() : null,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      setState(() {
+        _marketingConsent = consent;
+        if (consent) {
+          _marketingConsentDate = DateTime.now();
+        }
+      });
+
+      _showGlassyNotification(
+          consent
+              ? 'Marketing preferences updated. You\'ll receive updates about new features and fitness tips!'
+              : 'Marketing preferences updated. You\'ll no longer receive promotional emails.'
+      );
+    } catch (e) {
+      print('Error updating marketing consent: $e');
+      _showGlassyNotification('Error updating preferences', isError: true);
+    }
   }
 
   Future<void> _pickImage() async {
@@ -1005,6 +1040,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             Icons.lock_outline,
                 () => _showPasswordUpdateDialog(),
           ),
+          _buildMarketingConsentCard(),
           _buildSettingCard(
             'Sign Out',
             'Sign out of your account',
@@ -1018,6 +1054,83 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             Icons.delete_forever,
                 () => _showDeleteAccountDialog(),
             isDanger: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMarketingConsentCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.mail_outline,
+              color: Colors.white.withOpacity(0.7),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Marketing Emails',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _marketingConsent
+                      ? 'Receive updates about new features and fitness tips'
+                      : 'Marketing emails are disabled',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                ),
+                if (_marketingConsentDate != null && _marketingConsent) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Opted in on ${_marketingConsentDate!.day}/${_marketingConsentDate!.month}/${_marketingConsentDate!.year}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(0.3),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Switch(
+            value: _marketingConsent,
+            onChanged: (value) {
+              HapticFeedback.lightImpact();
+              _updateMarketingConsent(value);
+            },
+            activeColor: const Color(0xFFD4AF37),
+            inactiveThumbColor: Colors.white.withOpacity(0.3),
+            inactiveTrackColor: Colors.white.withOpacity(0.1),
           ),
         ],
       ),

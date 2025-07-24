@@ -1,7 +1,7 @@
 // sport_goals_data.dart
 
 class SportGoals {
-  // Backend goal keys for each display goal
+  // Backend goal keys for each display goal (updated to match goal_conversions.js)
   static final Map<String, String> goalKeyMappings = {
     // General goals
     'Increase Overall Strength': 'overall_strength',
@@ -15,69 +15,112 @@ class SportGoals {
     'Build Core Strength': 'core_strength',
     'Improve Coordination': 'coordination',
 
-    // Sport-specific goals
+    // Sport-specific goals - consolidated to match backend conversions
     'Increase Back Strength': 'back_strength',
     'Improve Shoulder Stability': 'shoulder_stability',
-    'Increase Smash Power': 'smash_power',
+
+    // All smash/serve/shot/overhead power goals map to same backend
+    'Increase Smash Power': 'overhead_power',
+    'Increase Serve Power': 'overhead_power',
+    'Build Shot Power': 'overhead_power',
+    'Increase Overhead Strength': 'overhead_power',
+    'Build Shoulder Power': 'overhead_power',
+
     'Improve Lateral Movement': 'lateral_movement',
     'Better Wrist Strength': 'wrist_strength',
-    'Increase Jump Height': 'jump_height',
+
+    // All jump/vertical goals map to same backend
+    'Increase Jump Height': 'vertical_jump',
+    'Boost Vertical Jump': 'vertical_jump',
+    'Increase Vertical Jump': 'vertical_jump',
+
     'Improve Extension': 'extension',
-    'Better Rotation Control': 'rotation_control',
-    'Increase Arm Strength': 'arm_strength',
-    'Better Hip Mobility': 'hip_mobility',
-    'Improve Sprint Speed': 'sprint_speed',
+
+    // All rotation goals map to rotational_power
+    'Better Rotation Control': 'rotational_power',
     'Increase Rotational Power': 'rotational_power',
-    'Improve Lateral Quickness': 'lateral_quickness',
+    'Improve Core Rotation': 'rotational_power',
+    'Increase Rotation Power': 'rotational_power',
+    'Improve Rotation Power': 'rotational_power',
+
+    // All upper body strength goals map to same backend
+    'Increase Arm Strength': 'upper_body_strength',
     'Build Upper Body Strength': 'upper_body_strength',
-    'Improve Core Rotation': 'core_rotation',
+    'Build Upper Body Power': 'upper_body_strength',
+
+    // All hip mobility goals map to same backend
+    'Better Hip Mobility': 'hip_mobility',
+    'Increase Hip Flexibility': 'hip_mobility',
+    'Better Hip Flexibility': 'hip_mobility',
+
+    'Improve Sprint Speed': 'sprint_speed',
+
+    // All lateral quickness goals map to same backend
+    'Improve Lateral Quickness': 'lateral_quickness',
+    'Better Court Speed': 'lateral_quickness',
+    'Improve Transition Speed': 'lateral_quickness',
+
+    // All balance goals map to balance_stability
     'Better Balance': 'balance_stability',
-    'Increase Punching Power': 'punching_power',
+    'Better Balance Control': 'balance_stability',
+    'Improve Balance & Stability': 'balance_stability',
+
+    // All striking/punching power goals map to same backend
+    'Increase Punching Power': 'striking_power',
+    'Build Striking Power': 'striking_power',
+
     'Better Footwork Speed': 'footwork_speed',
+
+    // All reaction time goals map to same backend
     'Improve Reaction Time': 'reaction_time',
+    'Faster Reaction Time': 'reaction_time',
+    'Better Reaction Time': 'reaction_time',
+
     'Build Pull-Up Strength': 'pull_up_strength',
-    'Improve Core Control': 'core_control',
-    'Increase Overhead Strength': 'overhead_strength',
+
+    // All core control/strength/stability goals map to core_strength
+    'Improve Core Control': 'core_strength',
+    'Build Core Strength': 'core_strength',
+    'Improve Core Stability': 'core_strength',
+    'Better Core Control': 'core_strength',
+
     'Improve Body Tension': 'body_tension',
+
+    // All flexibility goals map to flexibility
     'Better Flexibility': 'flexibility',
+    'Increase Flexibility': 'flexibility',
+
+    // All explosive power goals map to same backend
     'Build Explosive Power': 'explosive_power',
+    'Increase Explosive Power': 'explosive_power',
+
+    // All leg strength goals map to same backend
     'Increase Leg Strength': 'leg_strength',
+    'Build Leg Strength': 'leg_strength',
+    'Build Leg Power': 'leg_strength',
+
+    // All aerobic goals map to aerobic_capacity
     'Improve Aerobic Capacity': 'aerobic_capacity',
+    'Build Aerobic Base': 'aerobic_capacity',
+
     'Better Power-to-Weight': 'power_to_weight',
     'Better Turn Control': 'turn_control',
     'Improve Lunge Power': 'lunge_power',
-    'Faster Reaction Time': 'reaction_time',
-    'Increase Hip Flexibility': 'hip_flexibility',
-    'Better Balance Control': 'balance_control',
+
+    // All agility goals map to agility
     'Increase Agility': 'agility',
-    'Increase Rotation Power': 'rotation_power',
+    'Improve Agility': 'agility',
+    'Better Agility': 'agility',
+
     'Improve Acceleration': 'acceleration',
-    'Build Shot Power': 'shot_power',
-    'Better Hip Flexibility': 'hip_flexibility',
     'Increase Kick Height': 'kick_height',
-    'Build Striking Power': 'striking_power',
     'Improve Grip Strength': 'grip_strength',
-    'Build Upper Body Power': 'upper_body_strength',
     'Increase Jump Distance': 'jump_distance',
     'Better Landing Control': 'landing_control',
     'Build Pulling Power': 'pulling_power',
-    'Improve Core Stability': 'core_strength',
     'Improve Leg Endurance': 'leg_endurance',
     'Better Edge Control': 'edge_control',
-    'Build Leg Strength': 'leg_strength',
-    'Build Leg Power': 'leg_strength',
-    'Better Core Control': 'core_control',
-    'Increase Explosive Power': 'explosive_power',
     'Better Stroke Efficiency': 'stroke_efficiency',
-    'Increase Serve Power': 'serve_power',
-    'Better Court Speed': 'court_speed',
-    'Improve Rotation Power': 'rotation_power',
-    'Build Aerobic Base': 'aerobic_capacity',
-    'Improve Transition Speed': 'transition_speed',
-    'Increase Vertical Jump': 'vertical_jump',
-    'Build Shoulder Power': 'shoulder_power',
-    'Improve Agility': 'agility',
-    'Better Reaction Time': 'reaction_time',
     'Build Total Body Strength': 'total_body_strength',
     'Improve Cardiovascular Fitness': 'cardiovascular_fitness',
     'Better Running Economy': 'running_economy',
@@ -148,7 +191,7 @@ class SportGoals {
     },
   ];
 
-  // Sport and discipline specific goals
+  // Sport and discipline specific goals - consolidated to match backend mappings
   static final Map<String, Map<String, List<Map<String, dynamic>>>> sportSpecificGoals = {
     'Archery': {
       'Men': [
@@ -162,31 +205,31 @@ class SportGoals {
     },
     'Badminton': {
       'Men': [
-        {'title': 'Increase Smash Power', 'key': 'smash_power', 'icon': '💥', 'description': 'Explosive overhead'},
+        {'title': 'Increase Smash Power', 'key': 'overhead_power', 'icon': '💥', 'description': 'Explosive overhead'},
         {'title': 'Improve Lateral Movement', 'key': 'lateral_movement', 'icon': '↔️', 'description': 'Court coverage'},
         {'title': 'Better Wrist Strength', 'key': 'wrist_strength', 'icon': '🤚', 'description': 'Shot control'},
       ],
       'Women': [
-        {'title': 'Increase Smash Power', 'key': 'smash_power', 'icon': '💥', 'description': 'Explosive overhead'},
+        {'title': 'Increase Smash Power', 'key': 'overhead_power', 'icon': '💥', 'description': 'Explosive overhead'},
         {'title': 'Improve Lateral Movement', 'key': 'lateral_movement', 'icon': '↔️', 'description': 'Court coverage'},
         {'title': 'Better Wrist Strength', 'key': 'wrist_strength', 'icon': '🤚', 'description': 'Shot control'},
       ],
     },
     'Ballet': {
       'Men': [
-        {'title': 'Increase Jump Height', 'key': 'jump_height', 'icon': '🦅', 'description': 'Elevation power'},
+        {'title': 'Increase Jump Height', 'key': 'vertical_jump', 'icon': '🦅', 'description': 'Elevation power'},
         {'title': 'Improve Extension', 'key': 'extension', 'icon': '🦵', 'description': 'Leg flexibility'},
-        {'title': 'Better Rotation Control', 'key': 'rotation_control', 'icon': '🌀', 'description': 'Turn stability'},
+        {'title': 'Better Rotation Control', 'key': 'rotational_power', 'icon': '🌀', 'description': 'Turn stability'},
       ],
       'Women': [
-        {'title': 'Increase Jump Height', 'key': 'jump_height', 'icon': '🦅', 'description': 'Elevation power'},
+        {'title': 'Increase Jump Height', 'key': 'vertical_jump', 'icon': '🦅', 'description': 'Elevation power'},
         {'title': 'Improve Extension', 'key': 'extension', 'icon': '🦵', 'description': 'Leg flexibility'},
-        {'title': 'Better Rotation Control', 'key': 'rotation_control', 'icon': '🌀', 'description': 'Turn stability'},
+        {'title': 'Better Rotation Control', 'key': 'rotational_power', 'icon': '🌀', 'description': 'Turn stability'},
       ],
     },
     'Baseball': {
       'Pitcher/Catcher': [
-        {'title': 'Increase Arm Strength', 'key': 'arm_strength', 'icon': '💪', 'description': 'Throwing power'},
+        {'title': 'Increase Arm Strength', 'key': 'upper_body_strength', 'icon': '💪', 'description': 'Throwing power'},
         {'title': 'Better Hip Mobility', 'key': 'hip_mobility', 'icon': '🔄', 'description': 'Rotation range'},
       ],
       'Fielder': [
@@ -206,22 +249,22 @@ class SportGoals {
     },
     'Bowling': {
       'Men': [
-        {'title': 'Improve Core Rotation', 'key': 'core_rotation', 'icon': '🔄', 'description': 'Power generation'},
+        {'title': 'Improve Core Rotation', 'key': 'rotational_power', 'icon': '🔄', 'description': 'Power generation'},
         {'title': 'Better Balance', 'key': 'balance_stability', 'icon': '⚖️', 'description': 'Consistent approach'},
       ],
       'Women': [
-        {'title': 'Improve Core Rotation', 'key': 'core_rotation', 'icon': '🔄', 'description': 'Power generation'},
+        {'title': 'Improve Core Rotation', 'key': 'rotational_power', 'icon': '🔄', 'description': 'Power generation'},
         {'title': 'Better Balance', 'key': 'balance_stability', 'icon': '⚖️', 'description': 'Consistent approach'},
       ],
     },
     'Boxing': {
       'Men': [
-        {'title': 'Increase Punching Power', 'key': 'punching_power', 'icon': '👊', 'description': 'Core to fist transfer'},
+        {'title': 'Increase Punching Power', 'key': 'striking_power', 'icon': '👊', 'description': 'Core to fist transfer'},
         {'title': 'Better Footwork Speed', 'key': 'footwork_speed', 'icon': '👟', 'description': 'Ring movement'},
         {'title': 'Improve Reaction Time', 'key': 'reaction_time', 'icon': '⚡', 'description': 'Defensive reflexes'},
       ],
       'Women': [
-        {'title': 'Increase Punching Power', 'key': 'punching_power', 'icon': '👊', 'description': 'Core to fist transfer'},
+        {'title': 'Increase Punching Power', 'key': 'striking_power', 'icon': '👊', 'description': 'Core to fist transfer'},
         {'title': 'Better Footwork Speed', 'key': 'footwork_speed', 'icon': '👟', 'description': 'Ring movement'},
         {'title': 'Improve Reaction Time', 'key': 'reaction_time', 'icon': '⚡', 'description': 'Defensive reflexes'},
       ],
@@ -229,23 +272,23 @@ class SportGoals {
     'Calisthenics': {
       'Men': [
         {'title': 'Build Pull-Up Strength', 'key': 'pull_up_strength', 'icon': '💪', 'description': 'Upper body power'},
-        {'title': 'Improve Core Control', 'key': 'core_control', 'icon': '🎯', 'description': 'Static holds'},
+        {'title': 'Improve Core Control', 'key': 'core_strength', 'icon': '🎯', 'description': 'Static holds'},
       ],
       'Women': [
         {'title': 'Build Pull-Up Strength', 'key': 'pull_up_strength', 'icon': '💪', 'description': 'Upper body power'},
-        {'title': 'Improve Core Control', 'key': 'core_control', 'icon': '🎯', 'description': 'Static holds'},
+        {'title': 'Improve Core Control', 'key': 'core_strength', 'icon': '🎯', 'description': 'Static holds'},
       ],
     },
     'Cheerleading': {
       'Base/Spotter': [
-        {'title': 'Increase Overhead Strength', 'key': 'overhead_strength', 'icon': '🙌', 'description': 'Stunt support'},
+        {'title': 'Increase Overhead Strength', 'key': 'overhead_power', 'icon': '🙌', 'description': 'Stunt support'},
       ],
       'Flyer': [
         {'title': 'Improve Body Tension', 'key': 'body_tension', 'icon': '💎', 'description': 'Air control'},
         {'title': 'Better Flexibility', 'key': 'flexibility', 'icon': '🧘', 'description': 'Body positions'},
       ],
       'Base/Tumbler': [
-        {'title': 'Increase Jump Height', 'key': 'jump_height', 'icon': '🤸', 'description': 'Tumbling power'},
+        {'title': 'Increase Jump Height', 'key': 'vertical_jump', 'icon': '🤸', 'description': 'Tumbling power'},
       ],
     },
     'Cycling': {
@@ -260,12 +303,12 @@ class SportGoals {
     },
     'Dance': {
       'Men': [
-        {'title': 'Increase Jump Height', 'key': 'jump_height', 'icon': '🦘', 'description': 'Explosive leaps'},
+        {'title': 'Increase Jump Height', 'key': 'vertical_jump', 'icon': '🦘', 'description': 'Explosive leaps'},
         {'title': 'Improve Flexibility', 'key': 'flexibility', 'icon': '🧘', 'description': 'Movement range'},
         {'title': 'Better Turn Control', 'key': 'turn_control', 'icon': '🌀', 'description': 'Rotation stability'},
       ],
       'Women': [
-        {'title': 'Increase Jump Height', 'key': 'jump_height', 'icon': '🦘', 'description': 'Explosive leaps'},
+        {'title': 'Increase Jump Height', 'key': 'vertical_jump', 'icon': '🦘', 'description': 'Explosive leaps'},
         {'title': 'Improve Flexibility', 'key': 'flexibility', 'icon': '🧘', 'description': 'Movement range'},
         {'title': 'Better Turn Control', 'key': 'turn_control', 'icon': '🌀', 'description': 'Rotation stability'},
       ],
@@ -282,16 +325,16 @@ class SportGoals {
     },
     'Figure Skating': {
       'Singles': [
-        {'title': 'Increase Jump Height', 'key': 'jump_height', 'icon': '🚀', 'description': 'Rotation height'},
-        {'title': 'Better Core Control', 'key': 'core_control', 'icon': '🌀', 'description': 'Spin stability'},
+        {'title': 'Increase Jump Height', 'key': 'vertical_jump', 'icon': '🚀', 'description': 'Rotation height'},
+        {'title': 'Better Core Control', 'key': 'core_strength', 'icon': '🌀', 'description': 'Spin stability'},
       ],
       'Pairs': [
         {'title': 'Build Upper Body Strength', 'key': 'upper_body_strength', 'icon': '💪', 'description': 'Lift power'},
         {'title': 'Improve Core Stability', 'key': 'core_strength', 'icon': '🎯', 'description': 'Partner work'},
       ],
       'Ice Dance': [
-        {'title': 'Increase Hip Flexibility', 'key': 'hip_flexibility', 'icon': '🦵', 'description': 'Edge depth'},
-        {'title': 'Better Balance Control', 'key': 'balance_control', 'icon': '⚖️', 'description': 'Precision movements'},
+        {'title': 'Increase Hip Flexibility', 'key': 'hip_mobility', 'icon': '🦵', 'description': 'Edge depth'},
+        {'title': 'Better Balance Control', 'key': 'balance_stability', 'icon': '⚖️', 'description': 'Precision movements'},
       ],
     },
     'Football': {
@@ -310,12 +353,12 @@ class SportGoals {
     },
     'Golf': {
       'Men': [
-        {'title': 'Increase Rotation Power', 'key': 'rotation_power', 'icon': '🔄', 'description': 'Swing speed'},
+        {'title': 'Increase Rotation Power', 'key': 'rotational_power', 'icon': '🔄', 'description': 'Swing speed'},
         {'title': 'Better Core Stability', 'key': 'core_strength', 'icon': '🎯', 'description': 'Consistent contact'},
         {'title': 'Improve Hip Mobility', 'key': 'hip_mobility', 'icon': '🦵', 'description': 'Full turn'},
       ],
       'Women': [
-        {'title': 'Increase Rotation Power', 'key': 'rotation_power', 'icon': '🔄', 'description': 'Swing speed'},
+        {'title': 'Increase Rotation Power', 'key': 'rotational_power', 'icon': '🔄', 'description': 'Swing speed'},
         {'title': 'Better Core Stability', 'key': 'core_strength', 'icon': '🎯', 'description': 'Consistent contact'},
         {'title': 'Improve Hip Mobility', 'key': 'hip_mobility', 'icon': '🦵', 'description': 'Full turn'},
       ],
@@ -325,21 +368,21 @@ class SportGoals {
         {'title': 'Build Upper Body Strength', 'key': 'upper_body_strength', 'icon': '💪', 'description': 'Static holds'},
       ],
       'All-Around': [
-        {'title': 'Increase Jump Height', 'key': 'jump_height', 'icon': '🦘', 'description': 'Tumbling power'},
+        {'title': 'Increase Jump Height', 'key': 'vertical_jump', 'icon': '🦘', 'description': 'Tumbling power'},
         {'title': 'Improve Flexibility', 'key': 'flexibility', 'icon': '🧘', 'description': 'Full ROM'},
       ],
       'Balance/Grace Events': [
-        {'title': 'Better Balance Control', 'key': 'balance_control', 'icon': '⚖️', 'description': 'Beam stability'},
+        {'title': 'Better Balance Control', 'key': 'balance_stability', 'icon': '⚖️', 'description': 'Beam stability'},
         {'title': 'Increase Flexibility', 'key': 'flexibility', 'icon': '🦵', 'description': 'Split leaps'},
       ],
     },
     'Ice Hockey': {
       'Forward/Defense': [
         {'title': 'Improve Acceleration', 'key': 'acceleration', 'icon': '⚡', 'description': 'First steps'},
-        {'title': 'Build Shot Power', 'key': 'shot_power', 'icon': '🏒', 'description': 'Slap shot strength'},
+        {'title': 'Build Shot Power', 'key': 'overhead_power', 'icon': '🏒', 'description': 'Slap shot strength'},
       ],
       'Goaltender': [
-        {'title': 'Better Hip Flexibility', 'key': 'hip_flexibility', 'icon': '🦋', 'description': 'Butterfly saves'},
+        {'title': 'Better Hip Flexibility', 'key': 'hip_mobility', 'icon': '🦋', 'description': 'Butterfly saves'},
         {'title': 'Faster Reaction Time', 'key': 'reaction_time', 'icon': '⚡', 'description': 'Quick saves'},
       ],
     },
@@ -368,11 +411,11 @@ class SportGoals {
     'Rock Climbing': {
       'Men': [
         {'title': 'Increase Grip Strength', 'key': 'grip_strength', 'icon': '🤏', 'description': 'Hold endurance'},
-        {'title': 'Better Hip Flexibility', 'key': 'hip_flexibility', 'icon': '🦵', 'description': 'High steps'},
+        {'title': 'Better Hip Flexibility', 'key': 'hip_mobility', 'icon': '🦵', 'description': 'High steps'},
       ],
       'Women': [
         {'title': 'Increase Grip Strength', 'key': 'grip_strength', 'icon': '🤏', 'description': 'Hold endurance'},
-        {'title': 'Better Hip Flexibility', 'key': 'hip_flexibility', 'icon': '🦵', 'description': 'High steps'},
+        {'title': 'Better Hip Flexibility', 'key': 'hip_mobility', 'icon': '🦵', 'description': 'High steps'},
       ],
     },
     'Rowing': {
@@ -417,23 +460,23 @@ class SportGoals {
     'Soccer': {
       'Men': [
         {'title': 'Improve Sprint Speed', 'key': 'sprint_speed', 'icon': '⚡', 'description': 'Breakaways'},
-        {'title': 'Increase Jump Height', 'key': 'jump_height', 'icon': '🦘', 'description': 'Headers'},
+        {'title': 'Increase Jump Height', 'key': 'vertical_jump', 'icon': '🦘', 'description': 'Headers'},
         {'title': 'Better Agility', 'key': 'agility', 'icon': '🔄', 'description': 'Direction changes'},
       ],
       'Women': [
         {'title': 'Improve Sprint Speed', 'key': 'sprint_speed', 'icon': '⚡', 'description': 'Breakaways'},
-        {'title': 'Increase Jump Height', 'key': 'jump_height', 'icon': '🦘', 'description': 'Headers'},
+        {'title': 'Increase Jump Height', 'key': 'vertical_jump', 'icon': '🦘', 'description': 'Headers'},
         {'title': 'Better Agility', 'key': 'agility', 'icon': '🔄', 'description': 'Direction changes'},
       ],
     },
     'Speed Skating': {
       'Men': [
         {'title': 'Build Leg Power', 'key': 'leg_strength', 'icon': '🦵', 'description': 'Push strength'},
-        {'title': 'Better Core Control', 'key': 'core_control', 'icon': '🎯', 'description': 'Corner stability'},
+        {'title': 'Better Core Control', 'key': 'core_strength', 'icon': '🎯', 'description': 'Corner stability'},
       ],
       'Women': [
         {'title': 'Build Leg Power', 'key': 'leg_strength', 'icon': '🦵', 'description': 'Push strength'},
-        {'title': 'Better Core Control', 'key': 'core_control', 'icon': '🎯', 'description': 'Corner stability'},
+        {'title': 'Better Core Control', 'key': 'core_strength', 'icon': '🎯', 'description': 'Corner stability'},
       ],
     },
     'Swimming': {
@@ -448,30 +491,30 @@ class SportGoals {
     },
     'Tennis': {
       'Men': [
-        {'title': 'Increase Serve Power', 'key': 'serve_power', 'icon': '🎾', 'description': 'Shoulder strength'},
-        {'title': 'Better Court Speed', 'key': 'court_speed', 'icon': '⚡', 'description': 'Coverage'},
-        {'title': 'Improve Rotation Power', 'key': 'rotation_power', 'icon': '🔄', 'description': 'Groundstrokes'},
+        {'title': 'Increase Serve Power', 'key': 'overhead_power', 'icon': '🎾', 'description': 'Shoulder strength'},
+        {'title': 'Better Court Speed', 'key': 'lateral_quickness', 'icon': '⚡', 'description': 'Coverage'},
+        {'title': 'Improve Rotation Power', 'key': 'rotational_power', 'icon': '🔄', 'description': 'Groundstrokes'},
       ],
       'Women': [
-        {'title': 'Increase Serve Power', 'key': 'serve_power', 'icon': '🎾', 'description': 'Shoulder strength'},
-        {'title': 'Better Court Speed', 'key': 'court_speed', 'icon': '⚡', 'description': 'Coverage'},
-        {'title': 'Improve Rotation Power', 'key': 'rotation_power', 'icon': '🔄', 'description': 'Groundstrokes'},
+        {'title': 'Increase Serve Power', 'key': 'overhead_power', 'icon': '🎾', 'description': 'Shoulder strength'},
+        {'title': 'Better Court Speed', 'key': 'lateral_quickness', 'icon': '⚡', 'description': 'Coverage'},
+        {'title': 'Improve Rotation Power', 'key': 'rotational_power', 'icon': '🔄', 'description': 'Groundstrokes'},
       ],
     },
     'Triathlon': {
       'Men': [
         {'title': 'Build Aerobic Base', 'key': 'aerobic_capacity', 'icon': '🫁', 'description': 'Multi-sport endurance'},
-        {'title': 'Improve Transition Speed', 'key': 'transition_speed', 'icon': '🔄', 'description': 'Sport switching'},
+        {'title': 'Improve Transition Speed', 'key': 'lateral_quickness', 'icon': '🔄', 'description': 'Sport switching'},
       ],
       'Women': [
         {'title': 'Build Aerobic Base', 'key': 'aerobic_capacity', 'icon': '🫁', 'description': 'Multi-sport endurance'},
-        {'title': 'Improve Transition Speed', 'key': 'transition_speed', 'icon': '🔄', 'description': 'Sport switching'},
+        {'title': 'Improve Transition Speed', 'key': 'lateral_quickness', 'icon': '🔄', 'description': 'Sport switching'},
       ],
     },
     'Volleyball': {
       'Front Row (Hitter/Blocker)': [
         {'title': 'Increase Vertical Jump', 'key': 'vertical_jump', 'icon': '🏐', 'description': 'Attack height'},
-        {'title': 'Build Shoulder Power', 'key': 'shoulder_power', 'icon': '💪', 'description': 'Spike strength'},
+        {'title': 'Build Shoulder Power', 'key': 'overhead_power', 'icon': '💪', 'description': 'Spike strength'},
       ],
       'Back Row (Setter/Libero)': [
         {'title': 'Improve Agility', 'key': 'agility', 'icon': '🔄', 'description': 'Court coverage'},

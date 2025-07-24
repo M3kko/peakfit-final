@@ -25,3 +25,4 @@ PeakFit TRUST
 - Add 20s delay in between codes
 - Make exercises auto named in firebase
 - Make success + errors in profile more opaque 
+- Make success code the highest layer on profile screen

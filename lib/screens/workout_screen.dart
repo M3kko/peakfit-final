@@ -39,7 +39,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   // Workout state
   int _currentExerciseIndex = 0;
   int _currentSet = 1;
-  int _secondsRemaining = 30; // Default exercise duration
+  int _secondsRemaining = 30;
   Timer? _timer;
   bool _isPaused = false;
   bool _isResting = false;
@@ -47,9 +47,31 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
   // Inactivity tracking
   Timer? _inactivityTimer;
-  static const int _inactivityThreshold = 300; // 5 minutes in seconds
+  static const int _inactivityThreshold = 300; // 5 minutes
 
-  // Progress tracking
+  @override
+  void initState() {
+    super.initState();
+    _initAnimations();
+    _startAnimations();
+    _startExercise();
+    _startInactivityTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _inactivityTimer?.cancel();
+    _entryController.dispose();
+    _glowController.dispose();
+    _progressController.dispose();
+    _pulseController.dispose();
+    _checkmarkController.dispose();
+    super.dispose();
+  }
+
+  // ===== GETTERS =====
+
   double get _overallProgress {
     return (_currentExerciseIndex + (_currentSet - 1) / _totalSets) / widget.exercises.length;
   }
@@ -64,14 +86,16 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     return exercise['reps'] != null && !_isResting;
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _initAnimations();
-    _startAnimations();
-    _startExercise();
-    _startInactivityTimer();
+  Map<String, dynamic> get _currentExercise => widget.exercises[_currentExerciseIndex];
+
+  Map<String, dynamic>? get _nextExercise {
+    if (_currentExerciseIndex < widget.exercises.length - 1) {
+      return widget.exercises[_currentExerciseIndex + 1];
+    }
+    return null;
   }
+
+  // ===== INITIALIZATION =====
 
   void _initAnimations() {
     _entryController = AnimationController(
@@ -141,23 +165,10 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     _entryController.forward();
   }
 
-  void _startInactivityTimer() {
-    _resetInactivityTimer();
-  }
-
-  void _resetInactivityTimer() {
-    _inactivityTimer?.cancel();
-    if (!_isPaused) {
-      _inactivityTimer = Timer(Duration(seconds: _inactivityThreshold), () {
-        if (mounted && !_isPaused) {
-          _showInactivityDialog();
-        }
-      });
-    }
-  }
+  // ===== WORKOUT LOGIC =====
 
   void _startExercise() {
-    final exercise = widget.exercises[_currentExerciseIndex];
+    final exercise = _currentExercise;
 
     if (_isResting) {
       _secondsRemaining = 15; // Rest period
@@ -169,7 +180,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       _secondsRemaining = minutes * 60;
       _startTimer();
     } else if (exercise['reps'] != null) {
-      // Rep-based exercise - no timer but still track elapsed time
+      // Rep-based exercise - no countdown timer but still track elapsed time
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (!_isPaused) {
@@ -201,7 +212,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     HapticFeedback.mediumImpact();
 
     if (_isResting) {
-      // Rest period complete, move to next set or exercise
+      // Rest period complete
       setState(() {
         _isResting = false;
       });
@@ -209,23 +220,22 @@ class _WorkoutScreenState extends State<WorkoutScreen>
         _currentSet++;
         _startExercise();
       } else {
-        _nextExercise();
+        _goToNextExercise();
       }
     } else {
-      // Time-based exercise complete
+      // Exercise complete
       _onExerciseComplete();
     }
   }
 
   void _onExerciseComplete() {
-    // Check if we need to rest or move on
     if (_currentSet < _totalSets) {
       setState(() {
         _isResting = true;
       });
       _startExercise();
     } else {
-      _nextExercise();
+      _goToNextExercise();
     }
   }
 
@@ -238,7 +248,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     });
   }
 
-  void _nextExercise() {
+  void _goToNextExercise() {
     if (_currentExerciseIndex < widget.exercises.length - 1) {
       setState(() {
         _currentExerciseIndex++;
@@ -286,17 +296,24 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     HapticFeedback.lightImpact();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _inactivityTimer?.cancel();
-    _entryController.dispose();
-    _glowController.dispose();
-    _progressController.dispose();
-    _pulseController.dispose();
-    _checkmarkController.dispose();
-    super.dispose();
+  // ===== INACTIVITY HANDLING =====
+
+  void _startInactivityTimer() {
+    _resetInactivityTimer();
   }
+
+  void _resetInactivityTimer() {
+    _inactivityTimer?.cancel();
+    if (!_isPaused) {
+      _inactivityTimer = Timer(Duration(seconds: _inactivityThreshold), () {
+        if (mounted && !_isPaused) {
+          _showInactivityDialog();
+        }
+      });
+    }
+  }
+
+  // ===== UTILITY METHODS =====
 
   String _formatTime(int seconds) {
     final minutes = seconds ~/ 60;
@@ -304,10 +321,10 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
+  // ===== BUILD METHOD =====
+
   @override
   Widget build(BuildContext context) {
-    final currentExercise = widget.exercises[_currentExerciseIndex];
-
     return GestureDetector(
       onTap: _resetInactivityTimer,
       onPanUpdate: (_) => _resetInactivityTimer(),
@@ -334,9 +351,9 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                                 const SizedBox(height: 15),
                                 _buildVideoPlayer(),
                                 const SizedBox(height: 20),
-                                _buildExerciseInfo(currentExercise),
+                                _buildExerciseInfo(),
                                 const SizedBox(height: 30),
-                                _buildTimerOrReps(currentExercise),
+                                _buildMainContent(),
                                 const SizedBox(height: 30),
                                 _buildWorkoutStats(),
                                 const SizedBox(height: 20),
@@ -355,6 +372,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       ),
     );
   }
+
+  // ===== UI COMPONENTS =====
 
   Widget _buildBackground() {
     return Container(
@@ -473,12 +492,10 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Video placeholder with diagonal lines
                   CustomPaint(
                     size: const Size(double.infinity, 180),
                     painter: _VideoPlaceholderPainter(),
                   ),
-                  // Play button overlay
                   Container(
                     width: 60,
                     height: 60,
@@ -505,11 +522,11 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     );
   }
 
-  Widget _buildExerciseInfo(Map<String, dynamic> exercise) {
+  Widget _buildExerciseInfo() {
     return Column(
       children: [
         Text(
-          _isResting ? 'REST' : exercise['name'],
+          _isResting ? 'REST' : _currentExercise['name'],
           style: const TextStyle(
             color: Colors.white,
             fontSize: 28,
@@ -518,9 +535,9 @@ class _WorkoutScreenState extends State<WorkoutScreen>
           ),
         ),
         const SizedBox(height: 12),
-        if (!_isResting && exercise['sets'] != null)
+        if (!_isResting && _currentExercise['sets'] != null)
           Text(
-            'SET $_currentSet OF ${exercise['sets']}',
+            'SET $_currentSet OF ${_currentExercise['sets']}',
             style: TextStyle(
               color: const Color(0xFFD4AF37).withOpacity(0.8),
               fontSize: 16,
@@ -532,53 +549,25 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     );
   }
 
-  Widget _buildTimerOrReps(Map<String, dynamic> exercise) {
+  Widget _buildMainContent() {
     return Container(
-      height: 160, // Fixed height to prevent jumping
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (_isRepBased) const SizedBox(width: 80), // Balance spacing
-          _isRepBased
-              ? _buildRepsDisplay(exercise)
-              : _buildTimer(),
-          if (_isRepBased) ...[
-            const SizedBox(width: 40),
-            _buildCheckmarkButton(),
+      height: 160,
+      child: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _isRepBased ? _buildRepsCircle() : _buildTimerCircle(),
+            if (_isRepBased) ...[
+              const SizedBox(width: 40),
+              _buildCheckmarkButton(),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildRepsDisplay(Map<String, dynamic> exercise) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          exercise['reps']?.toString() ?? '10',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 72,
-            fontWeight: FontWeight.w200,
-            letterSpacing: 2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'REPS',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 16,
-            letterSpacing: 2,
-            fontWeight: FontWeight.w300,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimer() {
+  Widget _buildTimerCircle() {
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, child) {
@@ -616,11 +605,11 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                       letterSpacing: 2,
                     ),
                   ),
-                  if (_isResting && _currentExerciseIndex < widget.exercises.length - 1)
+                  if (_isResting && _nextExercise != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        'NEXT: ${widget.exercises[_currentSet < _totalSets ? _currentExerciseIndex : _currentExerciseIndex + 1]['name']}',
+                        'NEXT: ${_currentSet < _totalSets ? _currentExercise['name'] : (_nextExercise?['name'] ?? '')}',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.5),
                           fontSize: 12,
@@ -635,6 +624,46 @@ class _WorkoutScreenState extends State<WorkoutScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildRepsCircle() {
+    return Container(
+      width: 160,
+      height: 160,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 2,
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _currentExercise['reps']?.toString() ?? '10',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 48,
+                fontWeight: FontWeight.w200,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'REPS',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 14,
+                letterSpacing: 2,
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -704,10 +733,6 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   }
 
   Widget _buildWorkoutStats() {
-    final currentExercise = widget.exercises[_currentExerciseIndex];
-    final isLastExercise = _currentExerciseIndex == widget.exercises.length - 1;
-    final nextExercise = !isLastExercise ? widget.exercises[_currentExerciseIndex + 1] : null;
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(16),
@@ -721,7 +746,6 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       ),
       child: Column(
         children: [
-          // Current workout progress
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -742,7 +766,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                 label: 'EXERCISES',
                 color: const Color(0xFFD4AF37),
               ),
-              if (currentExercise['sets'] != null) ...[
+              if (_currentExercise['sets'] != null) ...[
                 Container(
                   height: 40,
                   width: 1,
@@ -757,72 +781,9 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               ],
             ],
           ),
-
-          // Next exercise preview
-          if (!_isResting && nextExercise != null) ...[
+          if (!_isResting && _nextExercise != null) ...[
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.02),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.05),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.arrow_forward,
-                    color: Colors.white.withOpacity(0.4),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'UP NEXT',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.4),
-                            fontSize: 10,
-                            letterSpacing: 1.5,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          nextExercise['name'],
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (nextExercise['reps'] != null)
-                    Text(
-                      '${nextExercise['reps']} reps',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 12,
-                      ),
-                    )
-                  else if (nextExercise['duration'] != null)
-                    Text(
-                      nextExercise['duration'],
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 12,
-                      ),
-                    ),
-                ],
-              ),
-            ),
+            _buildNextExercisePreview(),
           ],
         ],
       ),
@@ -864,6 +825,76 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       ],
     );
   }
+
+  Widget _buildNextExercisePreview() {
+    final next = _nextExercise;
+    if (next == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.05),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.arrow_forward,
+            color: Colors.white.withOpacity(0.4),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'UP NEXT',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 10,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  next['name'],
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (next['reps'] != null)
+            Text(
+              '${next['reps']} reps',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 12,
+              ),
+            )
+          else if (next['duration'] != null)
+            Text(
+              next['duration'],
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 12,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ===== DIALOGS =====
 
   void _showExitDialog() {
     showDialog(
@@ -1064,7 +1095,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
         bool isPrimary = false,
         bool isFullWidth = false,
       }) {
-    final Widget button = GestureDetector(
+    return GestureDetector(
       onTap: onTap,
       child: Container(
         height: 48,
@@ -1098,10 +1129,10 @@ class _WorkoutScreenState extends State<WorkoutScreen>
         ),
       ),
     );
-
-    return isFullWidth ? button : button;
   }
 }
+
+// ===== CUSTOM PAINTER =====
 
 class _VideoPlaceholderPainter extends CustomPainter {
   @override
@@ -1111,7 +1142,6 @@ class _VideoPlaceholderPainter extends CustomPainter {
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
 
-    // Draw diagonal lines
     const spacing = 20.0;
     for (double i = -size.height; i < size.width + size.height; i += spacing) {
       canvas.drawLine(

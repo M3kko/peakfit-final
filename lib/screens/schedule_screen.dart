@@ -15,18 +15,12 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   late AnimationController _entryController;
   late AnimationController _glowController;
   late AnimationController _dayCardController;
-  late AnimationController _navBarController;
 
   // Animations
   late Animation<double> _fadeIn;
   late Animation<double> _slideUp;
   late Animation<double> _glow;
   late Animation<double> _dayCardScale;
-  late Animation<double> _navBarSlide;
-
-  // Scroll Controller
-  late ScrollController _scrollController;
-  bool _isNavBarVisible = true;
 
   // Current week
   int _currentWeekOffset = 0;
@@ -83,7 +77,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     super.initState();
     _initializeWeek();
     _initAnimations();
-    _initScrollController();
     _startAnimations();
   }
 
@@ -106,11 +99,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
     _dayCardController = AnimationController(
       duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _navBarController = AnimationController(
-      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
@@ -142,27 +130,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       parent: _dayCardController,
       curve: Curves.easeOutBack,
     ));
-
-    _navBarSlide = Tween<double>(
-      begin: 0.0,
-      end: 100.0,
-    ).animate(CurvedAnimation(
-      parent: _navBarController,
-      curve: Curves.easeInOut,
-    ));
-  }
-
-  void _initScrollController() {
-    _scrollController = ScrollController();
-    _scrollController.addListener(() {
-      if (_scrollController.offset > 50 && _isNavBarVisible) {
-        setState(() => _isNavBarVisible = false);
-        _navBarController.forward();
-      } else if (_scrollController.offset <= 50 && !_isNavBarVisible) {
-        setState(() => _isNavBarVisible = true);
-        _navBarController.reverse();
-      }
-    });
   }
 
   void _startAnimations() {
@@ -177,14 +144,21 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     _entryController.dispose();
     _glowController.dispose();
     _dayCardController.dispose();
-    _navBarController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
   void _goToPreviousWeek() {
     setState(() {
       _currentWeekOffset--;
+      _dayCardController.reset();
+      _dayCardController.forward();
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  void _goToNextWeek() {
+    setState(() {
+      _currentWeekOffset++;
       _dayCardController.reset();
       _dayCardController.forward();
     });
@@ -249,7 +223,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               },
             ),
           ),
-          _buildBottomNav(),
         ],
       ),
     );
@@ -274,41 +247,66 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   Widget _buildScheduleContent() {
     return ListView(
-      controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       children: [
-        const SizedBox(height: 40),
-        _buildPageTitle(),
+        const SizedBox(height: 16),
+        _buildHeader(),
         const SizedBox(height: 32),
         _buildWeekSelector(),
         const SizedBox(height: 32),
         _buildScheduleList(),
-        const SizedBox(height: 100), // Bottom padding for nav bar
+        const SizedBox(height: 32),
       ],
     );
   }
 
-  Widget _buildPageTitle() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildHeader() {
+    return Row(
       children: [
-        Text(
-          'WEEKLY PLAN',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            letterSpacing: 2,
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+              ),
+            ),
+            child: const Icon(
+              Icons.arrow_back,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          'Your Training Schedule',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 32,
-            fontWeight: FontWeight.w300,
-            letterSpacing: -0.5,
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'WEEKLY PLAN',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Your Training Schedule',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -328,17 +326,23 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       ),
       child: Row(
         children: [
-          if (_currentWeekOffset < 0)
-            IconButton(
-              onPressed: _goToPreviousWeek,
-              icon: Icon(
+          // Previous week button
+          GestureDetector(
+            onTap: _goToPreviousWeek,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
                 Icons.chevron_left,
                 color: Colors.white.withOpacity(0.5),
+                size: 24,
               ),
-              padding: EdgeInsets.zero,
-            )
-          else
-            const SizedBox(width: 48), // Placeholder for alignment
+            ),
+          ),
           Expanded(
             child: Text(
               _getWeekDateRange(),
@@ -351,7 +355,26 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(width: 48), // Balance right side
+          // Next week button (only visible if not on current week)
+          if (_currentWeekOffset < 0)
+            GestureDetector(
+              onTap: _goToNextWeek,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.chevron_right,
+                  color: Colors.white.withOpacity(0.5),
+                  size: 24,
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 40), // Placeholder for alignment
         ],
       ),
     );
@@ -562,68 +585,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: AnimatedBuilder(
-        animation: _navBarSlide,
-        builder: (context, child) {
-          return Transform.translate(
-            offset: Offset(0, _navBarSlide.value),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    const Color(0xFF0A0A0A),
-                    const Color(0xFF0A0A0A).withOpacity(0.9),
-                    const Color(0xFF0A0A0A).withOpacity(0),
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildNavItem(Icons.home, false, 0),
-                  _buildNavItem(Icons.calendar_today, true, 1),
-                  _buildNavItem(Icons.bar_chart, false, 2),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, bool isActive, int index) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        if (index != 1) {
-          Navigator.pop(context);
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: isActive ? Colors.white.withOpacity(0.1) : Colors.transparent,
-        ),
-        child: Icon(
-          icon,
-          color: Colors.white.withOpacity(isActive ? 0.8 : 0.3),
-          size: 24,
-        ),
       ),
     );
   }

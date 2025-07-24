@@ -486,7 +486,7 @@ exports.onDeleteRequestCreated = onDocumentCreated({
     const { data: result, error } = await resend.emails.send({
       from: 'PeakFit <hello@peakfit.ai>',
       to: [data.email],
-      subject: '⚠️ PeakFit Account Deletion Verification',
+      subject: 'PeakFit Account Deletion Verification',
       text: createEmailText(title, content, data.code, true),
       html: createEmailHTML(title, subtitle, content, data.code),
       headers: {
@@ -667,7 +667,7 @@ exports.resetPasswordWithCode = onCall({ region: 'us-central1' }, async (request
   }
 });
 
-// Delete account with verification code
+// Delete account with verification code - COMPREHENSIVE DELETION
 exports.deleteAccountWithCode = onCall({ 
   region: 'us-central1',
   cors: true 
@@ -723,13 +723,30 @@ exports.deleteAccountWithCode = onCall({
       batch.delete(db.collection('usernames').doc(username));
     }
 
-    // Delete all user subcollections
-    const subcollections = ['achievements', 'workouts', 'programs'];
+    // Delete all user subcollections - expanded list
+    const subcollections = [
+      'achievements', 
+      'workouts', 
+      'programs', 
+      'exercises',
+      'routines',
+      'progress',
+      'stats',
+      'preferences',
+      'notifications',
+      'messages'
+    ];
+    
     for (const subcollection of subcollections) {
-      const snapshot = await db.collection('users').doc(uid).collection(subcollection).get();
-      snapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
+      try {
+        const snapshot = await db.collection('users').doc(uid).collection(subcollection).get();
+        console.log(`Deleting ${snapshot.size} documents from ${subcollection} subcollection`);
+        snapshot.docs.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+      } catch (e) {
+        console.log(`Subcollection ${subcollection} may not exist, skipping`);
+      }
     }
 
     // Delete the delete request document
@@ -738,29 +755,85 @@ exports.deleteAccountWithCode = onCall({
     // Delete any verification documents
     if (userData && userData.email) {
       const email = userData.email.toLowerCase();
-      batch.delete(db.collection('verifications').doc(email));
-      batch.delete(db.collection('password_resets').doc(email));
-      batch.delete(db.collection('email_changes').doc(uid));
+      
+      // Delete from verifications collection
+      const verificationDoc = await db.collection('verifications').doc(email).get();
+      if (verificationDoc.exists) {
+        batch.delete(db.collection('verifications').doc(email));
+      }
+      
+      // Delete from password_resets collection
+      const passwordResetDoc = await db.collection('password_resets').doc(email).get();
+      if (passwordResetDoc.exists) {
+        batch.delete(db.collection('password_resets').doc(email));
+      }
+      
+      // Delete from email_changes collection
+      const emailChangeDoc = await db.collection('email_changes').doc(uid).get();
+      if (emailChangeDoc.exists) {
+        batch.delete(db.collection('email_changes').doc(uid));
+      }
+      
+      // Delete from user_emails collection
+      const userEmailDoc = await db.collection('user_emails').doc(email).get();
+      if (userEmailDoc.exists) {
+        batch.delete(db.collection('user_emails').doc(email));
+      }
     }
 
     // Commit all deletions
     await batch.commit();
+    console.log('Firestore deletions completed successfully');
 
-    // Delete profile image from storage if exists
-    if (userData && userData.profileImageUrl) {
+    // Delete profile images from storage
+    if (userData && (userData.profileImageUrl || true)) { // Always try to delete storage
       try {
         const storage = admin.storage();
         const bucket = storage.bucket();
-        const filePath = `profile_images/${uid}/profile.jpg`;
-        await bucket.file(filePath).delete();
-        console.log('Profile image deleted successfully');
+        
+        // Delete all files in the user's profile_images folder
+        const folderPath = `profile_images/${uid}/`;
+        const [files] = await bucket.getFiles({ prefix: folderPath });
+        
+        console.log(`Found ${files.length} files to delete in storage`);
+        
+        // Delete all files in parallel
+        await Promise.all(files.map(file => {
+          console.log(`Deleting file: ${file.name}`);
+          return file.delete();
+        }));
+        
+        console.log('Storage deletions completed successfully');
       } catch (storageError) {
-        console.error('Failed to delete profile image:', storageError);
+        console.error('Failed to delete storage files:', storageError);
         // Don't throw - continue with deletion even if storage cleanup fails
       }
     }
 
-    // Optional: Mark user as deleted in Supabase if you're tracking deletions
+    // Delete any other storage references (e.g., workout videos, progress photos)
+    try {
+      const storage = admin.storage();
+      const bucket = storage.bucket();
+      
+      // Check for other potential storage locations
+      const otherFolders = [`workouts/${uid}/`, `progress/${uid}/`, `videos/${uid}/`];
+      
+      for (const folder of otherFolders) {
+        try {
+          const [files] = await bucket.getFiles({ prefix: folder });
+          if (files.length > 0) {
+            console.log(`Deleting ${files.length} files from ${folder}`);
+            await Promise.all(files.map(file => file.delete()));
+          }
+        } catch (e) {
+          console.log(`No files found in ${folder}`);
+        }
+      }
+    } catch (e) {
+      console.error('Error cleaning up additional storage:', e);
+    }
+
+    // Update Supabase to mark user as deleted
     if (userData && userData.email && SUPABASE_URL.value() && SUPABASE_SERVICE_KEY.value()) {
       try {
         const supabase = createClient(
@@ -773,9 +846,13 @@ exports.deleteAccountWithCode = onCall({
           .update({
             status: 'deleted',
             deleted_at: new Date().toISOString(),
-            firebase_uid: null
+            firebase_uid: null,
+            marketing_consent: false,
+            email_type: 'none'
           })
           .eq('email', userData.email.toLowerCase());
+          
+        console.log('Supabase user marked as deleted');
       } catch (supabaseError) {
         console.error('Failed to update Supabase:', supabaseError);
         // Don't throw - continue with deletion even if Supabase update fails
@@ -784,8 +861,9 @@ exports.deleteAccountWithCode = onCall({
 
     // Delete the user from Firebase Auth - do this last
     await auth.deleteUser(uid);
+    console.log('Firebase Auth user deleted successfully');
 
-    console.log(`Successfully deleted account for user: ${uid}`);
+    console.log(`Successfully deleted all data for user: ${uid}`);
     return { success: true, message: 'Account successfully deleted' };
 
   } catch (error) {
@@ -835,6 +913,7 @@ exports.changeEmailWithCode = onCall({
     }
 
     const newEmail = emailChangeData.newEmail;
+    const oldEmail = emailChangeData.currentEmail;
 
     // Update Firebase Auth email
     await auth.updateUser(uid, { email: newEmail });
@@ -846,10 +925,26 @@ exports.changeEmailWithCode = onCall({
       updated_at: admin.firestore.FieldValue.serverTimestamp()
     });
 
+    // Update user_emails collection
+    if (oldEmail) {
+      // Delete old email entry
+      const oldEmailDoc = await db.collection('user_emails').doc(oldEmail.toLowerCase()).get();
+      if (oldEmailDoc.exists) {
+        await oldEmailDoc.ref.delete();
+      }
+    }
+
+    // Add new email entry
+    await db.collection('user_emails').doc(newEmail.toLowerCase()).set({
+      uid: uid,
+      email: newEmail,
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
     // Delete the email change request
     await emailChangeDoc.ref.delete();
 
-    console.log(`Email successfully changed for user: ${uid} to ${newEmail}`);
+    console.log(`Email successfully changed for user: ${uid} from ${oldEmail} to ${newEmail}`);
     return { success: true, newEmail: newEmail };
 
   } catch (error) {

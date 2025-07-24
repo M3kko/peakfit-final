@@ -26,3 +26,4 @@ PeakFit TRUST
 - Make exercises auto named in firebase
 - Make success + errors in profile more opaque 
 - Make success code the highest layer on profile screen
+- Make opt in date not shown

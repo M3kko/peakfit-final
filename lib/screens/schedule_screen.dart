@@ -15,12 +15,18 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   late AnimationController _entryController;
   late AnimationController _glowController;
   late AnimationController _dayCardController;
+  late AnimationController _navBarController;
 
   // Animations
   late Animation<double> _fadeIn;
   late Animation<double> _slideUp;
   late Animation<double> _glow;
   late Animation<double> _dayCardScale;
+  late Animation<double> _navBarSlide;
+
+  // Scroll Controller
+  late ScrollController _scrollController;
+  bool _isNavBarVisible = true;
 
   // Current week
   int _currentWeekOffset = 0;
@@ -31,49 +37,42 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     'Monday': {
       'title': 'UPPER BODY STRENGTH',
       'focus': ['CHEST', 'SHOULDERS', 'TRICEPS'],
-      'duration': '45 MIN',
       'intensity': 'HIGH',
       'completed': false,
     },
     'Tuesday': {
       'title': 'CARDIO & CORE',
       'focus': ['HIIT', 'ABS', 'OBLIQUES'],
-      'duration': '30 MIN',
       'intensity': 'MEDIUM',
       'completed': true,
     },
     'Wednesday': {
       'title': 'LOWER BODY POWER',
       'focus': ['QUADS', 'GLUTES', 'CALVES'],
-      'duration': '50 MIN',
       'intensity': 'HIGH',
       'completed': false,
     },
     'Thursday': {
       'title': 'ACTIVE RECOVERY',
       'focus': ['YOGA', 'STRETCHING', 'MOBILITY'],
-      'duration': '25 MIN',
       'intensity': 'LOW',
       'completed': false,
     },
     'Friday': {
       'title': 'FULL BODY CIRCUIT',
       'focus': ['STRENGTH', 'ENDURANCE', 'POWER'],
-      'duration': '40 MIN',
       'intensity': 'HIGH',
       'completed': false,
     },
     'Saturday': {
       'title': 'OUTDOOR ACTIVITY',
       'focus': ['RUN', 'BIKE', 'SWIM'],
-      'duration': '60 MIN',
       'intensity': 'MEDIUM',
       'completed': false,
     },
     'Sunday': {
       'title': 'REST DAY',
       'focus': ['RECOVERY', 'NUTRITION', 'HYDRATION'],
-      'duration': '-',
       'intensity': 'REST',
       'completed': true,
     },
@@ -84,6 +83,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     super.initState();
     _initializeWeek();
     _initAnimations();
+    _initScrollController();
     _startAnimations();
   }
 
@@ -106,6 +106,11 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
     _dayCardController = AnimationController(
       duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _navBarController = AnimationController(
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
@@ -137,6 +142,27 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       parent: _dayCardController,
       curve: Curves.easeOutBack,
     ));
+
+    _navBarSlide = Tween<double>(
+      begin: 0.0,
+      end: 100.0,
+    ).animate(CurvedAnimation(
+      parent: _navBarController,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  void _initScrollController() {
+    _scrollController = ScrollController();
+    _scrollController.addListener(() {
+      if (_scrollController.offset > 50 && _isNavBarVisible) {
+        setState(() => _isNavBarVisible = false);
+        _navBarController.forward();
+      } else if (_scrollController.offset <= 50 && !_isNavBarVisible) {
+        setState(() => _isNavBarVisible = true);
+        _navBarController.reverse();
+      }
+    });
   }
 
   void _startAnimations() {
@@ -151,12 +177,18 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     _entryController.dispose();
     _glowController.dispose();
     _dayCardController.dispose();
+    _navBarController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   void _changeWeek(int offset) {
     setState(() {
       _currentWeekOffset += offset;
+      // Prevent going to future weeks
+      if (_currentWeekOffset > 0) {
+        _currentWeekOffset = 0;
+      }
       _dayCardController.reset();
       _dayCardController.forward();
     });
@@ -218,11 +250,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                     child: Column(
                       children: [
                         _buildHeader(),
-                        _buildWeekSelector(),
                         Expanded(
-                          child: _buildScheduleList(),
+                          child: _buildScheduleContent(),
                         ),
-                        _buildBottomNav(),
                       ],
                     ),
                   ),
@@ -230,6 +260,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               },
             ),
           ),
+          _buildBottomNav(),
         ],
       ),
     );
@@ -254,37 +285,83 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(24),
+      child: Row(
         children: [
+          IconButton(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              Navigator.pop(context);
+            },
+            icon: const Icon(
+              Icons.arrow_back,
+              color: Colors.white,
+              size: 24,
+            ),
+            padding: EdgeInsets.zero,
+          ),
+          const Spacer(),
           Text(
-            'WEEKLY SCHEDULE',
+            'SCHEDULE',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 16,
+              fontWeight: FontWeight.w300,
               letterSpacing: 2,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Your Training Plan',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 32,
-              fontWeight: FontWeight.w300,
-              letterSpacing: -0.5,
-            ),
-          ),
+          const Spacer(),
+          const SizedBox(width: 48), // Balance the header
         ],
       ),
     );
   }
 
+  Widget _buildScheduleContent() {
+    return ListView(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      children: [
+        const SizedBox(height: 20),
+        _buildPageTitle(),
+        const SizedBox(height: 32),
+        _buildWeekSelector(),
+        const SizedBox(height: 32),
+        _buildScheduleList(),
+        const SizedBox(height: 100), // Bottom padding for nav bar
+      ],
+    );
+  }
+
+  Widget _buildPageTitle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'WEEKLY PLAN',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Your Training Schedule',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 32,
+            fontWeight: FontWeight.w300,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildWeekSelector() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
@@ -298,41 +375,31 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            onPressed: () => _changeWeek(-1),
+            onPressed: _currentWeekOffset < 0 ? null : () => _changeWeek(-1),
             icon: Icon(
               Icons.chevron_left,
-              color: Colors.white.withOpacity(0.5),
+              color: _currentWeekOffset < 0
+                  ? Colors.white.withOpacity(0.5)
+                  : Colors.white.withOpacity(0.2),
             ),
             padding: EdgeInsets.zero,
           ),
-          Column(
-            children: [
-              Text(
-                _currentWeekOffset == 0 ? 'THIS WEEK' :
-                _currentWeekOffset > 0 ? 'NEXT WEEK' : 'LAST WEEK',
-                style: TextStyle(
-                  color: const Color(0xFFD4AF37).withOpacity(0.8),
-                  fontSize: 12,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _getWeekDateRange(),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w300,
-                ),
-              ),
-            ],
+          Text(
+            _getWeekDateRange(),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 18,
+              fontWeight: FontWeight.w300,
+              letterSpacing: 0.5,
+            ),
           ),
           IconButton(
-            onPressed: () => _changeWeek(1),
+            onPressed: _currentWeekOffset >= 0 ? null : () => _changeWeek(1),
             icon: Icon(
               Icons.chevron_right,
-              color: Colors.white.withOpacity(0.5),
+              color: _currentWeekOffset >= 0
+                  ? Colors.white.withOpacity(0.2)
+                  : Colors.white.withOpacity(0.5),
             ),
             padding: EdgeInsets.zero,
           ),
@@ -349,11 +416,10 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       builder: (context, child) {
         return Transform.scale(
           scale: _dayCardScale.value,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            itemCount: days.length,
-            itemBuilder: (context, index) {
-              final day = days[index];
+          child: Column(
+            children: days.asMap().entries.map((entry) {
+              final index = entry.key;
+              final day = entry.value;
               final workout = _weeklySchedule[day]!;
               final isToday = _isToday(day);
 
@@ -371,7 +437,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   );
                 },
               );
-            },
+            }).toList(),
           ),
         );
       },
@@ -524,12 +590,19 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                       const SizedBox(height: 16),
                       Row(
                         children: [
-                          _buildInfoItem(Icons.access_time, workout['duration']),
-                          const SizedBox(width: 24),
-                          _buildInfoItem(
+                          Icon(
                             Icons.flash_on,
-                            workout['intensity'],
                             color: _getIntensityColor(workout['intensity']),
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            workout['intensity'],
+                            style: TextStyle(
+                              color: _getIntensityColor(workout['intensity']),
+                              fontSize: 12,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ],
                       ),
@@ -544,37 +617,41 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     );
   }
 
-  Widget _buildInfoItem(IconData icon, String label, {Color? color}) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: color ?? Colors.white.withOpacity(0.4),
-          size: 16,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: color ?? Colors.white.withOpacity(0.6),
-            fontSize: 12,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildBottomNav() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(Icons.home, false, 0),
-          _buildNavItem(Icons.calendar_today, true, 1),
-          _buildNavItem(Icons.bar_chart, false, 2),
-        ],
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: AnimatedBuilder(
+        animation: _navBarSlide,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(0, _navBarSlide.value),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    const Color(0xFF0A0A0A),
+                    const Color(0xFF0A0A0A).withOpacity(0.9),
+                    const Color(0xFF0A0A0A).withOpacity(0),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(Icons.home, false, 0),
+                  _buildNavItem(Icons.calendar_today, true, 1),
+                  _buildNavItem(Icons.bar_chart, false, 2),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

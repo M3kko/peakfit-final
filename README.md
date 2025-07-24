@@ -18,7 +18,4 @@ PeakFit TRUST
 - Allow the uesr to go back on the post workout screen ratings
 - Change stats shown on the post workout screen
 - Fix glow problems on post workout screen
-- Make it delete from supabase and other folders
-- Make email change in all folders + supabase + display update immediately
-- Add 20s delay in between codes
 - Make exercises auto named in firebase

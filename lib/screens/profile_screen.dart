@@ -23,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   final ImagePicker _picker = ImagePicker();
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
+  // Animation controllers
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late AnimationController _notificationController;
@@ -31,6 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   late Animation<double> _notificationSlideAnimation;
   late Animation<double> _notificationFadeAnimation;
 
+  // State variables
   bool _isUploading = false;
   String? _profileImageUrl;
   String? _username;
@@ -39,12 +41,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   List<Map<String, dynamic>> _achievements = [];
   bool _marketingConsent = false;
   DateTime? _marketingConsentDate;
-
-  // For birthday tracking
   DateTime? _birthDate;
   int? _currentAge;
-
-  // Email tracking
   String? _currentEmail;
 
   // Notification state
@@ -64,8 +62,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     super.initState();
     _initAnimations();
     _loadUserData();
-    // Initialize current email from Firebase Auth
     _currentEmail = user?.email;
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    _notificationController.dispose();
+    _cooldownTimer?.cancel();
+    super.dispose();
   }
 
   void _initAnimations() {
@@ -135,15 +141,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           _lastUsernameChange = (data?['lastUsernameChange'] as Timestamp?)?.toDate();
           _marketingConsent = data?['marketing_consent'] ?? false;
           _marketingConsentDate = (data?['marketing_consent_date'] as Timestamp?)?.toDate();
-          // Update current email from Firestore
           _currentEmail = data?['email'] ?? user!.email;
 
-          // Load birthday and calculate age
           if (data?['birthDate'] != null) {
             _birthDate = (data!['birthDate'] as Timestamp).toDate();
             _currentAge = _calculateAge(_birthDate!);
 
-            // Update age in profile if it's different
             final profileAge = data['profile']?['age'];
             if (profileAge != null) {
               final ageRange = _getAgeRange(_currentAge!);
@@ -314,7 +317,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   Future<bool> _isUsernameAvailable(String username) async {
     try {
-      // Check in usernames collection
       final usernameDoc = await FirebaseFirestore.instance
           .collection('usernames')
           .doc(username.toLowerCase())
@@ -419,7 +421,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     _notificationController.forward();
     HapticFeedback.mediumImpact();
 
-    // Show notification as an overlay to ensure it's on top of everything
+    // Show notification as an overlay
     final overlay = Overlay.of(context);
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -664,9 +666,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         setState(() {
           _currentEmail = result.data['newEmail'];
         });
-        
+
         _showGlassyNotification('Email updated successfully to ${result.data['newEmail']}');
-        
+
         // Reload user data to ensure everything is in sync
         await _loadUserData();
       }
@@ -702,18 +704,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   @override
-  void dispose() {
-    _fadeController.dispose();
-    _slideController.dispose();
-    _notificationController.dispose();
-    _cooldownTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final statusBarHeight = MediaQuery.of(context).padding.top;
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -1220,7 +1211,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     color: Colors.white.withOpacity(0.5),
                   ),
                 ),
-                // Removed opt-in date display
               ],
             ),
           ),
@@ -1533,7 +1523,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   void _showEmailUpdateDialog() {
-    final controller = TextEditingController(); // Removed email prefill
+    final controller = TextEditingController();
     final codeController = TextEditingController();
     bool codeSent = false;
     String? newEmailAddress;
@@ -1559,113 +1549,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'This action cannot be undone. All your data will be permanently deleted.',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 14,
-                ),
-              ),
-              if (codeSent) ...[
-                const SizedBox(height: 20),
-                TextField(
-                  controller: codeController,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                    hintText: 'Enter 6-digit code',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    counterText: '',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.red.withOpacity(0.3),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.red.withOpacity(0.3),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.red.withOpacity(0.5),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'A verification code was sent to ${user?.email}',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
-                    fontSize: 12,
-                  ),
-                ),
-                if (_deleteCooldownSeconds > 0) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Resend code in $_deleteCooldownSeconds seconds',
-                    style: TextStyle(
-                      color: Colors.orange.withOpacity(0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white.withOpacity(0.5)),
-              ),
-            ),
-            if (codeSent && _deleteCooldownSeconds <= 0)
-              TextButton(
-                onPressed: () async {
-                  await _sendDeleteAccountCode();
-                },
-                child: Text(
-                  'Resend',
-                  style: TextStyle(color: Colors.red[300]),
-                ),
-              ),
-            TextButton(
-              onPressed: () async {
-                if (!codeSent) {
-                  await _sendDeleteAccountCode();
-                  setState(() {
-                    codeSent = true;
-                  });
-                } else {
-                  final code = codeController.text.trim();
-                  if (code.length == 6) {
-                    Navigator.pop(context);
-                    await _deleteAccount(code);
-                  }
-                }
-              },
-              child: Text(
-                codeSent ? 'Delete Account' : 'Send Code',
-                style: TextStyle(color: Colors.red[300]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-},
             children: [
               if (!codeSent) ...[
                 TextField(
@@ -1766,7 +1649,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 style: TextStyle(color: Colors.white.withOpacity(0.5)),
               ),
             ),
-            if (codeSent && _emailCooldownSeconds <= 0) 
+            if (codeSent && _emailCooldownSeconds <= 0)
               TextButton(
                 onPressed: () async {
                   await _sendEmailChangeCode(newEmailAddress!);

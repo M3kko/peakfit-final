@@ -331,17 +331,17 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                             padding: const EdgeInsets.symmetric(horizontal: 24),
                             child: Column(
                               children: [
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 15),
                                 _buildVideoPlayer(),
-                                const SizedBox(height: 30),
+                                const SizedBox(height: 20),
                                 _buildExerciseInfo(currentExercise),
-                                const SizedBox(height: 40),
+                                const SizedBox(height: 30),
                                 _buildTimerOrReps(currentExercise),
-                                const SizedBox(height: 50),
-                                if (_isRepBased) _buildCheckmarkButton(),
-                                const SizedBox(height: 50),
-                                _buildWorkoutStats(),
                                 const SizedBox(height: 40),
+                                if (_isRepBased) _buildCheckmarkButton(),
+                                const SizedBox(height: 30),
+                                _buildWorkoutStats(),
+                                const SizedBox(height: 20),
                               ],
                             ),
                           ),
@@ -461,7 +461,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
         return Transform.scale(
           scale: _scaleIn.value,
           child: Container(
-            height: 200,
+            height: 180,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(20),
@@ -477,7 +477,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                 children: [
                   // Video placeholder with diagonal lines
                   CustomPaint(
-                    size: const Size(double.infinity, 200),
+                    size: const Size(double.infinity, 180),
                     painter: _VideoPlaceholderPainter(),
                   ),
                   // Play button overlay
@@ -536,7 +536,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
   Widget _buildTimerOrReps(Map<String, dynamic> exercise) {
     return Container(
-      height: 180, // Fixed height to prevent jumping
+      height: 160, // Fixed height to prevent jumping
       child: Center(
         child: _isRepBased
             ? _buildRepsDisplay(exercise)
@@ -579,8 +579,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
         return Transform.scale(
           scale: _isResting ? _pulse.value : 1.0,
           child: Container(
-            width: 180,
-            height: 180,
+            width: 160,
+            height: 160,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
@@ -704,7 +704,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(20),
@@ -754,9 +754,9 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
           // Next exercise preview
           if (!_isResting && nextExercise != null) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.02),
                 borderRadius: BorderRadius.circular(16),
@@ -858,250 +858,243 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       ],
     );
   }
-  showDialog(
-  context: context,
-  barrierColor: Colors.black.withOpacity(0.8),
-  builder: (context) => Dialog(
-  backgroundColor: Colors.transparent,
-  child: Container(
-  decoration: BoxDecoration(
-  color: Colors.white.withOpacity(0.05),
-  borderRadius: BorderRadius.circular(24),
-  border: Border.all(
-  color: Colors.white.withOpacity(0.1),
-  width: 1,
-  ),
-  ),
-  child: ClipRRect(
-  borderRadius: BorderRadius.circular(24),
-  child: BackdropFilter(
-  filter: ColorFilter.mode(
-  Colors.white.withOpacity(0.1),
-  BlendMode.overlay,
-  ),
-  child: Padding(
-  padding: const EdgeInsets.all(32),
-  child: Column(
-  mainAxisSize: MainAxisSize.min,
-  children: [
-  Container(
-  width: 64,
-  height: 64,
-  decoration: BoxDecoration(
-  shape: BoxShape.circle,
-  color: Colors.red.withOpacity(0.1),
-  border: Border.all(
-  color: Colors.red.withOpacity(0.3),
-  width: 2,
-  ),
-  ),
-  child: Icon(
-  Icons.warning_rounded,
-  color: Colors.red[300],
-  size: 32,
-  ),
-  ),
-  const SizedBox(height: 24),
-  Text(
-  'EXIT WORKOUT?',
-  style: TextStyle(
-  color: Colors.white,
-  fontSize: 24,
-  fontWeight: FontWeight.w200,
-  letterSpacing: 2,
-  ),
-  textAlign: TextAlign.center,
-  ),
-  const SizedBox(height: 16),
-  Text(
-  'Your progress will NOT be saved',
-  style: TextStyle(
-  color: Colors.white.withOpacity(0.9),
-  fontSize: 16,
-  fontWeight: FontWeight.w500,
-  ),
-  textAlign: TextAlign.center,
-  ),
-  const SizedBox(height: 8),
-  Text(
-  'You must complete the entire workout\nfor it to count',
-  style: TextStyle(
-  color: Colors.white.withOpacity(0.6),
-  fontSize: 14,
-  height: 1.5,
-  ),
-  textAlign: TextAlign.center,
-  ),
-  const SizedBox(height: 32),
-  Row(
-  children: [
-  Expanded(
-  child: _buildDialogButton(
-  'KEEP GOING',
-  Colors.green,
-  () => Navigator.pop(context),
-  isPrimary: true,
-  ),
-  ),
-  const SizedBox(width: 16),
-  Expanded(
-  child: _buildDialogButton(
-  'EXIT',
-  Colors.red,
-  () {
-  Navigator.of(context).popUntil((route) => route.isFirst);
-  },
-  ),
-  ),
-  ],
-  ),
-  ],
-  ),
-  ),
-  ),
-  ),
-  ),
-  ),
-  );
-}
 
-void _showInactivityDialog() {
-  setState(() {
-    _isPaused = true;
-  });
-
-  showDialog(
-    context: context,
-    barrierColor: Colors.black.withOpacity(0.8),
-    barrierDismissible: false,
-    builder: (context) => Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A).withOpacity(0.95),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
+  void _showExitDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A).withOpacity(0.95),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.1),
+              width: 1,
+            ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFD4AF37).withOpacity(0.1),
-                  border: Border.all(
-                    color: const Color(0xFFD4AF37).withOpacity(0.3),
-                    width: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.red.withOpacity(0.1),
+                    border: Border.all(
+                      color: Colors.red.withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.warning_rounded,
+                    color: Colors.red[300],
+                    size: 32,
                   ),
                 ),
-                child: Icon(
-                  Icons.hourglass_empty,
-                  color: const Color(0xFFD4AF37),
-                  size: 32,
+                const SizedBox(height: 24),
+                Text(
+                  'EXIT WORKOUT?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w200,
+                    letterSpacing: 2,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'STILL HERE?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w200,
-                  letterSpacing: 2,
+                const SizedBox(height: 16),
+                Text(
+                  'Your progress will NOT be saved',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Your workout has been paused',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 16,
+                const SizedBox(height: 8),
+                Text(
+                  'You must complete the entire workout\nfor it to count',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tap continue to keep going',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 14,
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDialogButton(
+                        'KEEP GOING',
+                        Colors.green,
+                            () => Navigator.pop(context),
+                        isPrimary: true,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildDialogButton(
+                        'EXIT',
+                        Colors.red,
+                            () {
+                          Navigator.of(context).popUntil((route) => route.isFirst);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              _buildDialogButton(
-                'CONTINUE',
-                Colors.white,
-                    () {
-                  Navigator.pop(context);
-                  setState(() {
-                    _isPaused = false;
-                  });
-                  _resetInactivityTimer();
-                },
-                isPrimary: true,
-                isFullWidth: true,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-Widget _buildDialogButton(
-    String label,
-    Color color,
-    VoidCallback onTap, {
-      bool isPrimary = false,
-      bool isFullWidth = false,
-    }) {
-  final Widget button = GestureDetector(
-    onTap: onTap,
-    child: Container(
-      height: 48,
-      decoration: BoxDecoration(
-        color: isPrimary ? color.withOpacity(0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1.5,
+  void _showInactivityDialog() {
+    setState(() {
+      _isPaused = true;
+    });
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A).withOpacity(0.95),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.1),
+              width: 1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFD4AF37).withOpacity(0.1),
+                    border: Border.all(
+                      color: const Color(0xFFD4AF37).withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.hourglass_empty,
+                    color: const Color(0xFFD4AF37),
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'STILL HERE?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w200,
+                    letterSpacing: 2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Your workout has been paused',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 16,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Tap continue to keep going',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                _buildDialogButton(
+                  'CONTINUE',
+                  Colors.white,
+                      () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _isPaused = false;
+                    });
+                    _resetInactivityTimer();
+                  },
+                  isPrimary: true,
+                  isFullWidth: true,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ColorFilter.mode(
-            color.withOpacity(0.1),
-            BlendMode.overlay,
+    );
+  }
+
+  Widget _buildDialogButton(
+      String label,
+      Color color,
+      VoidCallback onTap, {
+        bool isPrimary = false,
+        bool isFullWidth = false,
+      }) {
+    final Widget button = GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: isPrimary ? color.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1.5,
           ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: color.withOpacity(0.9),
-                fontSize: 14,
-                letterSpacing: 1.5,
-                fontWeight: FontWeight.w600,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ColorFilter.mode(
+              color.withOpacity(0.1),
+              BlendMode.overlay,
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: color.withOpacity(0.9),
+                  fontSize: 14,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
 
-  return isFullWidth ? button : button;
-}
+    return isFullWidth ? button : button;
+  }
 }
 
 class _VideoPlaceholderPainter extends CustomPainter {

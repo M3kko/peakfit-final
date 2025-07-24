@@ -19,3 +19,4 @@ PeakFit TRUST
 - Change stats shown on the post workout screen
 - Fix glow problems on post workout screen
 - Make exercises auto named in firebase
+- Make resend code look nicer in settings (after launch)

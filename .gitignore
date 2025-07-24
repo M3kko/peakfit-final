@@ -54,4 +54,5 @@ firestore.rules
 # exercises
 functions/exercise*.js
 functions/exercises_*.js
-functions/exercises_to_import.jsonserviceAccountKey.json
+functions/exercises_to_import.json
+functions/serviceAccountKey.json

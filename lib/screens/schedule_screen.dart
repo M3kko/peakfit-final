@@ -217,24 +217,19 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   opacity: _fadeIn.value,
                   child: Transform.translate(
                     offset: Offset(0, _slideUp.value),
-                    child: Column(
-                      children: [
-                        _buildHeader(),
-                        const SizedBox(height: 20),
-                        _buildWeekSelector(),
-                        const SizedBox(height: 32),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Column(
-                              children: [
-                                _buildScheduleList(),
-                                const SizedBox(height: 32),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeader(),
+                          const SizedBox(height: 32),
+                          _buildWeekSelector(),
+                          const SizedBox(height: 32),
+                          _buildScheduleList(),
+                          const SizedBox(height: 100),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -264,31 +259,39 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(
-              Icons.arrow_back,
-              color: Colors.white,
-              size: 24,
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                ),
+              ),
+              child: const Icon(
+                Icons.arrow_back,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
-            padding: EdgeInsets.zero,
           ),
-          const Spacer(),
-          Text(
-            'WEEKLY PLAN',
+          const SizedBox(width: 16),
+          const Text(
+            'WEEKLY SCHEDULE',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 16,
+              fontSize: 24,
               fontWeight: FontWeight.w300,
+              color: Colors.white,
               letterSpacing: 2,
             ),
           ),
-          const Spacer(),
-          const SizedBox(width: 48), // Balance the header
         ],
       ),
     );
@@ -296,7 +299,15 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   Widget _buildWeekSelector() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.05),
+          width: 1,
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -304,7 +315,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
           GestureDetector(
             onTap: _goToPreviousWeek,
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               child: Icon(
                 Icons.chevron_left,
                 color: Colors.white.withOpacity(0.6),
@@ -312,7 +323,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               ),
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 16),
           // Week info
           Expanded(
             child: Column(
@@ -370,7 +381,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               ],
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 16),
           // Next week button
           AnimatedOpacity(
             duration: const Duration(milliseconds: 200),
@@ -378,7 +389,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
             child: GestureDetector(
               onTap: _currentWeekOffset < 0 ? _goToNextWeek : null,
               child: Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 child: Icon(
                   Icons.chevron_right,
                   color: Colors.white.withOpacity(_currentWeekOffset < 0 ? 0.6 : 0.2),

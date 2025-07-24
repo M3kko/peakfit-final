@@ -4,4 +4,4 @@ node_modules/
 # Environment variables
 functions/.env
 .env
-*.env
+*.envserviceAccountKey.json

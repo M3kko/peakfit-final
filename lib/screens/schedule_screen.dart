@@ -182,13 +182,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     super.dispose();
   }
 
-  void _changeWeek(int offset) {
+  void _goToPreviousWeek() {
     setState(() {
-      _currentWeekOffset += offset;
-      // Prevent going to future weeks
-      if (_currentWeekOffset > 0) {
-        _currentWeekOffset = 0;
-      }
+      _currentWeekOffset--;
       _dayCardController.reset();
       _dayCardController.forward();
     });
@@ -247,14 +243,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   opacity: _fadeIn.value,
                   child: Transform.translate(
                     offset: Offset(0, _slideUp.value),
-                    child: Column(
-                      children: [
-                        _buildHeader(),
-                        Expanded(
-                          child: _buildScheduleContent(),
-                        ),
-                      ],
-                    ),
+                    child: _buildScheduleContent(),
                   ),
                 );
               },
@@ -283,46 +272,12 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              Navigator.pop(context);
-            },
-            icon: const Icon(
-              Icons.arrow_back,
-              color: Colors.white,
-              size: 24,
-            ),
-            padding: EdgeInsets.zero,
-          ),
-          const Spacer(),
-          Text(
-            'SCHEDULE',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 16,
-              fontWeight: FontWeight.w300,
-              letterSpacing: 2,
-            ),
-          ),
-          const Spacer(),
-          const SizedBox(width: 48), // Balance the header
-        ],
-      ),
-    );
-  }
-
   Widget _buildScheduleContent() {
     return ListView(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       children: [
-        const SizedBox(height: 20),
+        const SizedBox(height: 40),
         _buildPageTitle(),
         const SizedBox(height: 32),
         _buildWeekSelector(),
@@ -372,37 +327,31 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton(
-            onPressed: _currentWeekOffset < 0 ? null : () => _changeWeek(-1),
-            icon: Icon(
-              Icons.chevron_left,
-              color: _currentWeekOffset < 0
-                  ? Colors.white.withOpacity(0.5)
-                  : Colors.white.withOpacity(0.2),
+          if (_currentWeekOffset < 0)
+            IconButton(
+              onPressed: _goToPreviousWeek,
+              icon: Icon(
+                Icons.chevron_left,
+                color: Colors.white.withOpacity(0.5),
+              ),
+              padding: EdgeInsets.zero,
+            )
+          else
+            const SizedBox(width: 48), // Placeholder for alignment
+          Expanded(
+            child: Text(
+              _getWeekDateRange(),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 18,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 0.5,
+              ),
+              textAlign: TextAlign.center,
             ),
-            padding: EdgeInsets.zero,
           ),
-          Text(
-            _getWeekDateRange(),
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 18,
-              fontWeight: FontWeight.w300,
-              letterSpacing: 0.5,
-            ),
-          ),
-          IconButton(
-            onPressed: _currentWeekOffset >= 0 ? null : () => _changeWeek(1),
-            icon: Icon(
-              Icons.chevron_right,
-              color: _currentWeekOffset >= 0
-                  ? Colors.white.withOpacity(0.2)
-                  : Colors.white.withOpacity(0.5),
-            ),
-            padding: EdgeInsets.zero,
-          ),
+          const SizedBox(width: 48), // Balance right side
         ],
       ),
     );

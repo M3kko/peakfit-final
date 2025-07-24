@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:math';
+import 'dart:async';
 import 'questionnaire/questionnaire_screen.dart';
 import 'home_screen.dart';
 
@@ -42,6 +43,13 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _glowAnimation;
+
+  // Cooldown tracking
+  Timer? _cooldownTimer;
+  int _verificationCooldownSeconds = 0;
+  int _resetCooldownSeconds = 0;
+  DateTime? _lastVerificationCodeSent;
+  DateTime? _lastResetCodeSent;
 
   @override
   void initState() {
@@ -127,6 +135,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     _fadeController.dispose();
     _slideController.dispose();
     _glowController.dispose();
+    _cooldownTimer?.cancel();
     super.dispose();
   }
 
@@ -216,6 +225,15 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _sendVerificationEmail() async {
+    // Check cooldown
+    if (_lastVerificationCodeSent != null) {
+      final timeSinceLastSent = DateTime.now().difference(_lastVerificationCodeSent!).inSeconds;
+      if (timeSinceLastSent < 30) {
+        _showGlassySnackBar('Please wait ${30 - timeSinceLastSent} seconds before requesting a new code', true);
+        return;
+      }
+    }
+
     final email = _emailC.text.trim().toLowerCase();
 
     // Delete any existing verification codes for this email
@@ -234,6 +252,23 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       'code': _actualVerificationCode,
       'created_at': FieldValue.serverTimestamp(),
       'email': email,
+    });
+
+    // Update cooldown
+    setState(() {
+      _lastVerificationCodeSent = DateTime.now();
+      _verificationCooldownSeconds = 30;
+    });
+
+    // Start cooldown timer
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _verificationCooldownSeconds--;
+        if (_verificationCooldownSeconds <= 0) {
+          timer.cancel();
+        }
+      });
     });
 
     // The cloud function will log this code
@@ -588,6 +623,15 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _sendPasswordResetCode() async {
+    // Check cooldown
+    if (_lastResetCodeSent != null) {
+      final timeSinceLastSent = DateTime.now().difference(_lastResetCodeSent!).inSeconds;
+      if (timeSinceLastSent < 30) {
+        _showGlassySnackBar('Please wait ${30 - timeSinceLastSent} seconds before requesting a new code', true);
+        return;
+      }
+    }
+
     final email = _emailC.text.trim().toLowerCase();
 
     if (email.isEmpty) {
@@ -626,13 +670,28 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         'email': email,
       });
 
-      // In production, send email here
-      debugPrint('Password reset code: $resetCode');
-
+      // Update cooldown
       setState(() {
         _resetEmail = email;
         _loading = false;
+        _lastResetCodeSent = DateTime.now();
+        _resetCooldownSeconds = 30;
       });
+
+      // Start cooldown timer
+      _cooldownTimer?.cancel();
+      _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {
+          _resetCooldownSeconds--;
+          if (_resetCooldownSeconds <= 0) {
+            timer.cancel();
+          }
+        });
+      });
+
+      // In production, send email here
+      debugPrint('Password reset code: $resetCode');
+
       _showGlassySnackBar('Reset code sent to $email', false);
     } catch (e) {
       setState(() {
@@ -1055,19 +1114,50 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                 const SizedBox(height: 30),
                 _buildActionButton(),
                 const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () async {
-                    await _sendVerificationEmail();
-                    _showGlassySnackBar('New verification code sent', false);
-                  },
-                  child: Text(
-                    'Resend Code',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 14,
+                if (_verificationCooldownSeconds > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.orange.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          color: Colors.orange.withOpacity(0.7),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Resend in $_verificationCooldownSeconds seconds',
+                          style: TextStyle(
+                            color: Colors.orange.withOpacity(0.7),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  TextButton(
+                    onPressed: () async {
+                      await _sendVerificationEmail();
+                      _showGlassySnackBar('New verification code sent', false);
+                    },
+                    child: Text(
+                      'Resend Code',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1187,21 +1277,52 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                   const SizedBox(height: 30),
                   _buildPasswordResetButton(false, canResetPassword),
                   const SizedBox(height: 20),
-                  TextButton(
-                    onPressed: () async {
-                      await _sendPasswordResetCode();
-                      if (mounted && _resetEmail != null && _resetEmail!.isNotEmpty) {
-                        _showGlassySnackBar('New reset code sent', false);
-                      }
-                    },
-                    child: Text(
-                      'Resend Code',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 14,
+                  if (_resetCooldownSeconds > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.orange.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            color: Colors.orange.withOpacity(0.7),
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Resend in $_resetCooldownSeconds seconds',
+                            style: TextStyle(
+                              color: Colors.orange.withOpacity(0.7),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    TextButton(
+                      onPressed: () async {
+                        await _sendPasswordResetCode();
+                        if (mounted && _resetEmail != null && _resetEmail!.isNotEmpty) {
+                          _showGlassySnackBar('New reset code sent', false);
+                        }
+                      },
+                      child: Text(
+                        'Resend Code',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 14,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ],
             ),

@@ -7,6 +7,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:math';
+import 'dart:async';
 import 'auth_screen.dart';
 import 'training_preferences_screen.dart';
 
@@ -50,6 +51,13 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   bool _showNotification = false;
   String _notificationMessage = '';
   bool _isError = false;
+
+  // Cooldown tracking
+  DateTime? _lastEmailCodeSent;
+  DateTime? _lastDeleteCodeSent;
+  Timer? _cooldownTimer;
+  int _emailCooldownSeconds = 0;
+  int _deleteCooldownSeconds = 0;
 
   @override
   void initState() {
@@ -430,46 +438,70 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   child: Container(
                     decoration: BoxDecoration(
                       color: _isError
-                          ? Colors.red.withOpacity(0.95) // Much more opaque
-                          : Colors.green.withOpacity(0.95), // Much more opaque
+                          ? Colors.red.withOpacity(0.1)
+                          : Colors.green.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: _isError
-                            ? Colors.red.withOpacity(0.5)
-                            : Colors.green.withOpacity(0.5),
-                        width: 2,
+                            ? Colors.red.withOpacity(0.3)
+                            : Colors.green.withOpacity(0.3),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.8),
+                          color: Colors.black.withOpacity(0.3),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
                       ],
                     ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _isError
-                                ? Icons.error_outline
-                                : Icons.check_circle_outline,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _notificationMessage,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: BackdropFilter(
+                        filter: ColorFilter.mode(
+                          _isError
+                              ? Colors.red.withOpacity(0.1)
+                              : Colors.green.withOpacity(0.1),
+                          BlendMode.overlay,
+                        ),
+                        child: Container(
+                          color: _isError
+                              ? Colors.red.withOpacity(0.2)
+                              : Colors.green.withOpacity(0.2),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _isError
+                                    ? Icons.error_outline
+                                    : Icons.check_circle_outline,
+                                color: _isError
+                                    ? Colors.red[300]
+                                    : Colors.green[300],
+                                size: 24,
                               ),
-                            ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _notificationMessage,
+                                  style: TextStyle(
+                                    color: _isError
+                                        ? Colors.red[300]
+                                        : Colors.green[300],
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    shadows: [
+                                      Shadow(
+                                        offset: const Offset(0, 1),
+                                        blurRadius: 3.0,
+                                        color: Colors.black.withOpacity(0.8),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -504,10 +536,28 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   Future<void> _sendDeleteAccountCode() async {
+    // Check cooldown
+    if (_lastDeleteCodeSent != null) {
+      final timeSinceLastSent = DateTime.now().difference(_lastDeleteCodeSent!).inSeconds;
+      if (timeSinceLastSent < 20) {
+        _showGlassyNotification('Please wait ${20 - timeSinceLastSent} seconds before requesting a new code', isError: true);
+        return;
+      }
+    }
+
     try {
       final code = _generateVerificationCode();
 
-      // Store code in Firestore - this will trigger the Cloud Function to send email
+      // Delete existing document first
+      await FirebaseFirestore.instance
+          .collection('delete_requests')
+          .doc(user!.uid)
+          .delete();
+
+      // Wait a moment to ensure deletion is processed
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Create new document - this will trigger the Cloud Function
       await FirebaseFirestore.instance
           .collection('delete_requests')
           .doc(user!.uid)
@@ -515,6 +565,23 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         'code': code,
         'created_at': FieldValue.serverTimestamp(),
         'email': user!.email,
+      });
+
+      // Update cooldown
+      setState(() {
+        _lastDeleteCodeSent = DateTime.now();
+        _deleteCooldownSeconds = 20;
+      });
+
+      // Start cooldown timer
+      _cooldownTimer?.cancel();
+      _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {
+          _deleteCooldownSeconds--;
+          if (_deleteCooldownSeconds <= 0) {
+            timer.cancel();
+          }
+        });
       });
 
       _showGlassyNotification('Verification code sent to ${user!.email}');
@@ -525,12 +592,30 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   Future<void> _sendEmailChangeCode(String newEmail) async {
+    // Check cooldown
+    if (_lastEmailCodeSent != null) {
+      final timeSinceLastSent = DateTime.now().difference(_lastEmailCodeSent!).inSeconds;
+      if (timeSinceLastSent < 20) {
+        _showGlassyNotification('Please wait ${20 - timeSinceLastSent} seconds before requesting a new code', isError: true);
+        return;
+      }
+    }
+
     try {
       final code = _generateVerificationCode();
 
       print('Sending email change code: $code to $newEmail'); // Debug log
 
-      // Store code in Firestore - this will trigger the Cloud Function to send email
+      // Delete existing document first
+      await FirebaseFirestore.instance
+          .collection('email_changes')
+          .doc(user!.uid)
+          .delete();
+
+      // Wait a moment to ensure deletion is processed
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Create new document - this will trigger the Cloud Function
       await FirebaseFirestore.instance
           .collection('email_changes')
           .doc(user!.uid)
@@ -539,6 +624,23 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         'created_at': FieldValue.serverTimestamp(),
         'currentEmail': user!.email,
         'newEmail': newEmail,
+      });
+
+      // Update cooldown
+      setState(() {
+        _lastEmailCodeSent = DateTime.now();
+        _emailCooldownSeconds = 20;
+      });
+
+      // Start cooldown timer
+      _cooldownTimer?.cancel();
+      _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {
+          _emailCooldownSeconds--;
+          if (_emailCooldownSeconds <= 0) {
+            timer.cancel();
+          }
+        });
       });
 
       print('Email change document created successfully'); // Debug log
@@ -562,9 +664,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         setState(() {
           _currentEmail = result.data['newEmail'];
         });
-
+        
         _showGlassyNotification('Email updated successfully to ${result.data['newEmail']}');
-
+        
         // Reload user data to ensure everything is in sync
         await _loadUserData();
       }
@@ -604,6 +706,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     _fadeController.dispose();
     _slideController.dispose();
     _notificationController.dispose();
+    _cooldownTimer?.cancel();
     super.dispose();
   }
 
@@ -1433,6 +1536,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     final controller = TextEditingController(); // Removed email prefill
     final codeController = TextEditingController();
     bool codeSent = false;
+    String? newEmailAddress;
 
     showDialog(
       context: context,
@@ -1455,6 +1559,113 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This action cannot be undone. All your data will be permanently deleted.',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 14,
+                ),
+              ),
+              if (codeSent) ...[
+                const SizedBox(height: 20),
+                TextField(
+                  controller: codeController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: InputDecoration(
+                    hintText: 'Enter 6-digit code',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    counterText: '',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.red.withOpacity(0.3),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.red.withOpacity(0.3),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.red.withOpacity(0.5),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'A verification code was sent to ${user?.email}',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 12,
+                  ),
+                ),
+                if (_deleteCooldownSeconds > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Resend code in $_deleteCooldownSeconds seconds',
+                    style: TextStyle(
+                      color: Colors.orange.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white.withOpacity(0.5)),
+              ),
+            ),
+            if (codeSent && _deleteCooldownSeconds <= 0)
+              TextButton(
+                onPressed: () async {
+                  await _sendDeleteAccountCode();
+                },
+                child: Text(
+                  'Resend',
+                  style: TextStyle(color: Colors.red[300]),
+                ),
+              ),
+            TextButton(
+              onPressed: () async {
+                if (!codeSent) {
+                  await _sendDeleteAccountCode();
+                  setState(() {
+                    codeSent = true;
+                  });
+                } else {
+                  final code = codeController.text.trim();
+                  if (code.length == 6) {
+                    Navigator.pop(context);
+                    await _deleteAccount(code);
+                  }
+                }
+              },
+              child: Text(
+                codeSent ? 'Delete Account' : 'Send Code',
+                style: TextStyle(color: Colors.red[300]),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+},
             children: [
               if (!codeSent) ...[
                 TextField(
@@ -1528,12 +1739,22 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Verification code sent to ${controller.text}',
+                  'Verification code sent to $newEmailAddress',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.4),
                     fontSize: 12,
                   ),
                 ),
+                if (_emailCooldownSeconds > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Resend code in $_emailCooldownSeconds seconds',
+                    style: TextStyle(
+                      color: Colors.orange.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ],
             ],
           ),
@@ -1545,6 +1766,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 style: TextStyle(color: Colors.white.withOpacity(0.5)),
               ),
             ),
+            if (codeSent && _emailCooldownSeconds <= 0) 
+              TextButton(
+                onPressed: () async {
+                  await _sendEmailChangeCode(newEmailAddress!);
+                },
+                child: const Text(
+                  'Resend',
+                  style: TextStyle(color: Color(0xFFD4AF37)),
+                ),
+              ),
             TextButton(
               onPressed: () async {
                 if (!codeSent) {
@@ -1556,6 +1787,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                       _showGlassyNotification('Please enter a valid email address', isError: true);
                       return;
                     }
+                    newEmailAddress = newEmail;
                     await _sendEmailChangeCode(newEmail);
                     setState(() {
                       codeSent = true;
@@ -1858,6 +2090,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     fontSize: 12,
                   ),
                 ),
+                if (_deleteCooldownSeconds > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Resend code in $_deleteCooldownSeconds seconds',
+                    style: TextStyle(
+                      color: Colors.orange.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ],
             ],
           ),
@@ -1869,6 +2111,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 style: TextStyle(color: Colors.white.withOpacity(0.5)),
               ),
             ),
+            if (codeSent && _deleteCooldownSeconds <= 0)
+              TextButton(
+                onPressed: () async {
+                  await _sendDeleteAccountCode();
+                },
+                child: Text(
+                  'Resend',
+                  style: TextStyle(color: Colors.red[300]),
+                ),
+              ),
             TextButton(
               onPressed: () async {
                 if (!codeSent) {

@@ -27,12 +27,14 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   late AnimationController _glowController;
   late AnimationController _progressController;
   late AnimationController _pulseController;
+  late AnimationController _checkmarkController;
 
   // Animations
   late Animation<double> _fadeIn;
   late Animation<double> _scaleIn;
   late Animation<double> _glow;
   late Animation<double> _pulse;
+  late Animation<double> _checkmarkScale;
 
   // Workout state
   int _currentExerciseIndex = 0;
@@ -51,6 +53,11 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   int get _totalSets {
     final exercise = widget.exercises[_currentExerciseIndex];
     return int.tryParse(exercise['sets']?.toString() ?? '1') ?? 1;
+  }
+
+  bool get _isRepBased {
+    final exercise = widget.exercises[_currentExerciseIndex];
+    return exercise['reps'] != null && !_isResting;
   }
 
   @override
@@ -82,6 +89,11 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       vsync: this,
     )..repeat(reverse: true);
 
+    _checkmarkController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
     _fadeIn = CurvedAnimation(
       parent: _entryController,
       curve: Curves.easeOut,
@@ -110,6 +122,14 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       parent: _pulseController,
       curve: Curves.easeInOut,
     ));
+
+    _checkmarkScale = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _checkmarkController,
+      curve: Curves.elasticOut,
+    ));
   }
 
   void _startAnimations() {
@@ -118,16 +138,20 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
   void _startExercise() {
     final exercise = widget.exercises[_currentExerciseIndex];
-    if (exercise['duration'] != null) {
+
+    if (_isResting) {
+      _secondsRemaining = 15; // Rest period
+      _startTimer();
+    } else if (exercise['duration'] != null) {
       // Parse duration (e.g., "2 min" -> 120 seconds)
       final durationStr = exercise['duration'] as String;
       final minutes = int.tryParse(durationStr.split(' ')[0]) ?? 1;
       _secondsRemaining = minutes * 60;
-    } else {
-      // For rep-based exercises, use 30 seconds per set
-      _secondsRemaining = 30;
+      _startTimer();
+    } else if (exercise['reps'] != null) {
+      // Rep-based exercise - no timer
+      _timer?.cancel();
     }
-    _startTimer();
   }
 
   void _startTimer() {
@@ -139,19 +163,21 @@ class _WorkoutScreenState extends State<WorkoutScreen>
           if (_secondsRemaining > 0) {
             _secondsRemaining--;
           } else {
-            _onExerciseComplete();
+            _onTimerComplete();
           }
         });
       }
     });
   }
 
-  void _onExerciseComplete() {
+  void _onTimerComplete() {
     HapticFeedback.mediumImpact();
 
     if (_isResting) {
       // Rest period complete, move to next set or exercise
-      _isResting = false;
+      setState(() {
+        _isResting = false;
+      });
       if (_currentSet < _totalSets) {
         _currentSet++;
         _startExercise();
@@ -159,14 +185,29 @@ class _WorkoutScreenState extends State<WorkoutScreen>
         _nextExercise();
       }
     } else {
-      // Exercise complete, start rest period
-      if (_currentSet < _totalSets) {
-        _isResting = true;
-        _secondsRemaining = 15; // 15 second rest between sets
-      } else {
-        _nextExercise();
-      }
+      // Time-based exercise complete
+      _onExerciseComplete();
     }
+  }
+
+  void _onExerciseComplete() {
+    // Check if we need to rest or move on
+    if (_currentSet < _totalSets) {
+      setState(() {
+        _isResting = true;
+      });
+      _startExercise();
+    } else {
+      _nextExercise();
+    }
+  }
+
+  void _onRepExerciseComplete() {
+    HapticFeedback.heavyImpact();
+    _checkmarkController.forward().then((_) {
+      _checkmarkController.reset();
+      _onExerciseComplete();
+    });
   }
 
   void _nextExercise() {
@@ -179,17 +220,6 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       _startExercise();
     } else {
       _completeWorkout();
-    }
-  }
-
-  void _previousExercise() {
-    if (_currentExerciseIndex > 0) {
-      setState(() {
-        _currentExerciseIndex--;
-        _currentSet = 1;
-        _isResting = false;
-      });
-      _startExercise();
     }
   }
 
@@ -229,6 +259,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     _glowController.dispose();
     _progressController.dispose();
     _pulseController.dispose();
+    _checkmarkController.dispose();
     super.dispose();
   }
 
@@ -266,9 +297,9 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                               _buildVideoPlayer(),
                               const SizedBox(height: 30),
                               _buildExerciseInfo(currentExercise),
-                              const SizedBox(height: 30),
-                              _buildTimer(),
                               const SizedBox(height: 40),
+                              _buildTimerOrReps(currentExercise),
+                              const SizedBox(height: 50),
                               _buildControls(),
                               const SizedBox(height: 40),
                             ],
@@ -331,12 +362,9 @@ class _WorkoutScreenState extends State<WorkoutScreen>
             ),
           ),
           IconButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              // Show workout settings/info
-            },
-            icon: const Icon(
-              Icons.info_outline,
+            onPressed: _togglePause,
+            icon: Icon(
+              _isPaused ? Icons.play_arrow : Icons.pause,
               color: Colors.white,
               size: 24,
             ),
@@ -451,7 +479,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
           ),
         ),
         const SizedBox(height: 12),
-        if (!_isResting && exercise['sets'] != null) ...[
+        if (!_isResting && exercise['sets'] != null)
           Text(
             'SET $_currentSet OF ${exercise['sets']}',
             style: TextStyle(
@@ -461,17 +489,44 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               fontWeight: FontWeight.w400,
             ),
           ),
-          const SizedBox(height: 8),
-        ],
-        if (!_isResting && exercise['reps'] != null)
-          Text(
-            exercise['reps'] + ' REPS',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 14,
-              letterSpacing: 1,
-            ),
+      ],
+    );
+  }
+
+  Widget _buildTimerOrReps(Map<String, dynamic> exercise) {
+    return Container(
+      height: 180, // Fixed height to prevent jumping
+      child: Center(
+        child: _isRepBased
+            ? _buildRepsDisplay(exercise)
+            : _buildTimer(),
+      ),
+    );
+  }
+
+  Widget _buildRepsDisplay(Map<String, dynamic> exercise) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          exercise['reps']?.toString() ?? '10',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 72,
+            fontWeight: FontWeight.w200,
+            letterSpacing: 2,
           ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'REPS',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.6),
+            fontSize: 16,
+            letterSpacing: 2,
+            fontWeight: FontWeight.w300,
+          ),
+        ),
       ],
     );
   }
@@ -514,13 +569,17 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                       letterSpacing: 2,
                     ),
                   ),
-                  if (_isResting)
-                    Text(
-                      'NEXT: ${widget.exercises[_currentExerciseIndex]['name']}',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 12,
-                        letterSpacing: 1,
+                  if (_isResting && _currentExerciseIndex < widget.exercises.length - 1)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'NEXT: ${widget.exercises[_currentSet < _totalSets ? _currentExerciseIndex : _currentExerciseIndex + 1]['name']}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 12,
+                          letterSpacing: 1,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                 ],
@@ -533,85 +592,82 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   }
 
   Widget _buildControls() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildControlButton(
-          Icons.skip_previous,
-              () => _previousExercise(),
-          enabled: _currentExerciseIndex > 0,
-        ),
-        const SizedBox(width: 24),
-        AnimatedBuilder(
-          animation: _glow,
-          builder: (context, child) {
-            return GestureDetector(
-              onTap: _togglePause,
+    if (_isRepBased) {
+      return AnimatedBuilder(
+        animation: Listenable.merge([_glow, _checkmarkScale]),
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _checkmarkScale.value,
+            child: GestureDetector(
+              onTap: _onRepExerciseComplete,
               child: Container(
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: _isPaused ? [
-                      const Color(0xFFD4AF37),
-                      const Color(0xFFB8941F),
-                    ] : [
-                      Colors.white,
-                      const Color(0xFFE0E0E0),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF4CAF50),
+                      Color(0xFF45A049),
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: (_isPaused ? const Color(0xFFD4AF37) : Colors.white)
-                          .withOpacity(0.3 * _glow.value),
+                      color: const Color(0xFF4CAF50).withOpacity(0.3 * _glow.value),
                       blurRadius: 30,
                       spreadRadius: 5,
                     ),
                   ],
                 ),
-                child: Icon(
-                  _isPaused ? Icons.play_arrow : Icons.pause,
-                  color: Colors.black,
-                  size: 36,
+                child: const Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 40,
                 ),
               ),
-            );
-          },
-        ),
-        const SizedBox(width: 24),
-        _buildControlButton(
-          Icons.skip_next,
-              () => _nextExercise(),
-          enabled: _currentExerciseIndex < widget.exercises.length - 1,
-        ),
-      ],
-    );
-  }
+            ),
+          );
+        },
+      );
+    }
 
-  Widget _buildControlButton(IconData icon, VoidCallback onPressed, {bool enabled = true}) {
-    return GestureDetector(
-      onTap: enabled ? () {
-        HapticFeedback.lightImpact();
-        onPressed();
-      } : null,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withOpacity(enabled ? 0.1 : 0.05),
-          border: Border.all(
-            color: Colors.white.withOpacity(enabled ? 0.2 : 0.1),
-            width: 1,
+    // For time-based exercises, just show a pause/play button
+    return AnimatedBuilder(
+      animation: _glow,
+      builder: (context, child) {
+        return GestureDetector(
+          onTap: _togglePause,
+          child: Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: _isPaused ? [
+                  const Color(0xFFD4AF37),
+                  const Color(0xFFB8941F),
+                ] : [
+                  Colors.white,
+                  const Color(0xFFE0E0E0),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: (_isPaused ? const Color(0xFFD4AF37) : Colors.white)
+                      .withOpacity(0.3 * _glow.value),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Icon(
+              _isPaused ? Icons.play_arrow : Icons.pause,
+              color: Colors.black,
+              size: 36,
+            ),
           ),
-        ),
-        child: Icon(
-          icon,
-          color: Colors.white.withOpacity(enabled ? 0.8 : 0.3),
-          size: 28,
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -629,7 +685,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
           ),
         ),
         title: Text(
-          'END WORKOUT?',
+          'EXIT WORKOUT?',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -638,34 +694,55 @@ class _WorkoutScreenState extends State<WorkoutScreen>
           ),
           textAlign: TextAlign.center,
         ),
-        content: Text(
-          'Your progress will be saved',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 14,
-          ),
-          textAlign: TextAlign.center,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.warning_outlined,
+              color: const Color(0xFFD4AF37),
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Your progress will NOT be saved',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You must complete the entire workout for it to count',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
-              'CONTINUE',
+              'KEEP GOING',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: const Color(0xFF4CAF50),
                 letterSpacing: 1,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              _completeWorkout();
+              Navigator.of(context).popUntil((route) => route.isFirst);
             },
-            child: const Text(
-              'END',
+            child: Text(
+              'EXIT',
               style: TextStyle(
-                color: Color(0xFFD4AF37),
+                color: Colors.red.withOpacity(0.8),
                 letterSpacing: 1,
               ),
             ),

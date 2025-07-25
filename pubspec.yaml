@@ -23,8 +23,11 @@ dependencies:
   fl_chart: ^1.0.0
   touchable: ^1.0.2
   flutter_svg: ^2.0.9
+
+  # SVG parsing & hit-testing
   path_parsing: ^1.0.1
   xml: ^6.3.0
+  path_drawing: ^1.0.1
 
   # Media
   video_player: ^2.8.1
@@ -40,4 +43,4 @@ flutter:
 
   assets:
     - assets/videos/skate-montage2.mp4
-    - assets/svg/backmuscle-final.svg
+    - assets/svg/

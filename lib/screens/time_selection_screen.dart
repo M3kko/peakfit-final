@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
-import 'preworkout_screen.dart';
+import 'soreness_tracker_screen.dart';
 
 class TimeSelectionScreen extends StatefulWidget {
   final String workoutType;

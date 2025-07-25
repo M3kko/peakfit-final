@@ -1,8 +1,12 @@
+// lib/screens/soreness_tracker_screen.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:path_parsing/path_parsing.dart';
-import 'package:xml/xml.dart' as xml;
+import 'package:xml/xml.dart';
+import 'package:path_drawing/path_drawing.dart';
+
 import 'preworkout_screen.dart';
 
 class SorenessTrackerScreen extends StatefulWidget {
@@ -21,20 +25,24 @@ class SorenessTrackerScreen extends StatefulWidget {
 
 class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     with TickerProviderStateMixin {
-  // Animation controllers
-  late AnimationController _entryController;
-  late AnimationController _pulseController;
-
   // Animations
-  late Animation<double> _fadeIn;
-  late Animation<double> _slideUp;
-  late Animation<double> _pulse;
+  late final AnimationController _fadeCtrl;
+  late final AnimationController _pulseCtrl;
+  late final Animation<double> _fade;
+  late final Animation<double> _slideUp;
+  late final Animation<double> _pulse;
 
-  // Track selected muscles
-  final Set<String> _selectedMuscles = {};
+  // Raw svg viewBox (from your file)
+  static const double _vbW = 156.0;
+  static const double _vbH = 236.0;
+
+  // Parsed muscle paths (id -> Path in viewBox coords)
+  Map<String, Path> _paths = {};
+  // Selected ids
+  final Set<String> _selected = {};
 
   // Muscle display names
-  final Map<String, String> _muscleNames = {
+  static const Map<String, String> _names = {
     'neck': 'Neck',
     'upper-trapezius': 'Upper Traps',
     'traps-middle': 'Middle Traps',
@@ -49,26 +57,26 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     'left-long-head-triceps': 'Left Triceps (Long)',
     'right-lateral-head-triceps': 'Right Triceps (Lateral)',
     'left-medial-head-triceps': 'Left Triceps (Medial)',
-    'right-wrist-flexors': 'Right Forearm Flexors',
-    'left-wrist-flexors': 'Left Forearm Flexors',
-    'right-wrist-extensors': 'Right Forearm Extensors',
-    'left-wrist-extensors': 'Left Forearm Extensors',
+    'right-wrist-flexors': 'Right Wrist Flexors',
+    'left-wrist-flexors': 'Left Wrist Flexors',
+    'right-wrist-extensors': 'Right Wrist Extensors',
+    'left-wrist-extensors': 'Left Wrist Extensors',
     'right-hand': 'Right Hand',
     'left-hand': 'Left Hand',
-    'right-gluteus-medius': 'Right Glute Med',
-    'left-gluteus-medius': 'Left Glute Med',
-    'right-gluteus-maximus': 'Right Glutes',
-    'left-gluteus-maximus': 'Left Glutes',
+    'right-gluteus-medius': 'Right Glute Medius',
+    'left-gluteus-medius': 'Left Glute Medius',
+    'right-gluteus-maximus': 'Right Glute Max',
+    'left-gluteus-maximus': 'Left Glute Max',
     'left-inner-thigh': 'Left Inner Thigh',
     'right-inner-thigh': 'Right Inner Thigh',
-    'right-lateral-hamstring': 'Right Hamstring (Outer)',
-    'left-lateral-hamstring': 'Left Hamstring (Outer)',
-    'right-medial-hamstring': 'Right Hamstring (Inner)',
-    'left-medial-hamstring': 'Left Hamstring (Inner)',
-    'left-soleus': 'Left Calf (Soleus)',
-    'right-soleus': 'Right Calf (Soleus)',
-    'left-gastrocnemius': 'Left Calf',
-    'right-gastrocnemius': 'Right Calf',
+    'right-lateral-hamstring': 'Right Lateral Hamstring',
+    'left-lateral-hamstring': 'Left Lateral Hamstring',
+    'right-medial-hamstring': 'Right Medial Hamstring',
+    'left-medial-hamstring': 'Left Medial Hamstring',
+    'left-soleus': 'Left Soleus',
+    'right-soleus': 'Right Soleus',
+    'left-gastrocnemius': 'Left Gastrocnemius',
+    'right-gastrocnemius': 'Right Gastrocnemius',
     'left-foot': 'Left Foot',
     'right-foot': 'Right Foot',
     'lower-back': 'Lower Back',
@@ -77,62 +85,48 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   @override
   void initState() {
     super.initState();
-    _initAnimations();
-    _startAnimations();
+    _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
+    _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+    _slideUp = Tween<double>(begin: 24, end: 0).animate(CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic));
+    _pulse = Tween<double>(begin: 0.95, end: 1.05).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+
+    _fadeCtrl.forward();
+    _loadPaths();
   }
 
-  void _initAnimations() {
-    _entryController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
+  Future<void> _loadPaths() async {
+    final raw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
+    final doc = XmlDocument.parse(raw);
 
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
+    /// Your SVG has a group transform: translate(-27.789474,-29.526316)
+    /// We need to shift paths back so the geometry lines up with what we paint.
+    const dx = 27.789474;
+    const dy = 29.526316;
 
-    _fadeIn = CurvedAnimation(
-      parent: _entryController,
-      curve: Curves.easeOut,
-    );
+    final map = <String, Path>{};
+    for (final p in doc.findAllElements('path')) {
+      final id = p.getAttribute('id');
+      final d = p.getAttribute('d');
+      if (id == null || d == null) continue;
+      Path path = parseSvgPathData(d).shift(const Offset(dx, dy));
+      map[id] = path;
+    }
 
-    _slideUp = Tween<double>(
-      begin: 30.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _entryController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _pulse = Tween<double>(
-      begin: 0.95,
-      end: 1.05,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
-  }
-
-  void _startAnimations() {
-    _entryController.forward();
+    if (mounted) setState(() => _paths = map);
   }
 
   @override
   void dispose() {
-    _entryController.dispose();
-    _pulseController.dispose();
+    _fadeCtrl.dispose();
+    _pulseCtrl.dispose();
     super.dispose();
   }
 
-  void _toggleMuscle(String muscleId) {
+  void _toggle(String id) {
     HapticFeedback.lightImpact();
     setState(() {
-      if (_selectedMuscles.contains(muscleId)) {
-        _selectedMuscles.remove(muscleId);
-      } else {
-        _selectedMuscles.add(muscleId);
-      }
+      _selected.contains(id) ? _selected.remove(id) : _selected.add(id);
     });
   }
 
@@ -142,203 +136,164 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
         children: [
-          _buildBackground(),
+          _background(),
           SafeArea(
-            child: AnimatedBuilder(
-              animation: _fadeIn,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeIn.value,
-                  child: Transform.translate(
-                    offset: Offset(0, _slideUp.value),
-                    child: Column(
-                      children: [
-                        _buildHeader(),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Column(
-                              children: [
-                                const SizedBox(height: 20),
-                                _buildTitle(),
-                                const SizedBox(height: 40),
-                                _buildBodyDiagram(),
-                                const SizedBox(height: 40),
-                                _buildSorenessLegend(),
-                                const SizedBox(height: 100),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+            child: FadeTransition(
+              opacity: _fade,
+              child: Transform.translate(
+                offset: Offset(0, _slideUp.value),
+                child: Column(
+                  children: [
+                    _header(context),
+                    Expanded(child: _body()),
+                  ],
+                ),
+              ),
             ),
           ),
-          _buildBottomButton(),
+          _bottomButton(context),
         ],
       ),
     );
   }
 
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFF0A0A0A),
-            const Color(0xFF0F0F0F),
-            const Color(0xFF050505),
-          ],
-          stops: const [0.0, 0.5, 1.0],
-        ),
+  Widget _background() => Container(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF0A0A0A), Color(0xFF0F0F0F), Color(0xFF050505)],
+        stops: [0, 0.5, 1],
       ),
-    );
-  }
+    ),
+  );
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              Navigator.pop(context);
-            },
-            icon: const Icon(
-              Icons.arrow_back,
-              color: Colors.white,
-              size: 24,
-            ),
-            padding: EdgeInsets.zero,
-          ),
-          const Spacer(),
-          Text(
-            'SORENESS CHECK',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 16,
-              fontWeight: FontWeight.w300,
-              letterSpacing: 2,
-            ),
-          ),
-          const Spacer(),
-          const SizedBox(width: 48),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTitle() {
-    return Column(
+  Widget _header(BuildContext ctx) => Padding(
+    padding: const EdgeInsets.all(24),
+    child: Row(
       children: [
-        Text(
-          'How are you feeling?',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w200,
-            letterSpacing: 0.5,
-          ),
+        IconButton(
+          onPressed: () => Navigator.pop(ctx),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
         ),
-        const SizedBox(height: 12),
+        const Spacer(),
         Text(
-          'Tap muscles that feel sore',
+          'SORENESS CHECK',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 16,
+            color: Colors.white.withOpacity(0.7),
+            letterSpacing: 2,
             fontWeight: FontWeight.w300,
           ),
         ),
+        const Spacer(),
+        const SizedBox(width: 48),
       ],
-    );
-  }
+    ),
+  );
 
-  Widget _buildBodyDiagram() {
-    return Container(
-      height: 500,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.05),
-          width: 1,
+  Widget _body() => SingleChildScrollView(
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    child: Column(
+      children: [
+        const SizedBox(height: 20),
+        const Text(
+          'How are you feeling?',
+          style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w200),
+        ),
+        const SizedBox(height: 12),
+        Text('Tap muscles that feel sore', style: TextStyle(color: Colors.white.withOpacity(0.5))),
+        const SizedBox(height: 40),
+        _diagram(),
+        const SizedBox(height: 40),
+        _legend(),
+        const SizedBox(height: 100),
+      ],
+    ),
+  );
+
+  Widget _diagram() {
+    return AspectRatio(
+      aspectRatio: _vbW / _vbH,
+      child: RepaintBoundary(
+        child: LayoutBuilder(
+          builder: (_, c) {
+            final sx = c.maxWidth / _vbW;
+            final sy = c.maxHeight / _vbH;
+
+            return Stack(
+              children: [
+                // Base SVG
+                SvgPicture.asset(
+                  'assets/svg/backmuscle-final.svg',
+                  fit: BoxFit.contain,
+                  width: c.maxWidth,
+                  height: c.maxHeight,
+                ),
+                // Highlights
+                CustomPaint(
+                  size: Size(c.maxWidth, c.maxHeight),
+                  painter: _HighlightPainter(
+                    selected: _selected,
+                    paths: _paths,
+                    sx: sx,
+                    sy: sy,
+                  ),
+                ),
+                // Hit detection
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (d) {
+                      if (_paths.isEmpty) return;
+                      final local = d.localPosition;
+                      final xSvg = local.dx / sx;
+                      final ySvg = local.dy / sy;
+                      for (final e in _paths.entries) {
+                        if (e.value.contains(Offset(xSvg, ySvg))) {
+                          _toggle(e.key);
+                          break;
+                        }
+                      }
+                    },
+                  ),
+                )
+              ],
+            );
+          },
         ),
       ),
-      child: InteractiveMusclesSvg(
-        selectedMuscles: _selectedMuscles,
-        onMuscleTap: _toggleMuscle,
-      ),
     );
   }
 
-  Widget _buildSorenessLegend() {
+  Widget _legend() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.05),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'SELECTED MUSCLES',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 12,
-              letterSpacing: 1.5,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
+          Text('SELECTED MUSCLES',
+              style: TextStyle(color: Colors.white.withOpacity(0.5), letterSpacing: 1.5, fontSize: 12)),
           const SizedBox(height: 16),
-          if (_selectedMuscles.isEmpty)
+          if (_selected.isEmpty)
             Center(
-              child: Text(
-                'No muscles selected',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 14,
-                ),
-              ),
+              child: Text('No muscles selected',
+                  style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14)),
             )
           else
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _selectedMuscles.map((muscleId) {
-                final muscleName = _muscleNames[muscleId] ?? muscleId;
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.red.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    muscleName.toUpperCase(),
-                    style: TextStyle(
-                      color: Colors.red.shade300,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+              children: _selected.map((id) {
+                final name = _names[id] ?? id;
+                return Chip(
+                  label: Text(name.toUpperCase(), style: TextStyle(color: Colors.red.shade300, fontSize: 12)),
+                  backgroundColor: Colors.red.withOpacity(0.2),
+                  side: BorderSide(color: Colors.red.withOpacity(0.3)),
                 );
               }).toList(),
             ),
@@ -347,498 +302,114 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     );
   }
 
-  Widget _buildBottomButton() {
+  Widget _bottomButton(BuildContext ctx) {
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [
-              const Color(0xFF0A0A0A),
-              const Color(0xFF0A0A0A).withOpacity(0.9),
-              const Color(0xFF0A0A0A).withOpacity(0),
-            ],
+      child: IgnorePointer(
+        ignoring: false,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                const Color(0xFF0A0A0A),
+                const Color(0xFF0A0A0A).withOpacity(0.9),
+                const Color(0xFF0A0A0A).withOpacity(0),
+              ],
+            ),
           ),
-        ),
-        child: AnimatedBuilder(
-          animation: _pulse,
-          builder: (context, child) {
-            return Transform.scale(
-              scale: _pulse.value,
-              child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.heavyImpact();
-                  Navigator.push(
-                    context,
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) =>
-                          PreWorkoutScreen(
-                            workoutType: widget.workoutType,
-                            duration: widget.duration,
-                          ),
-                      transitionsBuilder:
-                          (context, animation, secondaryAnimation, child) {
-                        const begin = Offset(0.0, 1.0);
-                        const end = Offset.zero;
-                        const curve = Curves.easeOutExpo;
-
-                        var tween = Tween(begin: begin, end: end).chain(
-                          CurveTween(curve: curve),
-                        );
-
-                        return SlideTransition(
-                          position: animation.drive(tween),
-                          child: child,
-                        );
-                      },
-                      transitionDuration: const Duration(milliseconds: 500),
+          child: ScaleTransition(
+            scale: _pulse,
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.heavyImpact();
+                Navigator.push(
+                  ctx,
+                  PageRouteBuilder(
+                    pageBuilder: (_, __, ___) => PreWorkoutScreen(
+                      workoutType: widget.workoutType,
+                      duration: widget.duration,
                     ),
-                  );
-                },
-                child: Container(
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    gradient: const LinearGradient(
-                      colors: [
-                        Colors.white,
-                        Color(0xFFE0E0E0),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, 0),
-                        spreadRadius: 2,
-                      ),
-                    ],
+                    transitionsBuilder: (_, anim, __, child) {
+                      final tween = Tween(begin: const Offset(0, 1), end: Offset.zero)
+                          .chain(CurveTween(curve: Curves.easeOutExpo));
+                      return SlideTransition(position: anim.drive(tween), child: child);
+                    },
+                    transitionDuration: const Duration(milliseconds: 500),
                   ),
+                );
+              },
+              child: Container(
+                height: 60,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Colors.white, Color(0xFFE0E0E0)]),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.2),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Center(
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'CONTINUE',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                          letterSpacing: 2,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.arrow_forward,
-                        color: Colors.black.withOpacity(0.8),
-                        size: 20,
-                      ),
+                      Text('CONTINUE',
+                          style: TextStyle(
+                            color: Colors.black,
+                            letterSpacing: 2,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          )),
+                      SizedBox(width: 8),
+                      Icon(Icons.arrow_forward, color: Colors.black, size: 20),
                     ],
                   ),
                 ),
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// Interactive SVG Widget with Path Parsing
-class InteractiveMusclesSvg extends StatefulWidget {
-  final Set<String> selectedMuscles;
-  final Function(String) onMuscleTap;
+class _HighlightPainter extends CustomPainter {
+  final Set<String> selected;
+  final Map<String, Path> paths;
+  final double sx, sy;
 
-  const InteractiveMusclesSvg({
-    Key? key,
-    required this.selectedMuscles,
-    required this.onMuscleTap,
-  }) : super(key: key);
-
-  @override
-  State<InteractiveMusclesSvg> createState() => _InteractiveMusclesSvgState();
-}
-
-class _InteractiveMusclesSvgState extends State<InteractiveMusclesSvg> {
-  List<MusclePathData> _musclePaths = [];
-  Size _svgSize = const Size(210, 297); // Original SVG size in mm
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSvgPaths();
-  }
-
-  Future<void> _loadSvgPaths() async {
-    try {
-      final String svgString = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
-      final document = xml.XmlDocument.parse(svgString);
-
-      final paths = document.findAllElements('path');
-      final List<MusclePathData> muscleData = [];
-
-      for (var element in paths) {
-        final id = element.getAttribute('id');
-        final d = element.getAttribute('d');
-        final style = element.getAttribute('style');
-
-        if (id != null && d != null && id != 'path10' &&
-            id != 'path29' && id != 'path30' && id != 'path33' &&
-            id != 'path39' && id != 'path42') {
-          // Parse the path
-          final path = parseSvgPathData(d);
-
-          muscleData.add(MusclePathData(
-            id: id,
-            path: path,
-            originalStyle: style ?? '',
-          ));
-        }
-      }
-
-      setState(() {
-        _musclePaths = muscleData;
-      });
-    } catch (e) {
-      print('Error loading SVG: $e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final scale = constraints.maxWidth / _svgSize.width;
-
-        return GestureDetector(
-          onTapDown: (details) {
-            _handleTap(details.localPosition, scale);
-          },
-          child: CustomPaint(
-            size: Size(constraints.maxWidth, constraints.maxHeight),
-            painter: MuscleSvgPainter(
-              musclePaths: _musclePaths,
-              selectedMuscles: widget.selectedMuscles,
-              scale: scale,
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _handleTap(Offset position, double scale) {
-    // Check which path was tapped
-    for (var muscleData in _musclePaths) {
-      final scaledPath = Path();
-      scaledPath.addPath(muscleData.path, Offset.zero,
-          matrix4: Matrix4.identity()..scale(scale).storage);
-
-      if (scaledPath.contains(position)) {
-        widget.onMuscleTap(muscleData.id);
-        break; // Stop after finding the first hit
-      }
-    }
-  }
-}
-
-class MuscleSvgPainter extends CustomPainter {
-  final List<MusclePathData> musclePaths;
-  final Set<String> selectedMuscles;
-  final double scale;
-
-  MuscleSvgPainter({
-    required this.musclePaths,
-    required this.selectedMuscles,
-    required this.scale,
+  _HighlightPainter({
+    required this.selected,
+    required this.paths,
+    required this.sx,
+    required this.sy,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (var muscleData in musclePaths) {
-      final isSelected = selectedMuscles.contains(muscleData.id);
-
-      // Create scaled path
-      final scaledPath = Path();
-      scaledPath.addPath(muscleData.path, Offset.zero,
-          matrix4: Matrix4.identity()..scale(scale).storage);
-
-      // Fill paint
-      final fillPaint = Paint()
-        ..style = PaintingStyle.fill
-        ..color = isSelected ? const Color(0xFFFF6B6B) : const Color(0xFFE6E6E6);
-
-      canvas.drawPath(scaledPath, fillPaint);
-
-      // Stroke paint
-      final strokePaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..color = Colors.black
-        ..strokeWidth = 0.564999 * scale
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-
-      canvas.drawPath(scaledPath, strokePaint);
+    final paint = Paint()..color = Colors.red.withOpacity(0.28);
+    canvas.save();
+    canvas.scale(sx, sy);
+    for (final id in selected) {
+      final p = paths[id];
+      if (p != null) canvas.drawPath(p, paint);
     }
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant MuscleSvgPainter oldDelegate) {
-    return oldDelegate.selectedMuscles != selectedMuscles ||
-        oldDelegate.musclePaths.length != musclePaths.length;
-  }
-}
-
-class MusclePathData {
-  final String id;
-  final Path path;
-  final String originalStyle;
-
-  MusclePathData({
-    required this.id,
-    required this.path,
-    required this.originalStyle,
-  });
-}
-
-// SVG Path Parser
-Path parseSvgPathData(String d) {
-  final path = Path();
-  final segments = SvgPathStringParser(d);
-
-  for (final segment in segments) {
-    switch (segment.command) {
-      case 'M':
-      case 'm':
-        if (segment.isAbsolute) {
-          path.moveTo(segment.targetPoint.x, segment.targetPoint.y);
-        } else {
-          path.relativeMoveTo(segment.targetPoint.x, segment.targetPoint.y);
-        }
-        break;
-      case 'L':
-      case 'l':
-        if (segment.isAbsolute) {
-          path.lineTo(segment.targetPoint.x, segment.targetPoint.y);
-        } else {
-          path.relativeLineTo(segment.targetPoint.x, segment.targetPoint.y);
-        }
-        break;
-      case 'H':
-      case 'h':
-        if (segment.isAbsolute) {
-          final currentY = path.getBounds().bottom;
-          path.lineTo(segment.targetPoint.x, currentY);
-        } else {
-          path.relativeLineTo(segment.targetPoint.x, 0);
-        }
-        break;
-      case 'V':
-      case 'v':
-        if (segment.isAbsolute) {
-          final currentX = path.getBounds().right;
-          path.lineTo(currentX, segment.targetPoint.y);
-        } else {
-          path.relativeLineTo(0, segment.targetPoint.y);
-        }
-        break;
-      case 'C':
-      case 'c':
-        if (segment.isAbsolute) {
-          path.cubicTo(
-            segment.point1!.x, segment.point1!.y,
-            segment.point2!.x, segment.point2!.y,
-            segment.targetPoint.x, segment.targetPoint.y,
-          );
-        } else {
-          path.relativeCubicTo(
-            segment.point1!.x, segment.point1!.y,
-            segment.point2!.x, segment.point2!.y,
-            segment.targetPoint.x, segment.targetPoint.y,
-          );
-        }
-        break;
-      case 'S':
-      case 's':
-      // Smooth cubic bezier - simplified implementation
-        if (segment.isAbsolute) {
-          path.cubicTo(
-            segment.point2!.x, segment.point2!.y,
-            segment.point2!.x, segment.point2!.y,
-            segment.targetPoint.x, segment.targetPoint.y,
-          );
-        } else {
-          path.relativeCubicTo(
-            segment.point2!.x, segment.point2!.y,
-            segment.point2!.x, segment.point2!.y,
-            segment.targetPoint.x, segment.targetPoint.y,
-          );
-        }
-        break;
-      case 'Q':
-      case 'q':
-        if (segment.isAbsolute) {
-          path.quadraticBezierTo(
-            segment.point1!.x, segment.point1!.y,
-            segment.targetPoint.x, segment.targetPoint.y,
-          );
-        } else {
-          path.relativeQuadraticBezierTo(
-            segment.point1!.x, segment.point1!.y,
-            segment.targetPoint.x, segment.targetPoint.y,
-          );
-        }
-        break;
-      case 'T':
-      case 't':
-      // Smooth quadratic bezier - simplified
-        if (segment.isAbsolute) {
-          path.quadraticBezierTo(
-            segment.targetPoint.x, segment.targetPoint.y,
-            segment.targetPoint.x, segment.targetPoint.y,
-          );
-        } else {
-          path.relativeQuadraticBezierTo(
-            segment.targetPoint.x, segment.targetPoint.y,
-            segment.targetPoint.x, segment.targetPoint.y,
-          );
-        }
-        break;
-      case 'A':
-      case 'a':
-      // Arc - simplified as line for now
-        if (segment.isAbsolute) {
-          path.lineTo(segment.targetPoint.x, segment.targetPoint.y);
-        } else {
-          path.relativeLineTo(segment.targetPoint.x, segment.targetPoint.y);
-        }
-        break;
-      case 'Z':
-      case 'z':
-        path.close();
-        break;
-    }
-  }
-
-  return path;
-}
-
-// SVG Path String Parser using path_parsing package
-class SvgPathStringParser extends SvgPathNormalizer {
-  SvgPathStringParser(String source) : super(source);
-}
-
-// Custom implementation of SvgPathNormalizer
-class SvgPathNormalizer {
-  final String _pathString;
-  late final List<PathSegment> _segments;
-
-  SvgPathNormalizer(this._pathString) {
-    _segments = _parse();
-  }
-
-  List<PathSegment> _parse() {
-    final segments = <PathSegment>[];
-    final parser = PathParser();
-
-    parser.parsePathString(_pathString, (command, points) {
-      segments.add(PathSegment(
-        command: command,
-        points: points,
-      ));
-    });
-
-    return segments;
-  }
-
-  // Make it iterable
-  List<PathSegment> get toList => _segments;
-}
-
-// Path segment representation
-class PathSegment {
-  final String command;
-  final List<double> points;
-
-  PathSegment({required this.command, required this.points});
-
-  bool get isAbsolute => command == command.toUpperCase();
-
-  SvgPoint get targetPoint {
-    switch (command.toUpperCase()) {
-      case 'M':
-      case 'L':
-      case 'T':
-        return SvgPoint(points[points.length - 2], points[points.length - 1]);
-      case 'H':
-        return SvgPoint(points.last, 0);
-      case 'V':
-        return SvgPoint(0, points.last);
-      case 'C':
-      case 'S':
-      case 'Q':
-        return SvgPoint(points[points.length - 2], points[points.length - 1]);
-      case 'A':
-        return SvgPoint(points[points.length - 2], points[points.length - 1]);
-      default:
-        return SvgPoint(0, 0);
-    }
-  }
-
-  SvgPoint? get point1 {
-    switch (command.toUpperCase()) {
-      case 'C':
-        return SvgPoint(points[0], points[1]);
-      case 'Q':
-        return SvgPoint(points[0], points[1]);
-      default:
-        return null;
-    }
-  }
-
-  SvgPoint? get point2 {
-    switch (command.toUpperCase()) {
-      case 'C':
-        return SvgPoint(points[2], points[3]);
-      case 'S':
-        return SvgPoint(points[0], points[1]);
-      default:
-        return null;
-    }
-  }
-}
-
-class SvgPoint {
-  final double x;
-  final double y;
-
-  SvgPoint(this.x, this.y);
-}
-
-// Path parser that handles the actual parsing
-class PathParser {
-  void parsePathString(String d, void Function(String command, List<double> points) callback) {
-    final regex = RegExp(r'([MmLlHhVvCcSsQqTtAaZz])\s*([\d\s,.-]+)?');
-    final matches = regex.allMatches(d);
-
-    for (final match in matches) {
-      final command = match.group(1)!;
-      final pointsString = match.group(2) ?? '';
-
-      final points = <double>[];
-      if (pointsString.isNotEmpty) {
-        final numbers = RegExp(r'-?\d*\.?\d+').allMatches(pointsString);
-        for (final number in numbers) {
-          points.add(double.parse(number.group(0)!));
-        }
-      }
-
-      callback(command, points);
-    }
+  bool shouldRepaint(covariant _HighlightPainter old) {
+    return !setEquals(old.selected, selected) ||
+        !mapEquals(old.paths, paths) ||
+        old.sx != sx ||
+        old.sy != sy;
   }
 }

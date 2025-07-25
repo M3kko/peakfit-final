@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' as math;
 import 'dart:math';
 
 class PostWorkoutScreen extends StatefulWidget {
   final String workoutType;
   final int duration; // in minutes
+  final int totalSecondsElapsed;
   final List<Map<String, dynamic>> exercises;
+  final int totalExercisesCompleted;
 
   const PostWorkoutScreen({
     Key? key,
     required this.workoutType,
     required this.duration,
+    required this.totalSecondsElapsed,
     required this.exercises,
+    required this.totalExercisesCompleted,
   }) : super(key: key);
 
   @override
@@ -39,16 +45,40 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
   final Map<int, int> _exerciseRatings = {};
   int _currentRatingIndex = 0;
   bool _showingSummary = false;
+  bool _canGoBack = true;
+  bool _isSavingToFirebase = false;
 
-  // Placeholder stats
-  final int _caloriesBurned = 234;
-  final int _avgHeartRate = 142;
+  // Calculated stats
+  late int _caloriesBurned;
+  late int _avgHeartRate;
 
   @override
   void initState() {
     super.initState();
     _initAnimations();
     _startAnimations();
+    _calculateStats();
+  }
+
+  void _calculateStats() {
+    // Calculate calories based on duration and workout intensity
+    // Rough estimate: 8-12 calories per minute depending on workout type
+    final caloriesPerMinute = widget.workoutType.toLowerCase().contains('intense') ||
+        widget.workoutType.toLowerCase().contains('hiit')
+        ? 12
+        : widget.workoutType.toLowerCase().contains('strength')
+        ? 10
+        : 8;
+    _caloriesBurned = (widget.duration * caloriesPerMinute).round();
+
+    // Calculate average heart rate based on workout type
+    // This is a rough estimate for demonstration
+    _avgHeartRate = widget.workoutType.toLowerCase().contains('intense') ||
+        widget.workoutType.toLowerCase().contains('hiit')
+        ? 142
+        : widget.workoutType.toLowerCase().contains('strength')
+        ? 125
+        : 115;
   }
 
   void _initAnimations() {
@@ -99,8 +129,8 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
     );
 
     _glow = Tween<double>(
-      begin: 0.5,
-      end: 1.0,
+      begin: 0.3,
+      end: 0.6,
     ).animate(CurvedAnimation(
       parent: _glowController,
       curve: Curves.easeInOut,
@@ -146,11 +176,98 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
         });
         _ratingController.forward();
       } else {
+        // Final rating submitted, can't go back anymore
         setState(() {
+          _canGoBack = false;
           _showingSummary = true;
         });
+        _saveWorkoutToFirebase();
       }
     });
+  }
+
+  void _goToPreviousRating() {
+    if (!_canGoBack || _currentRatingIndex == 0) return;
+
+    HapticFeedback.lightImpact();
+    _ratingController.reverse().then((_) {
+      setState(() {
+        _currentRatingIndex--;
+      });
+      _ratingController.forward();
+    });
+  }
+
+  Future<void> _saveWorkoutToFirebase() async {
+    if (_isSavingToFirebase) return;
+
+    setState(() {
+      _isSavingToFirebase = true;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Prepare workout data
+      final workoutData = {
+        'userId': user.uid,
+        'workoutType': widget.workoutType,
+        'duration': widget.duration,
+        'totalSecondsElapsed': widget.totalSecondsElapsed,
+        'caloriesBurned': _caloriesBurned,
+        'avgHeartRate': _avgHeartRate,
+        'totalExercisesCompleted': widget.totalExercisesCompleted,
+        'completedAt': FieldValue.serverTimestamp(),
+        'exercises': widget.exercises.asMap().entries.map((entry) {
+          final index = entry.key;
+          final exercise = entry.value;
+          return {
+            'name': exercise['name'],
+            'sets': exercise['sets'],
+            'reps': exercise['reps'],
+            'duration': exercise['duration'],
+            'difficulty_rating': _exerciseRatings[index] ?? 3,
+          };
+        }).toList(),
+      };
+
+      // Save to user's workouts subcollection
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('workouts')
+          .add(workoutData);
+
+      // Update user stats
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists) {
+        final currentStats = userDoc.data() ?? {};
+        final totalWorkouts = (currentStats['total_workouts'] ?? 0) + 1;
+        final totalMinutes = (currentStats['total_minutes'] ?? 0) + widget.duration;
+        final totalCalories = (currentStats['total_calories'] ?? 0) + _caloriesBurned;
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'total_workouts': totalWorkouts,
+          'total_minutes': totalMinutes,
+          'total_calories': totalCalories,
+          'last_workout_date': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print('Error saving workout: $e');
+    } finally {
+      setState(() {
+        _isSavingToFirebase = false;
+      });
+    }
   }
 
   Color _getDifficultyColor(int rating) {
@@ -308,6 +425,8 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                             ),
                             const SizedBox(height: 40),
                             _buildRatingButtons(),
+                            const SizedBox(height: 24),
+                            _buildRatingLegend(),
                           ],
                         ),
                       ),
@@ -315,6 +434,8 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                   },
                 ),
                 const Spacer(),
+                _buildNavigationButtons(),
+                const SizedBox(height: 20),
                 _buildProgressIndicator(),
                 const SizedBox(height: 40),
               ],
@@ -337,6 +458,7 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                 setState(() {
                   _showingSummary = true;
                 });
+                _saveWorkoutToFirebase();
               },
               child: Text(
                 'SKIP',
@@ -403,6 +525,79 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
     );
   }
 
+  Widget _buildRatingLegend() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.05),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildLegendItem(1, 'Too Easy'),
+              _buildLegendItem(2, 'Easy'),
+              _buildLegendItem(3, 'Just Right'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildLegendItem(4, 'Challenging'),
+              _buildLegendItem(5, 'Too Hard'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(int rating, String text) {
+    return Row(
+      children: [
+        Text(
+          '$rating',
+          style: TextStyle(
+            color: _getDifficultyColor(rating),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '= $text',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavigationButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (_canGoBack && _currentRatingIndex > 0)
+          IconButton(
+            onPressed: _goToPreviousRating,
+            icon: Icon(
+              Icons.arrow_back,
+              color: Colors.white.withOpacity(0.5),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildProgressIndicator() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -442,8 +637,8 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                       child: Column(
                         children: [
                           Container(
-                            width: 120,
-                            height: 120,
+                            width: 100,
+                            height: 100,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
@@ -454,16 +649,16 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFD4AF37).withOpacity(0.3),
-                                  blurRadius: 30,
-                                  spreadRadius: 10,
+                                  color: const Color(0xFFD4AF37).withOpacity(0.2),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
                                 ),
                               ],
                             ),
                             child: const Icon(
                               Icons.check,
                               color: Colors.black,
-                              size: 60,
+                              size: 50,
                             ),
                           ),
                           const SizedBox(height: 32),
@@ -519,29 +714,54 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFD4AF37).withOpacity(0.1 * _glow.value),
-                blurRadius: 30,
+                color: const Color(0xFFD4AF37).withOpacity(0.05 * _glow.value),
+                blurRadius: 20,
                 spreadRadius: 0,
               ),
             ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+          child: Column(
             children: [
-              _buildStatItem(
-                Icons.local_fire_department,
-                _caloriesBurned.toString(),
-                'CALORIES',
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatItem(
+                    Icons.timer,
+                    '${widget.duration}',
+                    'MINUTES',
+                  ),
+                  Container(
+                    height: 40,
+                    width: 1,
+                    color: const Color(0xFFD4AF37).withOpacity(0.2),
+                  ),
+                  _buildStatItem(
+                    Icons.fitness_center,
+                    widget.totalExercisesCompleted.toString(),
+                    'EXERCISES',
+                  ),
+                ],
               ),
-              Container(
-                height: 40,
-                width: 1,
-                color: const Color(0xFFD4AF37).withOpacity(0.2),
-              ),
-              _buildStatItem(
-                Icons.favorite,
-                _avgHeartRate.toString(),
-                'AVG BPM',
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatItem(
+                    Icons.local_fire_department,
+                    _caloriesBurned.toString(),
+                    'CALORIES',
+                  ),
+                  Container(
+                    height: 40,
+                    width: 1,
+                    color: const Color(0xFFD4AF37).withOpacity(0.2),
+                  ),
+                  _buildStatItem(
+                    Icons.favorite,
+                    _avgHeartRate.toString(),
+                    'AVG BPM',
+                  ),
+                ],
               ),
             ],
           ),

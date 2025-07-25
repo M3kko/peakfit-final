@@ -37,12 +37,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String? _profileImageUrl;
   String? _username;
 
+  // Stats data
+  int _currentStreak = 0;
+  int _weeklyWorkouts = 0;
+  int _totalWorkouts = 0;
+  bool _statsLoaded = false;
+
   @override
   void initState() {
     super.initState();
     _initAnimations();
     _startAnimations();
     _loadUserData();
+    _loadStats();
   }
 
   Future<void> _loadUserData() async {
@@ -62,6 +69,95 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     } catch (e) {
       print('Error loading user data: $e');
+    }
+  }
+
+  Future<void> _loadStats() async {
+    if (user == null) return;
+
+    try {
+      // Load user document for total workouts
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get();
+
+      if (userDoc.exists) {
+        _totalWorkouts = userDoc.data()?['total_workouts'] ?? 0;
+      }
+
+      // Calculate current streak
+      _currentStreak = await _calculateCurrentStreak();
+
+      // Calculate workouts this week
+      _weeklyWorkouts = await _calculateWeeklyWorkouts();
+
+      if (mounted) {
+        setState(() {
+          _statsLoaded = true;
+        });
+      }
+    } catch (e) {
+      print('Error loading stats: $e');
+    }
+  }
+
+  Future<int> _calculateCurrentStreak() async {
+    if (user == null) return 0;
+
+    try {
+      final now = DateTime.now();
+      int streak = 0;
+
+      for (int i = 0; i < 30; i++) {
+        final date = now.subtract(Duration(days: i));
+        final startOfDay = DateTime(date.year, date.month, date.day);
+        final endOfDay = startOfDay.add(const Duration(days: 1));
+
+        final workouts = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user!.uid)
+            .collection('workouts')
+            .where('completedAt', isGreaterThanOrEqualTo: startOfDay)
+            .where('completedAt', isLessThan: endOfDay)
+            .limit(1)
+            .get();
+
+        if (workouts.docs.isNotEmpty) {
+          if (i == 0 || streak > 0) {
+            streak++;
+          }
+        } else if (i > 0 && streak > 0) {
+          break;
+        }
+      }
+
+      return streak;
+    } catch (e) {
+      print('Error calculating streak: $e');
+      return 0;
+    }
+  }
+
+  Future<int> _calculateWeeklyWorkouts() async {
+    if (user == null) return 0;
+
+    try {
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final startOfWeek = DateTime(weekStart.year, weekStart.month, weekStart.day);
+
+      final workouts = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .collection('workouts')
+          .where('completedAt', isGreaterThanOrEqualTo: startOfWeek)
+          .get();
+
+      return workouts.docs.length;
+    } catch (e) {
+      print('Error calculating weekly workouts: $e');
+      return 0;
     }
   }
 
@@ -525,16 +621,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ],
           ),
-          child: IntrinsicHeight(
+          child: _statsLoaded
+              ? IntrinsicHeight(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                Expanded(child: _buildStatItem('7', 'DAY STREAK')),
+                Expanded(child: _buildStatItem(_currentStreak.toString(), 'DAY STREAK')),
                 _buildDivider(),
-                Expanded(child: _buildStatItem('4', 'THIS WEEK')),
+                Expanded(child: _buildStatItem(_weeklyWorkouts.toString(), 'THIS WEEK')),
                 _buildDivider(),
-                Expanded(child: _buildStatItem('156', 'TOTAL')),
+                Expanded(child: _buildStatItem(_totalWorkouts.toString(), 'TOTAL')),
               ],
+            ),
+          )
+              : const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
+              ),
             ),
           ),
         );
@@ -745,7 +852,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _handleNavigation(int index) async {
     switch (index) {
       case 0:
-      // Already on home
+      // Already on home - reload stats
+        _loadStats();
         break;
       case 1:
       // Navigate to schedule screen
@@ -753,6 +861,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           context,
           MaterialPageRoute(builder: (context) => const ScheduleScreen()),
         );
+        // Reload stats when returning
+        _loadStats();
         break;
       case 2:
       // Navigate to stats screen
@@ -760,6 +870,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           context,
           MaterialPageRoute(builder: (context) => const StatsScreen()),
         );
+        // Reload stats when returning
+        _loadStats();
         break;
     }
   }

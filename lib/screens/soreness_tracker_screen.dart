@@ -32,13 +32,12 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   late final Animation<double> _slideUp;
   late final Animation<double> _pulse;
 
-  // Raw svg viewBox (from your file)
+  // Raw SVG viewBox
   static const double _vbW = 156.0;
   static const double _vbH = 236.0;
 
-  // Parsed muscle paths (id -> Path in viewBox coords)
+  // Parsed paths (in viewBox coords AFTER we apply the group translate)
   Map<String, Path> _paths = {};
-  // Selected ids
   final Set<String> _selected = {};
 
   // Muscle display names
@@ -86,10 +85,14 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   void initState() {
     super.initState();
     _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
-    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
+    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
+      ..repeat(reverse: true);
+
     _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
-    _slideUp = Tween<double>(begin: 24, end: 0).animate(CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic));
-    _pulse = Tween<double>(begin: 0.95, end: 1.05).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    _slideUp = Tween<double>(begin: 24, end: 0)
+        .animate(CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic));
+    _pulse = Tween<double>(begin: 0.95, end: 1.05)
+        .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
 
     _fadeCtrl.forward();
     _loadPaths();
@@ -99,21 +102,22 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     final raw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
     final doc = XmlDocument.parse(raw);
 
-    /// Your SVG has a group transform: translate(-27.789474,-29.526316)
-    /// We need to shift paths back so the geometry lines up with what we paint.
-    const dx = 27.789474;
-    const dy = 29.526316;
+    // g transform in your file: translate(-27.789474,-29.526316)
+    // Apply the SAME negative shift to our paths so they align with SvgPicture.
+    const dx = -27.789474;
+    const dy = -29.526316;
 
     final map = <String, Path>{};
-    for (final p in doc.findAllElements('path')) {
-      final id = p.getAttribute('id');
-      final d = p.getAttribute('d');
+    for (final e in doc.findAllElements('path')) {
+      final id = e.getAttribute('id');
+      final d = e.getAttribute('d');
       if (id == null || d == null) continue;
-      Path path = parseSvgPathData(d).shift(const Offset(dx, dy));
-      map[id] = path;
+      final p = parseSvgPathData(d).shift(const Offset(dx, dy));
+      map[id] = p;
     }
 
-    if (mounted) setState(() => _paths = map);
+    if (!mounted) return;
+    setState(() => _paths = map);
   }
 
   @override
@@ -214,53 +218,47 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   Widget _diagram() {
     return AspectRatio(
       aspectRatio: _vbW / _vbH,
-      child: RepaintBoundary(
-        child: LayoutBuilder(
-          builder: (_, c) {
-            final sx = c.maxWidth / _vbW;
-            final sy = c.maxHeight / _vbH;
+      child: LayoutBuilder(
+        builder: (_, c) {
+          // Uniform scale (since we wrap with correct AspectRatio)
+          final scale = c.maxWidth / _vbW;
 
-            return Stack(
-              children: [
-                // Base SVG
-                SvgPicture.asset(
-                  'assets/svg/backmuscle-final.svg',
-                  fit: BoxFit.contain,
-                  width: c.maxWidth,
-                  height: c.maxHeight,
+          return Stack(
+            children: [
+              SvgPicture.asset(
+                'assets/svg/backmuscle-final.svg',
+                fit: BoxFit.contain,
+                width: c.maxWidth,
+                height: c.maxHeight,
+              ),
+              CustomPaint(
+                size: Size(c.maxWidth, c.maxHeight),
+                painter: _HighlightPainter(
+                  selected: _selected,
+                  paths: _paths,
+                  scale: scale,
                 ),
-                // Highlights
-                CustomPaint(
-                  size: Size(c.maxWidth, c.maxHeight),
-                  painter: _HighlightPainter(
-                    selected: _selected,
-                    paths: _paths,
-                    sx: sx,
-                    sy: sy,
-                  ),
-                ),
-                // Hit detection
-                Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapDown: (d) {
-                      if (_paths.isEmpty) return;
-                      final local = d.localPosition;
-                      final xSvg = local.dx / sx;
-                      final ySvg = local.dy / sy;
-                      for (final e in _paths.entries) {
-                        if (e.value.contains(Offset(xSvg, ySvg))) {
-                          _toggle(e.key);
-                          break;
-                        }
+              ),
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (d) {
+                    if (_paths.isEmpty) return;
+                    final lp = d.localPosition;
+                    final x = lp.dx / scale;
+                    final y = lp.dy / scale;
+                    for (final e in _paths.entries) {
+                      if (e.value.contains(Offset(x, y))) {
+                        _toggle(e.key);
+                        break;
                       }
-                    },
-                  ),
-                )
-              ],
-            );
-          },
-        ),
+                    }
+                  },
+                ),
+              )
+            ],
+          );
+        },
       ),
     );
   }
@@ -291,7 +289,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
               children: _selected.map((id) {
                 final name = _names[id] ?? id;
                 return Chip(
-                  label: Text(name.toUpperCase(), style: TextStyle(color: Colors.red.shade300, fontSize: 12)),
+                  label: Text(name.toUpperCase(),
+                      style: TextStyle(color: Colors.red.shade300, fontSize: 12, fontWeight: FontWeight.w500)),
                   backgroundColor: Colors.red.withOpacity(0.2),
                   side: BorderSide(color: Colors.red.withOpacity(0.3)),
                 );
@@ -307,70 +306,69 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       bottom: 0,
       left: 0,
       right: 0,
-      child: IgnorePointer(
-        ignoring: false,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [
-                const Color(0xFF0A0A0A),
-                const Color(0xFF0A0A0A).withOpacity(0.9),
-                const Color(0xFF0A0A0A).withOpacity(0),
-              ],
-            ),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              const Color(0xFF0A0A0A),
+              const Color(0xFF0A0A0A).withOpacity(0.9),
+              const Color(0xFF0A0A0A).withOpacity(0),
+            ],
           ),
-          child: ScaleTransition(
-            scale: _pulse,
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.heavyImpact();
-                Navigator.push(
-                  ctx,
-                  PageRouteBuilder(
-                    pageBuilder: (_, __, ___) => PreWorkoutScreen(
-                      workoutType: widget.workoutType,
-                      duration: widget.duration,
-                    ),
-                    transitionsBuilder: (_, anim, __, child) {
-                      final tween = Tween(begin: const Offset(0, 1), end: Offset.zero)
-                          .chain(CurveTween(curve: Curves.easeOutExpo));
-                      return SlideTransition(position: anim.drive(tween), child: child);
-                    },
-                    transitionDuration: const Duration(milliseconds: 500),
+        ),
+        child: ScaleTransition(
+          scale: _pulse,
+          child: GestureDetector(
+            onTap: () {
+              HapticFeedback.heavyImpact();
+              Navigator.push(
+                ctx,
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => PreWorkoutScreen(
+                    workoutType: widget.workoutType,
+                    duration: widget.duration,
                   ),
-                );
-              },
-              child: Container(
-                height: 60,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Colors.white, Color(0xFFE0E0E0)]),
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.2),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
+                  transitionsBuilder: (_, anim, __, child) {
+                    final tween = Tween(begin: const Offset(0, 1), end: Offset.zero)
+                        .chain(CurveTween(curve: Curves.easeOutExpo));
+                    return SlideTransition(position: anim.drive(tween), child: child);
+                  },
+                  transitionDuration: const Duration(milliseconds: 500),
                 ),
-                child: const Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('CONTINUE',
-                          style: TextStyle(
-                            color: Colors.black,
-                            letterSpacing: 2,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          )),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward, color: Colors.black, size: 20),
-                    ],
+              );
+            },
+            child: Container(
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Colors.white, Color(0xFFE0E0E0)]),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.white.withOpacity(0.2),
+                    blurRadius: 20,
+                    spreadRadius: 2,
                   ),
+                ],
+              ),
+              child: const Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'CONTINUE',
+                      style: TextStyle(
+                        color: Colors.black,
+                        letterSpacing: 2,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(Icons.arrow_forward, color: Colors.black, size: 20),
+                  ],
                 ),
               ),
             ),
@@ -384,20 +382,19 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
 class _HighlightPainter extends CustomPainter {
   final Set<String> selected;
   final Map<String, Path> paths;
-  final double sx, sy;
+  final double scale;
 
   _HighlightPainter({
     required this.selected,
     required this.paths,
-    required this.sx,
-    required this.sy,
+    required this.scale,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = Colors.red.withOpacity(0.28);
     canvas.save();
-    canvas.scale(sx, sy);
+    canvas.scale(scale, scale);
     for (final id in selected) {
       final p = paths[id];
       if (p != null) canvas.drawPath(p, paint);
@@ -406,10 +403,8 @@ class _HighlightPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _HighlightPainter old) {
-    return !setEquals(old.selected, selected) ||
-        !mapEquals(old.paths, paths) ||
-        old.sx != sx ||
-        old.sy != sy;
-  }
+  bool shouldRepaint(covariant _HighlightPainter old) =>
+      !setEquals(old.selected, selected) ||
+          !mapEquals(old.paths, paths) ||
+          old.scale != scale;
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -45,6 +47,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   bool _isPaused = false;
   bool _isResting = false;
   int _totalSecondsElapsed = 0;
+  int _totalExercisesCompleted = 0;
 
   // Inactivity tracking
   Timer? _inactivityTimer;
@@ -250,6 +253,10 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   }
 
   void _goToNextExercise() {
+    setState(() {
+      _totalExercisesCompleted++;
+    });
+
     if (_currentExerciseIndex < widget.exercises.length - 1) {
       setState(() {
         _currentExerciseIndex++;
@@ -272,7 +279,9 @@ class _WorkoutScreenState extends State<WorkoutScreen>
             PostWorkoutScreen(
               workoutType: widget.workoutType,
               duration: _totalSecondsElapsed ~/ 60,
+              totalSecondsElapsed: _totalSecondsElapsed,
               exercises: widget.exercises,
+              totalExercisesCompleted: widget.exercises.length,
             ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
@@ -620,6 +629,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
             child: Container(
               height: 56,
               width: 240,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
                 color: Colors.green.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(28),
@@ -627,41 +637,15 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                   color: Colors.green.withOpacity(0.3),
                   width: 1,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.green.withOpacity(0.2 * _glow.value),
-                    blurRadius: 30,
-                    spreadRadius: 5,
-                  ),
-                ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.green.withOpacity(0.15),
-                          Colors.green.withOpacity(0.05),
-                        ],
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'CONTINUE',
-                        style: TextStyle(
-                          color: Colors.green[300],
-                          fontSize: 16,
-                          letterSpacing: 1.5,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
+              child: Center(
+                child: Text(
+                  'CONTINUE',
+                  style: TextStyle(
+                    color: Colors.green[300],
+                    fontSize: 16,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),

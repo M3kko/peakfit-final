@@ -605,17 +605,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             borderRadius: BorderRadius.circular(20),
             color: const Color(0xFF0F0F0F),
             border: Border.all(
-              color: const Color(0xFFFFD700).withOpacity(0.2),
-              width: 1,
+              color: const Color(0xFFD4AF37).withOpacity(0.3),
+              width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFFFD700).withOpacity(0.1 * _statsGlow.value),
+                color: const Color(0xFFD4AF37).withOpacity(0.1 * _statsGlow.value),
                 blurRadius: 30,
                 spreadRadius: 0,
               ),
               BoxShadow(
-                color: const Color(0xFFFFD700).withOpacity(0.05 * _statsGlow.value),
+                color: const Color(0xFFD4AF37).withOpacity(0.05 * _statsGlow.value),
                 blurRadius: 60,
                 spreadRadius: 10,
               ),
@@ -640,7 +640,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               height: 20,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
               ),
             ),
           ),
@@ -701,7 +701,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       height: 40,
       width: 1,
       margin: const EdgeInsets.symmetric(horizontal: 12),
-      color: const Color(0xFFFFD700).withOpacity(0.2),
+      color: const Color(0xFFD4AF37).withOpacity(0.2),
     );
   }
 

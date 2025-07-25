@@ -395,13 +395,14 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
 
     return Column(
       children: [
-        _buildHeader(),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             physics: const BouncingScrollPhysics(),
             child: Column(
               children: [
+                const SizedBox(height: 24),
+                _buildHeader(),
                 const SizedBox(height: 40),
                 AnimatedBuilder(
                   animation: _scaleIn,
@@ -483,30 +484,27 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          if (!_showingSummary)
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _showingSummary = true;
-                });
-                _saveWorkoutToFirebase();
-              },
-              child: Text(
-                'SKIP',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 14,
-                  letterSpacing: 1,
-                ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        if (!_showingSummary)
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _showingSummary = true;
+              });
+              _saveWorkoutToFirebase();
+            },
+            child: Text(
+              'SKIP',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 14,
+                letterSpacing: 1,
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 

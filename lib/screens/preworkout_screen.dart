@@ -52,7 +52,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     {
       'name': 'LUNGES',
       'sets': '3',
-      'reps': '10 each',
+      'reps': '10',
       'type': 'strength',
       'intensity': 'Medium',
     },

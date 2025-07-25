@@ -42,6 +42,13 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
       'type': 'strength',
       'intensity': 'Medium',
     },
+    {
+      'name': 'LUNGES',
+      'sets': '1',
+      'reps': '10',
+      'type': 'strength',
+      'intensity': 'Medium',
+    },
   ];
 
   @override

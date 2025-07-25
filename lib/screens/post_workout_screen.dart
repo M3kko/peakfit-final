@@ -209,14 +209,20 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
+      // Calculate average difficulty
+      double averageDifficulty = 0;
+      if (_exerciseRatings.isNotEmpty) {
+        int totalRating = _exerciseRatings.values.reduce((a, b) => a + b);
+        averageDifficulty = totalRating / _exerciseRatings.length;
+      }
+
       // Prepare workout data
       final workoutData = {
         'userId': user.uid,
         'workoutType': widget.workoutType,
         'duration': widget.duration,
         'totalSecondsElapsed': widget.totalSecondsElapsed,
-        'caloriesBurned': _caloriesBurned,
-        'avgHeartRate': _avgHeartRate,
+        'averageDifficulty': averageDifficulty,
         'totalExercisesCompleted': widget.totalExercisesCompleted,
         'completedAt': FieldValue.serverTimestamp(),
         'exercises': widget.exercises.asMap().entries.map((entry) {
@@ -249,7 +255,6 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
         final currentStats = userDoc.data() ?? {};
         final totalWorkouts = (currentStats['total_workouts'] ?? 0) + 1;
         final totalMinutes = (currentStats['total_minutes'] ?? 0) + widget.duration;
-        final totalCalories = (currentStats['total_calories'] ?? 0) + _caloriesBurned;
 
         await FirebaseFirestore.instance
             .collection('users')
@@ -257,7 +262,6 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
             .update({
           'total_workouts': totalWorkouts,
           'total_minutes': totalMinutes,
-          'total_calories': totalCalories,
           'last_workout_date': FieldValue.serverTimestamp(),
         });
       }
@@ -527,10 +531,10 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
 
   Widget _buildRatingLegend() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: Colors.white.withOpacity(0.05),
           width: 1,
@@ -538,44 +542,52 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
       ),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildLegendItem(1, 'Too Easy'),
-              _buildLegendItem(2, 'Easy'),
-              _buildLegendItem(3, 'Just Right'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildLegendItem(4, 'Challenging'),
-              _buildLegendItem(5, 'Too Hard'),
-            ],
-          ),
+          _buildLegendItem(1, 'Too Easy', Colors.green),
+          const SizedBox(height: 16),
+          _buildLegendItem(2, 'Easy', Colors.lightGreen),
+          const SizedBox(height: 16),
+          _buildLegendItem(3, 'Just Right', Colors.yellow),
+          const SizedBox(height: 16),
+          _buildLegendItem(4, 'Challenging', Colors.orange),
+          const SizedBox(height: 16),
+          _buildLegendItem(5, 'Too Hard', Colors.red),
         ],
       ),
     );
   }
 
-  Widget _buildLegendItem(int rating, String text) {
+  Widget _buildLegendItem(int rating, String text, Color color) {
     return Row(
       children: [
-        Text(
-          '$rating',
-          style: TextStyle(
-            color: _getDifficultyColor(rating),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withOpacity(0.1),
+            border: Border.all(
+              color: color.withOpacity(0.3),
+              width: 1.5,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              '$rating',
+              style: TextStyle(
+                color: color,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 16),
         Text(
-          '= $text',
+          text,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 12,
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 16,
+            fontWeight: FontWeight.w400,
           ),
         ),
       ],
@@ -621,14 +633,21 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
   }
 
   Widget _buildSummary() {
+    // Calculate average difficulty
+    double averageDifficulty = 0;
+    if (_exerciseRatings.isNotEmpty) {
+      int totalRating = _exerciseRatings.values.reduce((a, b) => a + b);
+      averageDifficulty = totalRating / _exerciseRatings.length;
+    }
+
     return Column(
       children: [
-        const SizedBox(height: 40),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
+                const SizedBox(height: 40),
                 AnimatedBuilder(
                   animation: _scaleIn,
                   builder: (context, child) {
@@ -686,7 +705,7 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                   },
                 ),
                 const SizedBox(height: 40),
-                _buildStatsGrid(),
+                _buildStatsGrid(averageDifficulty),
                 const SizedBox(height: 40),
                 _buildExerciseSummary(),
                 const SizedBox(height: 40),
@@ -699,7 +718,7 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
     );
   }
 
-  Widget _buildStatsGrid() {
+  Widget _buildStatsGrid(double averageDifficulty) {
     return AnimatedBuilder(
       animation: _glow,
       builder: (context, child) {
@@ -720,48 +739,33 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
               ),
             ],
           ),
-          child: Column(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatItem(
-                    Icons.timer,
-                    '${widget.duration}',
-                    'MINUTES',
-                  ),
-                  Container(
-                    height: 40,
-                    width: 1,
-                    color: const Color(0xFFD4AF37).withOpacity(0.2),
-                  ),
-                  _buildStatItem(
-                    Icons.fitness_center,
-                    widget.totalExercisesCompleted.toString(),
-                    'EXERCISES',
-                  ),
-                ],
+              _buildStatItem(
+                Icons.timer,
+                '${widget.duration}',
+                'MINUTES',
               ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatItem(
-                    Icons.local_fire_department,
-                    _caloriesBurned.toString(),
-                    'CALORIES',
-                  ),
-                  Container(
-                    height: 40,
-                    width: 1,
-                    color: const Color(0xFFD4AF37).withOpacity(0.2),
-                  ),
-                  _buildStatItem(
-                    Icons.favorite,
-                    _avgHeartRate.toString(),
-                    'AVG BPM',
-                  ),
-                ],
+              Container(
+                height: 40,
+                width: 1,
+                color: const Color(0xFFD4AF37).withOpacity(0.2),
+              ),
+              _buildStatItem(
+                Icons.fitness_center,
+                widget.totalExercisesCompleted.toString(),
+                'EXERCISES',
+              ),
+              Container(
+                height: 40,
+                width: 1,
+                color: const Color(0xFFD4AF37).withOpacity(0.2),
+              ),
+              _buildStatItem(
+                Icons.speed,
+                averageDifficulty.toStringAsFixed(1),
+                'AVG DIFFICULTY',
               ),
             ],
           ),

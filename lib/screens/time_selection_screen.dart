@@ -346,12 +346,11 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen>
     return GestureDetector(
       onTap: () {
         HapticFeedback.heavyImpact();
-        // Navigate to pre-workout screen
         Navigator.push(
           context,
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-                PreWorkoutScreen(
+                SorenessTrackerScreen(
                   workoutType: widget.workoutType,
                   duration: _selectedMinutes.round(),
                 ),

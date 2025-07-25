@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' as math;
 import 'dart:math';
+import 'dart:ui';
 
 class PostWorkoutScreen extends StatefulWidget {
   final String workoutType;
@@ -431,7 +432,7 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                     );
                   },
                 ),
-                const SizedBox(height: 60),
+                const SizedBox(height: 40),
                 AnimatedBuilder(
                   animation: _ratingScale,
                   builder: (context, child) {
@@ -1025,10 +1026,16 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.white.withOpacity(0.2 * _glow.value),
-                  blurRadius: 20,
+                  color: Colors.white.withOpacity(0.4 * _glow.value),
+                  blurRadius: 30,
                   offset: const Offset(0, 0),
-                  spreadRadius: 2,
+                  spreadRadius: 5,
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.2 * _glow.value),
+                  blurRadius: 60,
+                  offset: const Offset(0, 0),
+                  spreadRadius: 15,
                 ),
               ],
             ),
@@ -1037,7 +1044,7 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                 label,
                 style: const TextStyle(
                   color: Colors.black,
-                  fontSize: 14,
+                  fontSize: 16,
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w600,
                 ),

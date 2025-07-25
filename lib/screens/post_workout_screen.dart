@@ -752,24 +752,23 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
   Widget _buildStatsGrid(double averageDifficulty) {
     return Column(
       children: [
-        Row(
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 1.2,
           children: [
-            Expanded(
-              child: _buildStatWidget(
-                icon: Icons.timer,
-                value: '${widget.duration}',
-                label: 'MINUTES',
-                color: const Color(0xFFD4AF37),
-              ),
+            _buildStatWidget(
+              icon: Icons.timer,
+              value: '${widget.duration}',
+              label: 'Minutes',
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildStatWidget(
-                icon: Icons.fitness_center,
-                value: widget.totalExercisesCompleted.toString(),
-                label: 'EXERCISES',
-                color: const Color(0xFFD4AF37),
-              ),
+            _buildStatWidget(
+              icon: Icons.fitness_center,
+              value: widget.totalExercisesCompleted.toString(),
+              label: 'Exercises',
             ),
           ],
         ),
@@ -777,8 +776,7 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
         _buildStatWidget(
           icon: Icons.speed,
           value: averageDifficulty > 0 ? averageDifficulty.toStringAsFixed(1) : '—',
-          label: 'AVERAGE DIFFICULTY',
-          color: const Color(0xFFD4AF37),
+          label: 'Average Difficulty',
           isFullWidth: true,
         ),
       ],
@@ -789,53 +787,75 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
     required IconData icon,
     required String value,
     required String label,
-    required Color color,
     bool isFullWidth = false,
   }) {
     return AnimatedBuilder(
-      animation: _glow,
+      animation: _glowController,
       builder: (context, child) {
         return Container(
-          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.03),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [const Color(0xFF1A1A1A), const Color(0xFF0F0F0F)],
+            ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: color.withOpacity(0.2),
-              width: 1,
+              color: const Color(0xFFD4AF37).withOpacity(0.3),
+              width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.05 * _glow.value),
+                color: const Color(0xFFD4AF37).withOpacity(0.1 * _glow.value),
                 blurRadius: 20,
-                spreadRadius: 0,
+                spreadRadius: 2,
               ),
             ],
           ),
+          padding: const EdgeInsets.all(20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(
-                icon,
-                color: color.withOpacity(0.7),
-                size: 28,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD4AF37).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: const Color(0xFFD4AF37),
+                      size: 20,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w200,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 12,
-                  letterSpacing: 1.5,
-                ),
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.6),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

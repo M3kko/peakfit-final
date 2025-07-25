@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui';
 import 'post_workout_screen.dart';
 
 class WorkoutScreen extends StatefulWidget {
@@ -530,53 +531,144 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   }
 
   Widget _buildExerciseInfo() {
-    return Column(
-      children: [
-        Container(
-          constraints: const BoxConstraints(maxWidth: 300),
-          child: Text(
-            _isResting ? 'REST' : _currentExercise['name'],
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.w300,
-              letterSpacing: 0.5,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 300),
+      child: Text(
+        _isResting ? 'REST' : _currentExercise['name'],
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 26,
+          fontWeight: FontWeight.w300,
+          letterSpacing: 0.5,
         ),
-        const SizedBox(height: 12),
-        if (!_isResting && _currentExercise['sets'] != null)
-          Text(
-            'SET $_currentSet OF ${_currentExercise['sets']}',
-            style: TextStyle(
-              color: const Color(0xFFD4AF37).withOpacity(0.8),
-              fontSize: 15,
-              letterSpacing: 1.2,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-      ],
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 
   Widget _buildMainContent() {
     return Container(
-      height: 140,
+      height: 180,
       child: Center(
-        child: Row(
+        child: _isRepBased ? _buildRepBasedContent() : _buildTimerCircle(),
+      ),
+    );
+  }
+
+  Widget _buildRepBasedContent() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _isRepBased ? _buildRepsCircle() : _buildTimerCircle(),
-            if (_isRepBased) ...[
-              const SizedBox(width: 32),
-              _buildCheckmarkButton(),
-            ],
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 2,
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _currentExercise['reps']?.toString() ?? '10',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w200,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'REPS',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 12,
+                        letterSpacing: 2,
+                        fontWeight: FontWeight.w300,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
-      ),
+        const SizedBox(height: 24),
+        _buildContinueButton(),
+      ],
+    );
+  }
+
+  Widget _buildContinueButton() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_glow, _checkmarkScale]),
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _checkmarkScale.value,
+          child: GestureDetector(
+            onTap: _onRepExerciseComplete,
+            child: Container(
+              height: 56,
+              width: 240,
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: Colors.green.withOpacity(0.3),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.2 * _glow.value),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.green.withOpacity(0.15),
+                          Colors.green.withOpacity(0.05),
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'CONTINUE',
+                        style: TextStyle(
+                          color: Colors.green[300],
+                          fontSize: 16,
+                          letterSpacing: 1.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -637,111 +729,6 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                       ),
                     ),
                 ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildRepsCircle() {
-    return Container(
-      width: 140,
-      height: 140,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 2,
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _currentExercise['reps']?.toString() ?? '10',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 42,
-                fontWeight: FontWeight.w200,
-                letterSpacing: 2,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'REPS',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
-                fontSize: 13,
-                letterSpacing: 2,
-                fontWeight: FontWeight.w300,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCheckmarkButton() {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_glow, _checkmarkScale]),
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _checkmarkScale.value,
-          child: GestureDetector(
-            onTap: _onRepExerciseComplete,
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.green.withOpacity(0.1),
-                border: Border.all(
-                  color: Colors.green.withOpacity(0.3),
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.green.withOpacity(0.2 * _glow.value),
-                    blurRadius: 25,
-                    spreadRadius: 5,
-                  ),
-                  BoxShadow(
-                    color: Colors.green.withOpacity(0.1 * _glow.value),
-                    blurRadius: 40,
-                    spreadRadius: 10,
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(36),
-                child: BackdropFilter(
-                  filter: ColorFilter.mode(
-                    Colors.green.withOpacity(0.1),
-                    BlendMode.overlay,
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.green.withOpacity(0.3),
-                          Colors.green.withOpacity(0.1),
-                        ],
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.check,
-                      color: Colors.green[300],
-                      size: 36,
-                    ),
-                  ),
-                ),
               ),
             ),
           ),

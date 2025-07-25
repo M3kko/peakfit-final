@@ -345,18 +345,19 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                         _buildProgressBar(),
                         Expanded(
                           child: SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            physics: const BouncingScrollPhysics(),
                             child: Column(
                               children: [
-                                const SizedBox(height: 15),
+                                const SizedBox(height: 20),
                                 _buildVideoPlayer(),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 30),
                                 _buildExerciseInfo(),
-                                const SizedBox(height: 30),
+                                const SizedBox(height: 40),
                                 _buildMainContent(),
-                                const SizedBox(height: 30),
+                                const SizedBox(height: 40),
                                 _buildWorkoutStats(),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 40),
                               ],
                             ),
                           ),
@@ -394,7 +395,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -409,14 +410,18 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               size: 24,
             ),
             padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
-          Text(
-            'EXERCISE ${_currentExerciseIndex + 1} OF ${widget.exercises.length}',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
-              fontWeight: FontWeight.w300,
-              letterSpacing: 1.5,
+          Flexible(
+            child: Text(
+              'EXERCISE ${_currentExerciseIndex + 1} OF ${widget.exercises.length}',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 13,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 1.2,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           IconButton(
@@ -427,6 +432,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               size: 24,
             ),
             padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
@@ -436,7 +442,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   Widget _buildProgressBar() {
     return Container(
       height: 4,
-      margin: const EdgeInsets.symmetric(horizontal: 24),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(2),
@@ -478,7 +484,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
         return Transform.scale(
           scale: _scaleIn.value,
           child: Container(
-            height: 180,
+            height: 160,
+            width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(20),
@@ -493,12 +500,12 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                 alignment: Alignment.center,
                 children: [
                   CustomPaint(
-                    size: const Size(double.infinity, 180),
+                    size: const Size(double.infinity, 160),
                     painter: _VideoPlaceholderPainter(),
                   ),
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white.withOpacity(0.2),
@@ -510,7 +517,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                     child: Icon(
                       Icons.play_arrow,
                       color: Colors.white.withOpacity(0.8),
-                      size: 32,
+                      size: 28,
                     ),
                   ),
                 ],
@@ -525,13 +532,19 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   Widget _buildExerciseInfo() {
     return Column(
       children: [
-        Text(
-          _isResting ? 'REST' : _currentExercise['name'],
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w300,
-            letterSpacing: 1,
+        Container(
+          constraints: const BoxConstraints(maxWidth: 300),
+          child: Text(
+            _isResting ? 'REST' : _currentExercise['name'],
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.w300,
+              letterSpacing: 0.5,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         const SizedBox(height: 12),
@@ -540,8 +553,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
             'SET $_currentSet OF ${_currentExercise['sets']}',
             style: TextStyle(
               color: const Color(0xFFD4AF37).withOpacity(0.8),
-              fontSize: 16,
-              letterSpacing: 1.5,
+              fontSize: 15,
+              letterSpacing: 1.2,
               fontWeight: FontWeight.w400,
             ),
           ),
@@ -551,14 +564,14 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
   Widget _buildMainContent() {
     return Container(
-      height: 160,
+      height: 140,
       child: Center(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _isRepBased ? _buildRepsCircle() : _buildTimerCircle(),
             if (_isRepBased) ...[
-              const SizedBox(width: 40),
+              const SizedBox(width: 32),
               _buildCheckmarkButton(),
             ],
           ],
@@ -574,8 +587,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
         return Transform.scale(
           scale: _isResting ? _pulse.value : 1.0,
           child: Container(
-            width: 160,
-            height: 160,
+            width: 140,
+            height: 140,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
@@ -600,7 +613,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                     _formatTime(_secondsRemaining),
                     style: TextStyle(
                       color: _isResting ? const Color(0xFFD4AF37) : Colors.white,
-                      fontSize: 48,
+                      fontSize: 42,
                       fontWeight: FontWeight.w200,
                       letterSpacing: 2,
                     ),
@@ -608,14 +621,19 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                   if (_isResting && _nextExercise != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        'NEXT: ${_currentSet < _totalSets ? _currentExercise['name'] : (_nextExercise?['name'] ?? '')}',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 12,
-                          letterSpacing: 1,
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 120),
+                        child: Text(
+                          'NEXT: ${_currentSet < _totalSets ? _currentExercise['name'] : (_nextExercise?['name'] ?? '')}',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 10,
+                            letterSpacing: 0.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                 ],
@@ -629,8 +647,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
   Widget _buildRepsCircle() {
     return Container(
-      width: 160,
-      height: 160,
+      width: 140,
+      height: 140,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
@@ -646,7 +664,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               _currentExercise['reps']?.toString() ?? '10',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 48,
+                fontSize: 42,
                 fontWeight: FontWeight.w200,
                 letterSpacing: 2,
               ),
@@ -656,7 +674,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               'REPS',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.6),
-                fontSize: 14,
+                fontSize: 13,
                 letterSpacing: 2,
                 fontWeight: FontWeight.w300,
               ),
@@ -676,8 +694,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
           child: GestureDetector(
             onTap: _onRepExerciseComplete,
             child: Container(
-              width: 80,
-              height: 80,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.green.withOpacity(0.1),
@@ -688,18 +706,18 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                 boxShadow: [
                   BoxShadow(
                     color: Colors.green.withOpacity(0.2 * _glow.value),
-                    blurRadius: 30,
+                    blurRadius: 25,
                     spreadRadius: 5,
                   ),
                   BoxShadow(
                     color: Colors.green.withOpacity(0.1 * _glow.value),
-                    blurRadius: 50,
+                    blurRadius: 40,
                     spreadRadius: 10,
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(40),
+                borderRadius: BorderRadius.circular(36),
                 child: BackdropFilter(
                   filter: ColorFilter.mode(
                     Colors.green.withOpacity(0.1),
@@ -720,7 +738,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                     child: Icon(
                       Icons.check,
                       color: Colors.green[300],
-                      size: 40,
+                      size: 36,
                     ),
                   ),
                 ),
@@ -734,8 +752,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
   Widget _buildWorkoutStats() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(20),
@@ -746,43 +764,51 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       ),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(
-                icon: Icons.timer_outlined,
-                value: _formatTime(_totalSecondsElapsed),
-                label: 'ELAPSED',
-                color: Colors.white,
-              ),
-              Container(
-                height: 40,
-                width: 1,
-                color: Colors.white.withOpacity(0.1),
-              ),
-              _buildStatItem(
-                icon: Icons.fitness_center,
-                value: '${_currentExerciseIndex + 1}/${widget.exercises.length}',
-                label: 'EXERCISES',
-                color: const Color(0xFFD4AF37),
-              ),
-              if (_currentExercise['sets'] != null) ...[
+          IntrinsicHeight(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    icon: Icons.timer_outlined,
+                    value: _formatTime(_totalSecondsElapsed),
+                    label: 'ELAPSED',
+                    color: Colors.white,
+                  ),
+                ),
                 Container(
-                  height: 40,
                   width: 1,
                   color: Colors.white.withOpacity(0.1),
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
                 ),
-                _buildStatItem(
-                  icon: Icons.repeat,
-                  value: '$_currentSet/${_totalSets}',
-                  label: 'SETS',
-                  color: Colors.white,
+                Expanded(
+                  child: _buildStatItem(
+                    icon: Icons.fitness_center,
+                    value: '${_currentExerciseIndex + 1}/${widget.exercises.length}',
+                    label: 'EXERCISES',
+                    color: const Color(0xFFD4AF37),
+                  ),
                 ),
+                if (_currentExercise['sets'] != null) ...[
+                  Container(
+                    width: 1,
+                    color: Colors.white.withOpacity(0.1),
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  Expanded(
+                    child: _buildStatItem(
+                      icon: Icons.repeat,
+                      value: '$_currentSet/${_totalSets}',
+                      label: 'SETS',
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
           if (!_isResting && _nextExercise != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             _buildNextExercisePreview(),
           ],
         ],
@@ -797,6 +823,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     required Color color,
   }) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           icon,
@@ -808,7 +835,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
           value,
           style: TextStyle(
             color: color,
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -831,7 +858,7 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     if (next == null) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.02),
         borderRadius: BorderRadius.circular(16),
@@ -869,10 +896,13 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           if (next['reps'] != null)
             Text(
               '${next['reps']} reps',

@@ -108,22 +108,22 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     );
 
     _glowController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat(reverse: true);
 
     _progressController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
 
     _pulseController = AnimationController(
-      duration: const Duration(seconds: 1),
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
 
     _checkmarkController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
@@ -137,12 +137,12 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _entryController,
-      curve: Curves.easeOutBack,
+      curve: Curves.easeOutCubic,
     ));
 
     _glow = Tween<double>(
-      begin: 0.3,
-      end: 0.7,
+      begin: 0.4,
+      end: 0.8,
     ).animate(CurvedAnimation(
       parent: _glowController,
       curve: Curves.easeInOut,
@@ -150,18 +150,18 @@ class _WorkoutScreenState extends State<WorkoutScreen>
 
     _pulse = Tween<double>(
       begin: 1.0,
-      end: 1.1,
+      end: 1.05,
     ).animate(CurvedAnimation(
       parent: _pulseController,
       curve: Curves.easeInOut,
     ));
 
     _checkmarkScale = Tween<double>(
-      begin: 0.8,
+      begin: 0.95,
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _checkmarkController,
-      curve: Curves.elasticOut,
+      curve: Curves.easeOutCubic,
     ));
   }
 
@@ -244,11 +244,16 @@ class _WorkoutScreenState extends State<WorkoutScreen>
   }
 
   void _onRepExerciseComplete() {
-    HapticFeedback.heavyImpact();
+    HapticFeedback.lightImpact();
     _resetInactivityTimer();
+
+    // Smooth scale animation
     _checkmarkController.forward().then((_) {
-      _checkmarkController.reset();
-      _onExerciseComplete();
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _checkmarkController.reverse().then((_) {
+          _onExerciseComplete();
+        });
+      });
     });
   }
 
@@ -460,7 +465,9 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       child: AnimatedBuilder(
         animation: _progressController,
         builder: (context, child) {
-          return FractionallySizedBox(
+          return AnimatedFractionallySizedBox(
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeInOut,
             alignment: Alignment.centerLeft,
             widthFactor: _overallProgress,
             child: Container(
@@ -624,28 +631,45 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       builder: (context, child) {
         return Transform.scale(
           scale: _checkmarkScale.value,
-          child: GestureDetector(
-            onTap: _onRepExerciseComplete,
-            child: Container(
-              height: 56,
-              width: 240,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            height: 56,
+            width: 240,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _onRepExerciseComplete,
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: Colors.green.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  'CONTINUE',
-                  style: TextStyle(
-                    color: Colors.green[300],
-                    fontSize: 16,
-                    letterSpacing: 1.5,
-                    fontWeight: FontWeight.w500,
+                splashColor: Colors.green.withOpacity(0.2),
+                highlightColor: Colors.green.withOpacity(0.1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: Colors.green.withOpacity(0.3),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.15 * _glow.value),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      'CONTINUE',
+                      style: TextStyle(
+                        color: Colors.green[300],
+                        fontSize: 16,
+                        letterSpacing: 1.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -662,7 +686,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
       builder: (context, child) {
         return Transform.scale(
           scale: _isResting ? _pulse.value : 1.0,
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
             width: 140,
             height: 140,
             decoration: BoxDecoration(
@@ -675,9 +700,9 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               ),
               boxShadow: _isResting ? [
                 BoxShadow(
-                  color: const Color(0xFFD4AF37).withOpacity(0.3),
-                  blurRadius: 30,
-                  spreadRadius: 5,
+                  color: const Color(0xFFD4AF37).withOpacity(0.2),
+                  blurRadius: 25,
+                  spreadRadius: 3,
                 ),
               ] : [],
             ),
@@ -685,14 +710,15 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    _formatTime(_secondsRemaining),
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 300),
                     style: TextStyle(
                       color: _isResting ? const Color(0xFFD4AF37) : Colors.white,
                       fontSize: 42,
                       fontWeight: FontWeight.w200,
                       letterSpacing: 2,
                     ),
+                    child: Text(_formatTime(_secondsRemaining)),
                   ),
                   if (_isResting && _nextExercise != null)
                     Padding(

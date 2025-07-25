@@ -34,10 +34,10 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
 
   // Placeholder exercise data
   final List<Map<String, dynamic>> _exercises = [
-    
+
     {
       'name': 'LUNGES',
-      'sets': '3',
+      'sets': '1',
       'reps': '10',
       'type': 'strength',
       'intensity': 'Medium',

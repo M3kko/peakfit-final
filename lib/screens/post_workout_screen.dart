@@ -412,10 +412,28 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                       scale: _scaleIn.value,
                       child: Column(
                         children: [
-                          Icon(
-                            Icons.emoji_events,
-                            color: const Color(0xFFD4AF37),
-                            size: 80,
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xFFD4AF37),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFD4AF37).withOpacity(0.2),
+                                  blurRadius: 30,
+                                  spreadRadius: 10,
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.emoji_events_outlined,
+                              color: const Color(0xFFD4AF37),
+                              size: 50,
+                            ),
                           ),
                           const SizedBox(height: 24),
                           Text(
@@ -691,23 +709,21 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                             height: 100,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [
-                                  const Color(0xFFD4AF37),
-                                  const Color(0xFFB8941F),
-                                ],
+                              border: Border.all(
+                                color: const Color(0xFFD4AF37),
+                                width: 2,
                               ),
                               boxShadow: [
                                 BoxShadow(
                                   color: const Color(0xFFD4AF37).withOpacity(0.2),
-                                  blurRadius: 20,
-                                  spreadRadius: 5,
+                                  blurRadius: 30,
+                                  spreadRadius: 10,
                                 ),
                               ],
                             ),
                             child: const Icon(
                               Icons.check,
-                              color: Colors.black,
+                              color: Color(0xFFD4AF37),
                               size: 50,
                             ),
                           ),

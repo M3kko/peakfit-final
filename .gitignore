@@ -57,3 +57,4 @@ functions/exercises_*.js
 functions/exercises_to_import.json
 functions/serviceAccountKey.json
 functions/goal_conversion.js
+functions/exercises.json

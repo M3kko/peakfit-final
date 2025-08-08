@@ -403,21 +403,14 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
 
           return Stack(
             children: [
-              // SVG with custom color theme
-              ColorFiltered(
-                colorFilter: ColorFilter.mode(
-                  Colors.white.withOpacity(0.15), // Subtle white tint for visibility
-                  BlendMode.modulate,
-                ),
-                child: SvgPicture.asset(
-                  svgPath,
-                  fit: BoxFit.contain,
-                  width: c.maxWidth,
-                  height: c.maxHeight,
-                  colorFilter: const ColorFilter.mode(
-                    Color(0xFF2A2A2A), // Dark grey base color
-                    BlendMode.srcIn,
-                  ),
+              // Display SVG directly without color filters
+              SvgPicture.asset(
+                svgPath,
+                fit: BoxFit.contain,
+                width: c.maxWidth,
+                height: c.maxHeight,
+                theme: SvgTheme(
+                  currentColor: Colors.white.withOpacity(0.3), // Subtle muscle outline color
                 ),
               ),
               CustomPaint(

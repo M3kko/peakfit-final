@@ -979,8 +979,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ).then((_) {
             // Reset state when returning from time selection
             _resetToDefaultState();
-            // Refresh stats after potential workout
-            _updateLightweightStats();
+            // Don't call _updateLightweightStats() - the listener will update automatically
           });
         },
         child: Container(

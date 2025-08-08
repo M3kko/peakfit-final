@@ -10,7 +10,7 @@ class PreWorkoutScreen extends StatefulWidget {
   const PreWorkoutScreen({
     Key? key,
     required this.workoutType,
-    required this.duration,
+    required this.duration, required List<String> soreMuscles,
   }) : super(key: key);
 
   @override

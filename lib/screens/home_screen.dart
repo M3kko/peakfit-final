@@ -37,11 +37,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String? _profileImageUrl;
   String? _username;
 
-  // Stats data
+  // Stats data with caching
   int _currentStreak = 0;
   int _weeklyWorkouts = 0;
   int _totalWorkouts = 0;
   bool _statsLoaded = false;
+  DateTime? _lastStatsUpdate;
+
+  // Stream subscription for real-time updates
+  Stream<DocumentSnapshot>? _userStatsStream;
 
   @override
   void initState() {
@@ -49,7 +53,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _initAnimations();
     _startAnimations();
     _loadUserData();
-    _loadStats();
+    _initializeStatsStream();
+    _loadCachedStats();
+  }
+
+  // Initialize real-time stats stream
+  void _initializeStatsStream() {
+    if (user == null) return;
+
+    _userStatsStream = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user!.uid)
+        .snapshots();
+
+    // Listen to user document changes
+    _userStatsStream?.listen((snapshot) {
+      if (snapshot.exists && mounted) {
+        final data = snapshot.data() as Map<String, dynamic>?;
+        setState(() {
+          _totalWorkouts = data?['total_workouts'] ?? 0;
+          _profileImageUrl = data?['profileImageUrl'];
+          _username = data?['username'];
+        });
+
+        // Trigger lightweight stats update
+        _updateLightweightStats();
+      }
+    });
+  }
+
+  // Load cached stats immediately
+  Future<void> _loadCachedStats() async {
+    if (user == null) return;
+
+    try {
+      // First, get cached stats from user document
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get(const GetOptions(source: Source.cache));
+
+      if (userDoc.exists) {
+        setState(() {
+          _totalWorkouts = userDoc.data()?['total_workouts'] ?? 0;
+          _currentStreak = userDoc.data()?['cached_streak'] ?? 0;
+          _weeklyWorkouts = userDoc.data()?['cached_weekly_workouts'] ?? 0;
+          _profileImageUrl = userDoc.data()?['profileImageUrl'];
+          _username = userDoc.data()?['username'];
+          _statsLoaded = true;
+        });
+      }
+
+      // Then fetch fresh data in background
+      _loadFreshStats();
+    } catch (e) {
+      // If cache fails, load fresh
+      _loadFreshStats();
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -59,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
-          .get();
+          .get(const GetOptions(source: Source.cache));
 
       if (doc.exists && mounted) {
         setState(() {
@@ -72,11 +132,114 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _loadStats() async {
+  // Lightweight stats update (only today and this week)
+  Future<void> _updateLightweightStats() async {
     if (user == null) return;
 
     try {
-      // Load user document for total workouts
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final weekStartDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
+
+      // Check only today and this week
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Get today's workouts to update streak
+      final todayWorkouts = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .collection('workouts')
+          .where('completedAt', isGreaterThanOrEqualTo: todayStart)
+          .where('completedAt', isLessThan: todayStart.add(const Duration(days: 1)))
+          .limit(1)
+          .get();
+
+      // Get this week's workouts
+      final weekWorkouts = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .collection('workouts')
+          .where('completedAt', isGreaterThanOrEqualTo: weekStartDate)
+          .get();
+
+      final weekCount = weekWorkouts.docs.length;
+
+      // Quick streak check (simplified)
+      int streak = await _calculateQuickStreak();
+
+      if (mounted) {
+        setState(() {
+          _weeklyWorkouts = weekCount;
+          _currentStreak = streak;
+        });
+
+        // Update cache in Firestore
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(user!.uid)
+            .update({
+          'cached_streak': streak,
+          'cached_weekly_workouts': weekCount,
+          'last_stats_update': FieldValue.serverTimestamp(),
+        }).catchError((e) => print('Cache update error: $e'));
+      }
+    } catch (e) {
+      print('Error updating lightweight stats: $e');
+    }
+  }
+
+  // Quick streak calculation (last 7 days only for speed)
+  Future<int> _calculateQuickStreak() async {
+    if (user == null) return 0;
+
+    try {
+      final now = DateTime.now();
+      int streak = 0;
+      bool streakBroken = false;
+
+      // Only check last 7 days for quick calculation
+      for (int i = 0; i < 7 && !streakBroken; i++) {
+        final date = now.subtract(Duration(days: i));
+        final startOfDay = DateTime(date.year, date.month, date.day);
+        final endOfDay = startOfDay.add(const Duration(days: 1));
+
+        final workouts = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user!.uid)
+            .collection('workouts')
+            .where('completedAt', isGreaterThanOrEqualTo: startOfDay)
+            .where('completedAt', isLessThan: endOfDay)
+            .limit(1)
+            .get();
+
+        if (workouts.docs.isNotEmpty) {
+          streak++;
+        } else if (i > 0) {
+          streakBroken = true;
+        }
+      }
+
+      return streak;
+    } catch (e) {
+      print('Error calculating quick streak: $e');
+      return _currentStreak; // Return cached value on error
+    }
+  }
+
+  Future<void> _loadFreshStats() async {
+    if (user == null) return;
+
+    // Avoid too frequent updates
+    if (_lastStatsUpdate != null &&
+        DateTime.now().difference(_lastStatsUpdate!).inSeconds < 30) {
+      return;
+    }
+
+    try {
+      _lastStatsUpdate = DateTime.now();
+
+      // Load user document
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
@@ -86,23 +249,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _totalWorkouts = userDoc.data()?['total_workouts'] ?? 0;
       }
 
-      // Calculate current streak
-      _currentStreak = await _calculateCurrentStreak();
+      // Calculate current streak and weekly workouts in parallel
+      final results = await Future.wait([
+        _calculateFullStreak(),
+        _calculateWeeklyWorkouts(),
+      ]);
 
-      // Calculate workouts this week
-      _weeklyWorkouts = await _calculateWeeklyWorkouts();
+      _currentStreak = results[0] as int;
+      _weeklyWorkouts = results[1] as int;
 
       if (mounted) {
         setState(() {
           _statsLoaded = true;
         });
+
+        // Update cache
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(user!.uid)
+            .update({
+          'cached_streak': _currentStreak,
+          'cached_weekly_workouts': _weeklyWorkouts,
+          'last_stats_update': FieldValue.serverTimestamp(),
+        }).catchError((e) => print('Cache update error: $e'));
       }
     } catch (e) {
-      print('Error loading stats: $e');
+      print('Error loading fresh stats: $e');
+      setState(() {
+        _statsLoaded = true; // Show whatever we have
+      });
     }
   }
 
-  Future<int> _calculateCurrentStreak() async {
+  Future<int> _calculateFullStreak() async {
     if (user == null) return 0;
 
     try {
@@ -134,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       return streak;
     } catch (e) {
-      print('Error calculating streak: $e');
+      print('Error calculating full streak: $e');
       return 0;
     }
   }
@@ -161,6 +340,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  void _resetToDefaultState() {
+    // Reset selection state
+    setState(() {
+      _selectedWorkout = null;
+    });
+    _glowController.reset();
+    _transformController.reset();
+    _backButtonController.reset();
+  }
+
   void _initAnimations() {
     // Entry animations
     _entryController = AnimationController(
@@ -169,7 +358,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
 
     _glowController = AnimationController(
-      duration: const Duration(milliseconds: 800), // Slightly slower
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
@@ -284,6 +473,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // Reset state when returning to this screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_selectedWorkout != null) {
+        _resetToDefaultState();
+      }
+    });
+
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
@@ -414,7 +610,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 context,
                 MaterialPageRoute(builder: (context) => const ProfileScreen()),
               );
-              // Reload user data when returning from profile
+              // Reset state and reload data when returning
+              _resetToDefaultState();
               _loadUserData();
             },
             child: Container(
@@ -575,12 +772,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       animation: _transform,
       builder: (context, child) {
         return Container(
-          // Expand container significantly to prevent any glow cutoff
           constraints: const BoxConstraints(minHeight: 160),
           child: AnimatedCrossFade(
             firstChild: _buildStatsBox(),
             secondChild: Container(
-              // More padding for the glow
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: _buildStartButton(),
             ),
@@ -621,8 +816,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ],
           ),
-          child: _statsLoaded
-              ? IntrinsicHeight(
+          child: IntrinsicHeight(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -632,16 +826,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 _buildDivider(),
                 Expanded(child: _buildStatItem(_totalWorkouts.toString(), 'TOTAL')),
               ],
-            ),
-          )
-              : const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
-              ),
             ),
           ),
         );
@@ -708,10 +892,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildStartButton() {
     return Center(
       child: GestureDetector(
-        onTap: () {
+        onTap: () async {
           HapticFeedback.heavyImpact();
           // Navigate to time selection screen
-          Navigator.push(
+          final result = await Navigator.push(
             context,
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
@@ -733,6 +917,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               transitionDuration: const Duration(milliseconds: 500),
             ),
           );
+
+          // Reset state when returning
+          _resetToDefaultState();
+          // Refresh stats after workout
+          _updateLightweightStats();
         },
         child: Container(
           width: 200,
@@ -852,8 +1041,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _handleNavigation(int index) async {
     switch (index) {
       case 0:
-      // Already on home - reload stats
-        _loadStats();
+      // Already on home - reset state and reload stats
+        _resetToDefaultState();
+        _updateLightweightStats();
         break;
       case 1:
       // Navigate to schedule screen
@@ -861,8 +1051,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           context,
           MaterialPageRoute(builder: (context) => const ScheduleScreen()),
         );
-        // Reload stats when returning
-        _loadStats();
+        // Reset state and reload stats when returning
+        _resetToDefaultState();
+        _updateLightweightStats();
         break;
       case 2:
       // Navigate to stats screen
@@ -870,8 +1061,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           context,
           MaterialPageRoute(builder: (context) => const StatsScreen()),
         );
-        // Reload stats when returning
-        _loadStats();
+        // Reset state and reload stats when returning
+        _resetToDefaultState();
+        _updateLightweightStats();
         break;
     }
   }

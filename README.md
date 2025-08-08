@@ -9,4 +9,3 @@ PeakFit TRUST
 - Make Post workout screen have functioning share button
 - Make exercises auto named in firebase
 - Make resend code button look nicer in settings (after launch)
-- Fix continue button in the workout screen

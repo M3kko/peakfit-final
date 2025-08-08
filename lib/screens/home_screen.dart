@@ -70,14 +70,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _userStatsStream?.listen((snapshot) {
       if (snapshot.exists && mounted) {
         final data = snapshot.data() as Map<String, dynamic>?;
-        setState(() {
-          _totalWorkouts = data?['total_workouts'] ?? 0;
-          _profileImageUrl = data?['profileImageUrl'];
-          _username = data?['username'];
-        });
-
-        // Trigger lightweight stats update
-        _updateLightweightStats();
+        if (mounted) {
+          setState(() {
+            _totalWorkouts = data?['total_workouts'] ?? 0;
+            _currentStreak = data?['cached_streak'] ?? _currentStreak;
+            _weeklyWorkouts = data?['cached_weekly_workouts'] ?? _weeklyWorkouts;
+            _profileImageUrl = data?['profileImageUrl'];
+            _username = data?['username'];
+          });
+        }
       }
     });
   }

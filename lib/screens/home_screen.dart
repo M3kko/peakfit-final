@@ -473,13 +473,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    // Reset state when returning to this screen
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_selectedWorkout != null) {
-        _resetToDefaultState();
-      }
-    });
-
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       body: Stack(
@@ -609,10 +602,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-              // Reset state and reload data when returning
-              _resetToDefaultState();
-              _loadUserData();
+              ).then((_) {
+                // Reset state and reload data when returning
+                _resetToDefaultState();
+                _loadUserData();
+              });
             },
             child: Container(
               width: 48,
@@ -895,7 +889,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         onTap: () async {
           HapticFeedback.heavyImpact();
           // Navigate to time selection screen
-          final result = await Navigator.push(
+          await Navigator.push(
             context,
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
@@ -916,12 +910,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               },
               transitionDuration: const Duration(milliseconds: 500),
             ),
-          );
-
-          // Reset state when returning
-          _resetToDefaultState();
-          // Refresh stats after workout
-          _updateLightweightStats();
+          ).then((_) {
+            // Reset state when returning from time selection
+            _resetToDefaultState();
+            // Refresh stats after potential workout
+            _updateLightweightStats();
+          });
         },
         child: Container(
           width: 200,
@@ -1041,8 +1035,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _handleNavigation(int index) async {
     switch (index) {
       case 0:
-      // Already on home - reset state and reload stats
-        _resetToDefaultState();
+      // Already on home - just reload stats
         _updateLightweightStats();
         break;
       case 1:
@@ -1050,20 +1043,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const ScheduleScreen()),
-        );
-        // Reset state and reload stats when returning
-        _resetToDefaultState();
-        _updateLightweightStats();
+        ).then((_) {
+          // Reset state and reload stats when returning
+          _resetToDefaultState();
+          _updateLightweightStats();
+        });
         break;
       case 2:
       // Navigate to stats screen
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const StatsScreen()),
-        );
-        // Reset state and reload stats when returning
-        _resetToDefaultState();
-        _updateLightweightStats();
+        ).then((_) {
+          // Reset state and reload stats when returning
+          _resetToDefaultState();
+          _updateLightweightStats();
+        });
         break;
     }
   }

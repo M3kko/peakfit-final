@@ -286,32 +286,51 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
       final totalWorkouts = (currentStats['total_workouts'] ?? 0) + 1;
       final totalMinutes = (currentStats['total_minutes'] ?? 0) + widget.duration;
 
-      // Get current cached weekly workouts and increment
+      // Calculate weekly workouts - always increment since we're adding a workout now
       final cachedWeekly = (currentStats['cached_weekly_workouts'] ?? 0);
 
-      // Check if this workout is in the current week
+      // Check when the cache was last updated
+      final lastUpdate = currentStats['last_stats_update'] as Timestamp?;
       final now = DateTime.now();
       final weekStart = now.subtract(Duration(days: now.weekday - 1));
       final startOfWeek = DateTime(weekStart.year, weekStart.month, weekStart.day);
 
-      // If we're in the current week, increment the cached value
-      // Otherwise, recalculate from scratch
       int weeklyWorkouts;
-      if (now.isAfter(startOfWeek)) {
-        weeklyWorkouts = cachedWeekly + 1;
+
+      // If last update was before this week, need to recalculate
+      if (lastUpdate != null && lastUpdate.toDate().isBefore(startOfWeek)) {
+        // Cache is from last week, start fresh count
+        weeklyWorkouts = 1; // This workout is the first of the week
       } else {
-        // Full recalculation if needed
-        final weekWorkouts = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('workouts')
-            .where('completedAt', isGreaterThanOrEqualTo: startOfWeek)
-            .get();
-        weeklyWorkouts = weekWorkouts.docs.length + 1; // +1 for current workout
+        // Cache is from this week, just increment
+        weeklyWorkouts = cachedWeekly + 1;
       }
 
-      // Calculate updated streak
-      final currentStreak = await _calculateQuickStreak(user.uid);
+      // Calculate updated streak (accounting for today's workout)
+      int currentStreak = (currentStats['cached_streak'] ?? 0);
+
+      // Check if we need to update streak
+      final lastWorkoutDate = currentStats['last_workout_date'] as Timestamp?;
+      if (lastWorkoutDate != null) {
+        final lastDate = lastWorkoutDate.toDate();
+        final today = DateTime(now.year, now.month, now.day);
+        final yesterday = today.subtract(const Duration(days: 1));
+        final lastWorkoutDay = DateTime(lastDate.year, lastDate.month, lastDate.day);
+
+        if (lastWorkoutDay.isAtSameMomentAs(today)) {
+          // Already worked out today, streak stays the same
+        } else if (lastWorkoutDay.isAtSameMomentAs(yesterday)) {
+          // Worked out yesterday, increment streak
+          currentStreak++;
+        } else {
+          // Streak broken, restart at 1
+          currentStreak = 1;
+        }
+      } else {
+        // First workout ever
+        currentStreak = 1;
+      }
+
       final longestStreak = math.max(
         (currentStats['longestStreak'] as int?) ?? 0,
         currentStreak,
@@ -363,41 +382,6 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
           _isSavingToFirebase = false;
         });
       }
-    }
-  }
-
-  Future<int> _calculateQuickStreak(String userId) async {
-    try {
-      final now = DateTime.now();
-      int streak = 0;
-      bool streakBroken = false;
-
-      // Only check last 30 days for quick calculation
-      for (int i = 0; i < 30 && !streakBroken; i++) {
-        final date = now.subtract(Duration(days: i));
-        final startOfDay = DateTime(date.year, date.month, date.day);
-        final endOfDay = startOfDay.add(const Duration(days: 1));
-
-        final workouts = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('workouts')
-            .where('completedAt', isGreaterThanOrEqualTo: startOfDay)
-            .where('completedAt', isLessThan: endOfDay)
-            .limit(1)
-            .get();
-
-        if (workouts.docs.isNotEmpty) {
-          streak++;
-        } else if (i > 0) {
-          streakBroken = true;
-        }
-      }
-
-      return streak;
-    } catch (e) {
-      print('Error calculating streak: $e');
-      return 0;
     }
   }
 

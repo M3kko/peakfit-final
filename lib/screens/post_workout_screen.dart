@@ -293,8 +293,8 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
         currentStreak,
       );
 
-      // Calculate weekly workouts
-      final weeklyWorkouts = await _calculateWeeklyWorkouts(user.uid);
+      // Calculate weekly workouts more efficiently
+      final weeklyWorkouts = await _calculateWeeklyWorkoutsOptimized(user.uid, workWorkouts.docs.length + 1);
 
       // Update user stats with all calculated values
       final userRef = FirebaseFirestore.instance
@@ -376,26 +376,6 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
       return streak;
     } catch (e) {
       print('Error calculating streak: $e');
-      return 0;
-    }
-  }
-
-  Future<int> _calculateWeeklyWorkouts(String userId) async {
-    try {
-      final now = DateTime.now();
-      final weekStart = now.subtract(Duration(days: now.weekday - 1));
-      final startOfWeek = DateTime(weekStart.year, weekStart.month, weekStart.day);
-
-      final workouts = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('workouts')
-          .where('completedAt', isGreaterThanOrEqualTo: startOfWeek)
-          .get();
-
-      return workouts.docs.length;
-    } catch (e) {
-      print('Error calculating weekly workouts: $e');
       return 0;
     }
   }

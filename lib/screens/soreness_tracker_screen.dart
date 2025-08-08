@@ -28,20 +28,79 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   // Animations
   late final AnimationController _fadeCtrl;
   late final AnimationController _pulseCtrl;
+  late final AnimationController _switchCtrl;
   late final Animation<double> _fade;
   late final Animation<double> _slideUp;
   late final Animation<double> _pulse;
+  late final Animation<double> _switchFade;
+
+  // View state
+  bool _showingFront = true;
 
   // Raw SVG viewBox
-  static const double _vbW = 156.0;
-  static const double _vbH = 236.0;
+  static const double _vbW = 210.0;  // Updated for front SVG
+  static const double _vbH = 297.0;  // Updated for front SVG
+  static const double _backVbW = 156.0;
+  static const double _backVbH = 236.0;
 
-  // Parsed paths (in viewBox coords AFTER we apply the group translate)
-  Map<String, Path> _paths = {};
-  final Set<String> _selected = {};
+  // Parsed paths for both views
+  Map<String, Path> _frontPaths = {};
+  Map<String, Path> _backPaths = {};
+  final Set<String> _selectedFront = {};
+  final Set<String> _selectedBack = {};
 
-  // Muscle display names
-  static const Map<String, String> _names = {
+  // Get current selection based on view
+  Set<String> get _currentSelection => _showingFront ? _selectedFront : _selectedBack;
+  Map<String, Path> get _currentPaths => _showingFront ? _frontPaths : _backPaths;
+
+  // Muscle display names for front
+  static const Map<String, String> _frontNames = {
+    'neck': 'Neck',
+    'upper-trapezius-left': 'Left Upper Traps',
+    'upper-trapezius-right': 'Right Upper Traps',
+    'upper-pectoralis-right': 'Right Upper Chest',
+    'upper-pectoralis-left': 'Left Upper Chest',
+    'anterior-deltoid-right': 'Right Front Delt',
+    'anterior-deltoid-left': 'Left Front Delt',
+    'lateral-deltoid-right': 'Right Side Delt',
+    'lateral-deltoid-left': 'Left Side Delt',
+    'mid-lower-pectoralis-right': 'Right Lower Chest',
+    'mid-lower-pectoralis-left': 'Left Lower Chest',
+    'obliques-left': 'Left Obliques',
+    'obliques-right': 'Right Obliques',
+    'short-head-bicep-left': 'Left Bicep (Short)',
+    'long-head-bicep-left': 'Left Bicep (Long)',
+    'short-head-bicep-right': 'Right Bicep (Short)',
+    'long-head-bicep-right': 'Right Bicep (Long)',
+    'wrist-extensors-left': 'Left Wrist Extensors',
+    'wrist-flexors-left': 'Left Wrist Flexors',
+    'wrist-left': 'Left Wrist',
+    'wrist-extensors-right': 'Right Wrist Extensors',
+    'wrist-flexors-right': 'Right Wrist Flexors',
+    'wrist-right': 'Right Wrist',
+    'groin': 'Groin',
+    'lower-abdominals': 'Lower Abs',
+    'upper-abdominals': 'Upper Abs',
+    'outer-quadricep-right': 'Right Outer Quad',
+    'outer-quadricep-left': 'Left Outer Quad',
+    'rectus-femoris-right': 'Right Rectus Femoris',
+    'rectus-femoris-left': 'Left Rectus Femoris',
+    'inner-quadricep-right': 'Right Inner Quad',
+    'inner-quadricep-left': 'Left Inner Quad',
+    'inner-thigh-right': 'Right Inner Thigh',
+    'inner-thigh-left': 'Left Inner Thigh',
+    'tibialis-right': 'Right Tibialis',
+    'tibialis-left': 'Left Tibialis',
+    'gastrocnemius-right': 'Right Calf',
+    'gastrocnemius-left': 'Left Calf',
+    'soleus-right': 'Right Soleus',
+    'soleus-left': 'Left Soleus',
+    'foot-right': 'Right Foot',
+    'foot-left': 'Left Foot',
+  };
+
+  // Muscle display names for back
+  static const Map<String, String> _backNames = {
     'neck': 'Neck',
     'upper-trapezius': 'Upper Traps',
     'traps-middle': 'Middle Traps',
@@ -87,50 +146,86 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
     _pulseCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
       ..repeat(reverse: true);
+    _switchCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
 
     _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _slideUp = Tween<double>(begin: 24, end: 0)
         .animate(CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic));
     _pulse = Tween<double>(begin: 0.95, end: 1.05)
         .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    _switchFade = CurvedAnimation(parent: _switchCtrl, curve: Curves.easeInOut);
 
     _fadeCtrl.forward();
+    _switchCtrl.value = 1.0; // Start fully visible
     _loadPaths();
   }
 
   Future<void> _loadPaths() async {
-    final raw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
-    final doc = XmlDocument.parse(raw);
+    // Load front muscles
+    final frontRaw = await rootBundle.loadString('assets/svg/final-front-muscles.svg');
+    final frontDoc = XmlDocument.parse(frontRaw);
 
-    // g transform in your file: translate(-27.789474,-29.526316)
-    // Apply the SAME negative shift to our paths so they align with SvgPicture.
+    final frontMap = <String, Path>{};
+    for (final e in frontDoc.findAllElements('path')) {
+      final id = e.getAttribute('id');
+      final d = e.getAttribute('d');
+      if (id == null || d == null || id == 'path18' || id == 'path19' ||
+          id == 'path28' || id == 'path29' || id == 'path30' ||
+          id == 'path31' || id == 'path32' || id == 'path33' || id == 'path39' || id == 'path45') continue;
+      final p = parseSvgPathData(d);
+      frontMap[id] = p;
+    }
+
+    // Load back muscles
+    final backRaw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
+    final backDoc = XmlDocument.parse(backRaw);
+
+    // Back SVG has a transform
     const dx = -27.789474;
     const dy = -29.526316;
 
-    final map = <String, Path>{};
-    for (final e in doc.findAllElements('path')) {
+    final backMap = <String, Path>{};
+    for (final e in backDoc.findAllElements('path')) {
       final id = e.getAttribute('id');
       final d = e.getAttribute('d');
       if (id == null || d == null) continue;
       final p = parseSvgPathData(d).shift(const Offset(dx, dy));
-      map[id] = p;
+      backMap[id] = p;
     }
 
     if (!mounted) return;
-    setState(() => _paths = map);
+    setState(() {
+      _frontPaths = frontMap;
+      _backPaths = backMap;
+    });
   }
 
   @override
   void dispose() {
     _fadeCtrl.dispose();
     _pulseCtrl.dispose();
+    _switchCtrl.dispose();
     super.dispose();
   }
 
   void _toggle(String id) {
     HapticFeedback.lightImpact();
     setState(() {
-      _selected.contains(id) ? _selected.remove(id) : _selected.add(id);
+      if (_showingFront) {
+        _selectedFront.contains(id) ? _selectedFront.remove(id) : _selectedFront.add(id);
+      } else {
+        _selectedBack.contains(id) ? _selectedBack.remove(id) : _selectedBack.add(id);
+      }
+    });
+  }
+
+  void _switchView() {
+    HapticFeedback.mediumImpact();
+    _switchCtrl.reverse().then((_) {
+      setState(() {
+        _showingFront = !_showingFront;
+      });
+      _switchCtrl.forward();
     });
   }
 
@@ -207,7 +302,12 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
         const SizedBox(height: 12),
         Text('Tap muscles that feel sore', style: TextStyle(color: Colors.white.withOpacity(0.5))),
         const SizedBox(height: 40),
-        _diagram(),
+        _viewToggle(),
+        const SizedBox(height: 20),
+        FadeTransition(
+          opacity: _switchFade,
+          child: _diagram(),
+        ),
         const SizedBox(height: 40),
         _legend(),
         const SizedBox(height: 100),
@@ -215,27 +315,116 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     ),
   );
 
+  Widget _viewToggle() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Left Arrow
+        GestureDetector(
+          onTap: _showingFront ? null : _switchView,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _showingFront ? Colors.transparent : Colors.white.withOpacity(0.05),
+              border: Border.all(
+                color: _showingFront ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              Icons.arrow_back_ios_rounded,
+              color: _showingFront ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.6),
+              size: 18,
+            ),
+          ),
+        ),
+        const SizedBox(width: 20),
+        // View Label
+        Column(
+          children: [
+            Text(
+              _showingFront ? 'FRONT VIEW' : 'BACK VIEW',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 16,
+                letterSpacing: 2,
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              width: 80,
+              height: 2,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4AF37).withOpacity(0.5),
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 20),
+        // Right Arrow
+        GestureDetector(
+          onTap: !_showingFront ? null : _switchView,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: !_showingFront ? Colors.transparent : Colors.white.withOpacity(0.05),
+              border: Border.all(
+                color: !_showingFront ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: !_showingFront ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.6),
+              size: 18,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _diagram() {
+    final currentVbW = _showingFront ? _vbW : _backVbW;
+    final currentVbH = _showingFront ? _vbH : _backVbH;
+    final svgPath = _showingFront ? 'assets/svg/final-front-muscles.svg' : 'assets/svg/backmuscle-final.svg';
+
     return AspectRatio(
-      aspectRatio: _vbW / _vbH,
+      aspectRatio: currentVbW / currentVbH,
       child: LayoutBuilder(
         builder: (_, c) {
-          // Uniform scale (since we wrap with correct AspectRatio)
-          final scale = c.maxWidth / _vbW;
+          final scale = c.maxWidth / currentVbW;
 
           return Stack(
             children: [
-              SvgPicture.asset(
-                'assets/svg/backmuscle-final.svg',
-                fit: BoxFit.contain,
-                width: c.maxWidth,
-                height: c.maxHeight,
+              // SVG with custom color theme
+              ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  Colors.white.withOpacity(0.15), // Subtle white tint for visibility
+                  BlendMode.modulate,
+                ),
+                child: SvgPicture.asset(
+                  svgPath,
+                  fit: BoxFit.contain,
+                  width: c.maxWidth,
+                  height: c.maxHeight,
+                  colorFilter: const ColorFilter.mode(
+                    Color(0xFF2A2A2A), // Dark grey base color
+                    BlendMode.srcIn,
+                  ),
+                ),
               ),
               CustomPaint(
                 size: Size(c.maxWidth, c.maxHeight),
                 painter: _HighlightPainter(
-                  selected: _selected,
-                  paths: _paths,
+                  selected: _currentSelection,
+                  paths: _currentPaths,
                   scale: scale,
                 ),
               ),
@@ -243,11 +432,11 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapDown: (d) {
-                    if (_paths.isEmpty) return;
+                    if (_currentPaths.isEmpty) return;
                     final lp = d.localPosition;
                     final x = lp.dx / scale;
                     final y = lp.dy / scale;
-                    for (final e in _paths.entries) {
+                    for (final e in _currentPaths.entries) {
                       if (e.value.contains(Offset(x, y))) {
                         _toggle(e.key);
                         break;
@@ -264,6 +453,9 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   }
 
   Widget _legend() {
+    final currentNames = _showingFront ? _frontNames : _backNames;
+    final currentSelection = _showingFront ? _selectedFront : _selectedBack;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -274,10 +466,30 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('SELECTED MUSCLES',
-              style: TextStyle(color: Colors.white.withOpacity(0.5), letterSpacing: 1.5, fontSize: 12)),
+          Row(
+            children: [
+              Text('SELECTED MUSCLES',
+                  style: TextStyle(color: Colors.white.withOpacity(0.5), letterSpacing: 1.5, fontSize: 12)),
+              const Spacer(),
+              if (currentSelection.isNotEmpty)
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    setState(() {
+                      if (_showingFront) {
+                        _selectedFront.clear();
+                      } else {
+                        _selectedBack.clear();
+                      }
+                    });
+                  },
+                  child: Text('CLEAR ALL',
+                      style: TextStyle(color: Colors.red.shade400, fontSize: 10, fontWeight: FontWeight.w600)),
+                ),
+            ],
+          ),
           const SizedBox(height: 16),
-          if (_selected.isEmpty)
+          if (currentSelection.isEmpty)
             Center(
               child: Text('No muscles selected',
                   style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14)),
@@ -286,13 +498,15 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _selected.map((id) {
-                final name = _names[id] ?? id;
+              children: currentSelection.map((id) {
+                final name = currentNames[id] ?? id;
                 return Chip(
                   label: Text(name.toUpperCase(),
-                      style: TextStyle(color: Colors.red.shade300, fontSize: 12, fontWeight: FontWeight.w500)),
-                  backgroundColor: Colors.red.withOpacity(0.2),
+                      style: TextStyle(color: Colors.red.shade300, fontSize: 11, fontWeight: FontWeight.w500)),
+                  backgroundColor: Colors.red.withOpacity(0.15),
                   side: BorderSide(color: Colors.red.withOpacity(0.3)),
+                  deleteIcon: Icon(Icons.close, size: 14, color: Colors.red.shade300),
+                  onDeleted: () => _toggle(id),
                 );
               }).toList(),
             ),
@@ -324,12 +538,16 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
           child: GestureDetector(
             onTap: () {
               HapticFeedback.heavyImpact();
+              // Combine selections from both views
+              final allSoreMuscles = {..._selectedFront, ..._selectedBack};
+
               Navigator.push(
                 ctx,
                 PageRouteBuilder(
                   pageBuilder: (_, __, ___) => PreWorkoutScreen(
                     workoutType: widget.workoutType,
                     duration: widget.duration,
+                    soreMuscles: allSoreMuscles.toList(), // Pass the sore muscles
                   ),
                   transitionsBuilder: (_, anim, __, child) {
                     final tween = Tween(begin: const Offset(0, 1), end: Offset.zero)
@@ -392,12 +610,21 @@ class _HighlightPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.red.withOpacity(0.28);
+    final paint = Paint()..color = Colors.red.withOpacity(0.35);
+    final glowPaint = Paint()
+      ..color = Colors.red.withOpacity(0.15)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
     canvas.save();
     canvas.scale(scale, scale);
     for (final id in selected) {
       final p = paths[id];
-      if (p != null) canvas.drawPath(p, paint);
+      if (p != null) {
+        // Draw glow effect
+        canvas.drawPath(p, glowPaint);
+        // Draw main highlight
+        canvas.drawPath(p, paint);
+      }
     }
     canvas.restore();
   }

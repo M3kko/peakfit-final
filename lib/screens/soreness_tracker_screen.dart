@@ -200,35 +200,10 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       }
       print('Parsed ${frontMap.length} front paths');
 
-      // Load back muscles
+      // Load back muscles - NO TRANSFORM APPLIED
       print('Loading back SVG...');
       final backRaw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
       final backDoc = XmlDocument.parse(backRaw);
-
-      // Check for transform in back SVG
-      final backGroup = backDoc.findAllElements('g').firstWhere(
-            (element) => element.getAttribute('transform') != null,
-        orElse: () => XmlElement(XmlName('g')),
-      );
-
-      String? transform = backGroup.getAttribute('transform');
-      double dx = 0, dy = 0;
-
-      if (transform != null && transform.contains('translate')) {
-        print('Found transform: $transform');
-        // Parse transform translate values
-        final match = RegExp(r'translate\(([-\d.]+),([-\d.]+)\)').firstMatch(transform);
-        if (match != null) {
-          dx = double.parse(match.group(1)!);
-          dy = double.parse(match.group(2)!);
-          print('Transform values: dx=$dx, dy=$dy');
-        }
-      } else {
-        // Use default values if no transform found
-        dx = -27.789474;
-        dy = -29.526316;
-        print('Using default transform values');
-      }
 
       final backMap = <String, Path>{};
       final backPaths = backDoc.findAllElements('path').toList();
@@ -240,7 +215,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
         if (id == null || d == null) continue;
 
         try {
-          final p = parseSvgPathData(d).shift(Offset(dx, dy));
+          // Parse WITHOUT applying transform - let SVG handle it visually
+          final p = parseSvgPathData(d);
           backMap[id] = p;
           print('Added back path: $id');
         } catch (e) {
@@ -472,73 +448,95 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     );
   }
 
+
+
   Widget _diagram() {
-    final currentVbW = _showingFront ? _frontVbW : _backVbW;
-    final currentVbH = _showingFront ? _frontVbH : _backVbH;
     final svgPath = _showingFront
         ? 'assets/svg/final-front-muscles.svg'
         : 'assets/svg/backmuscle-final.svg';
 
     // Debug info
     print('Showing ${_showingFront ? "front" : "back"} diagram');
-    print('ViewBox: $currentVbW x $currentVbH');
     print('Current paths: ${_currentPaths.length}');
     print('Current selection: ${_currentSelection.length}');
 
-    return AspectRatio(
-      aspectRatio: currentVbW / currentVbH,
-      child: LayoutBuilder(
-        builder: (_, c) {
-          final scale = c.maxWidth / currentVbW;
+    // Use a consistent height for both views
+    final screenHeight = MediaQuery.of(context).size.height;
+    final diagramHeight = screenHeight * 0.45; // 45% of screen height
 
-          return Stack(
-            children: [
-              SvgPicture.asset(
-                svgPath,
-                fit: BoxFit.contain,
-                width: c.maxWidth,
-                height: c.maxHeight,
-              ),
-              CustomPaint(
-                size: Size(c.maxWidth, c.maxHeight),
-                painter: _HighlightPainter(
-                  selected: _currentSelection,
-                  paths: _currentPaths,
-                  scale: scale,
-                ),
-              ),
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (d) {
-                    if (_currentPaths.isEmpty) {
-                      print('No paths loaded for tap detection');
-                      return;
-                    }
-                    final lp = d.localPosition;
-                    final x = lp.dx / scale;
-                    final y = lp.dy / scale;
-                    print('Tap at screen: (${lp.dx.toStringAsFixed(1)}, ${lp.dy.toStringAsFixed(1)})');
-                    print('Tap at viewBox: (${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)})');
+    // Calculate width based on each SVG's aspect ratio
+    final currentVbW = _showingFront ? _frontVbW : _backVbW;
+    final currentVbH = _showingFront ? _frontVbH : _backVbH;
+    final aspectRatio = currentVbW / currentVbH;
+    final diagramWidth = diagramHeight * aspectRatio;
 
-                    bool found = false;
-                    for (final e in _currentPaths.entries) {
-                      if (e.value.contains(Offset(x, y))) {
-                        print('Found path: ${e.key}');
-                        _toggle(e.key);
-                        found = true;
-                        break;
-                      }
-                    }
-                    if (!found) {
-                      print('No path found at tap location');
-                    }
-                  },
-                ),
-              ),
-            ],
-          );
-        },
+    return SizedBox(
+      height: diagramHeight,
+      child: Center(
+        child: SizedBox(
+          width: diagramWidth,
+          height: diagramHeight,
+          child: LayoutBuilder(
+            builder: (_, constraints) {
+              final scale = constraints.maxHeight / currentVbH; // Scale based on height
+
+              return Stack(
+                children: [
+                  // SVG Display - scaled to same height
+                  SvgPicture.asset(
+                    svgPath,
+                    fit: BoxFit.fill,
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                  ),
+
+                  // Custom Paint overlay for highlights
+                  CustomPaint(
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: _HighlightPainter(
+                      selected: _currentSelection,
+                      paths: _currentPaths,
+                      scale: scale,
+                    ),
+                  ),
+
+                  // Gesture Detector
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (d) {
+                        if (_currentPaths.isEmpty) {
+                          print('No paths loaded for tap detection');
+                          return;
+                        }
+
+                        final lp = d.localPosition;
+                        final x = lp.dx / scale;
+                        final y = lp.dy / scale;
+
+                        print('Tap at screen: (${lp.dx.toStringAsFixed(1)}, ${lp.dy.toStringAsFixed(1)})');
+                        print('Tap at viewBox: (${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)})');
+
+                        bool found = false;
+                        for (final e in _currentPaths.entries) {
+                          if (e.value.contains(Offset(x, y))) {
+                            print('Found path: ${e.key}');
+                            _toggle(e.key);
+                            found = true;
+                            break;
+                          }
+                        }
+                        if (!found) {
+                          print('No path found at tap location');
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }

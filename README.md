@@ -10,3 +10,4 @@ PeakFit TRUST
 - Make exercises auto named in firebase
 - Make resend code button look nicer in settings (after launch)
 - Do full codebase optimization after initial launch
+- Funny messages for people trying to skip workouts

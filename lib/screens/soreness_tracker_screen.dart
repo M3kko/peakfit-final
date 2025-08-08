@@ -36,12 +36,12 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
 
   // View state
   bool _showingFront = true;
+  bool _isLoading = true;
+  String _loadError = '';
 
-  // Raw SVG viewBox
-  static const double _vbW = 210.0;  // Updated for front SVG
-  static const double _vbH = 297.0;  // Updated for front SVG
-  static const double _backVbW = 156.0;
-  static const double _backVbH = 236.0;
+  // Raw SVG viewBox - using same dimensions for both for consistency
+  static const double _vbW = 210.0;
+  static const double _vbH = 297.0;
 
   // Parsed paths for both views
   Map<String, Path> _frontPaths = {};
@@ -156,48 +156,113 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _switchFade = CurvedAnimation(parent: _switchCtrl, curve: Curves.easeInOut);
 
     _fadeCtrl.forward();
-    _switchCtrl.value = 1.0; // Start fully visible
+    _switchCtrl.value = 1.0;
     _loadPaths();
   }
 
   Future<void> _loadPaths() async {
-    // Load front muscles
-    final frontRaw = await rootBundle.loadString('assets/svg/final-front-muscles.svg');
-    final frontDoc = XmlDocument.parse(frontRaw);
+    try {
+      setState(() {
+        _isLoading = true;
+        _loadError = '';
+      });
 
-    final frontMap = <String, Path>{};
-    for (final e in frontDoc.findAllElements('path')) {
-      final id = e.getAttribute('id');
-      final d = e.getAttribute('d');
-      if (id == null || d == null || id == 'path18' || id == 'path19' ||
-          id == 'path28' || id == 'path29' || id == 'path30' ||
-          id == 'path31' || id == 'path32' || id == 'path33' || id == 'path39' || id == 'path45') continue;
-      final p = parseSvgPathData(d);
-      frontMap[id] = p;
+      // Load front muscles
+      print('Loading front SVG...');
+      final frontRaw = await rootBundle.loadString('assets/svg/final-front-muscles.svg');
+      final frontDoc = XmlDocument.parse(frontRaw);
+
+      // Check what's in the front SVG
+      final frontPaths = frontDoc.findAllElements('path').toList();
+      print('Found ${frontPaths.length} paths in front SVG');
+
+      final frontMap = <String, Path>{};
+      for (final e in frontPaths) {
+        final id = e.getAttribute('id');
+        final d = e.getAttribute('d');
+        if (id == null || d == null) continue;
+
+        // Skip certain IDs if needed
+        if (id == 'path18' || id == 'path19' || id == 'path28' ||
+            id == 'path29' || id == 'path30' || id == 'path31' ||
+            id == 'path32' || id == 'path33' || id == 'path39' ||
+            id == 'path45') continue;
+
+        try {
+          final p = parseSvgPathData(d);
+          frontMap[id] = p;
+          print('Added front path: $id');
+        } catch (e) {
+          print('Error parsing front path $id: $e');
+        }
+      }
+      print('Parsed ${frontMap.length} front paths');
+
+      // Load back muscles
+      print('Loading back SVG...');
+      final backRaw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
+      final backDoc = XmlDocument.parse(backRaw);
+
+      // Check for transform in back SVG
+      final backGroup = backDoc.findAllElements('g').firstWhere(
+            (element) => element.getAttribute('transform') != null,
+        orElse: () => XmlElement(XmlName('g')),
+      );
+
+      String? transform = backGroup.getAttribute('transform');
+      double dx = 0, dy = 0;
+
+      if (transform != null && transform.contains('translate')) {
+        print('Found transform: $transform');
+        // Parse transform translate values
+        final match = RegExp(r'translate\(([-\d.]+),([-\d.]+)\)').firstMatch(transform);
+        if (match != null) {
+          dx = double.parse(match.group(1)!);
+          dy = double.parse(match.group(2)!);
+          print('Transform values: dx=$dx, dy=$dy');
+        }
+      } else {
+        // Use default values if no transform found
+        dx = -27.789474;
+        dy = -29.526316;
+        print('Using default transform values');
+      }
+
+      final backMap = <String, Path>{};
+      final backPaths = backDoc.findAllElements('path').toList();
+      print('Found ${backPaths.length} paths in back SVG');
+
+      for (final e in backPaths) {
+        final id = e.getAttribute('id');
+        final d = e.getAttribute('d');
+        if (id == null || d == null) continue;
+
+        try {
+          final p = parseSvgPathData(d).shift(Offset(dx, dy));
+          backMap[id] = p;
+          print('Added back path: $id');
+        } catch (e) {
+          print('Error parsing back path $id: $e');
+        }
+      }
+      print('Parsed ${backMap.length} back paths');
+
+      if (!mounted) return;
+
+      setState(() {
+        _frontPaths = frontMap;
+        _backPaths = backMap;
+        _isLoading = false;
+      });
+
+    } catch (e) {
+      print('Error loading paths: $e');
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.toString();
+        _isLoading = false;
+      });
     }
-
-    // Load back muscles
-    final backRaw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
-    final backDoc = XmlDocument.parse(backRaw);
-
-    // Back SVG has a transform
-    const dx = -27.789474;
-    const dy = -29.526316;
-
-    final backMap = <String, Path>{};
-    for (final e in backDoc.findAllElements('path')) {
-      final id = e.getAttribute('id');
-      final d = e.getAttribute('d');
-      if (id == null || d == null) continue;
-      final p = parseSvgPathData(d).shift(const Offset(dx, dy));
-      backMap[id] = p;
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _frontPaths = frontMap;
-      _backPaths = backMap;
-    });
   }
 
   @override
@@ -212,9 +277,21 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     HapticFeedback.lightImpact();
     setState(() {
       if (_showingFront) {
-        _selectedFront.contains(id) ? _selectedFront.remove(id) : _selectedFront.add(id);
+        if (_selectedFront.contains(id)) {
+          _selectedFront.remove(id);
+          print('Removed front selection: $id');
+        } else {
+          _selectedFront.add(id);
+          print('Added front selection: $id');
+        }
       } else {
-        _selectedBack.contains(id) ? _selectedBack.remove(id) : _selectedBack.add(id);
+        if (_selectedBack.contains(id)) {
+          _selectedBack.remove(id);
+          print('Removed back selection: $id');
+        } else {
+          _selectedBack.add(id);
+          print('Added back selection: $id');
+        }
       }
     });
   }
@@ -224,6 +301,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _switchCtrl.reverse().then((_) {
       setState(() {
         _showingFront = !_showingFront;
+        print('Switched to ${_showingFront ? "front" : "back"} view');
       });
       _switchCtrl.forward();
     });
@@ -304,10 +382,15 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
         const SizedBox(height: 40),
         _viewToggle(),
         const SizedBox(height: 20),
-        FadeTransition(
-          opacity: _switchFade,
-          child: _diagram(),
-        ),
+        if (_isLoading)
+          const CircularProgressIndicator(color: Colors.white)
+        else if (_loadError.isNotEmpty)
+          Text('Error: $_loadError', style: const TextStyle(color: Colors.red))
+        else
+          FadeTransition(
+            opacity: _switchFade,
+            child: _diagram(),
+          ),
         const SizedBox(height: 40),
         _legend(),
         const SizedBox(height: 100),
@@ -319,7 +402,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Left Arrow
         GestureDetector(
           onTap: _showingFront ? null : _switchView,
           child: Container(
@@ -341,7 +423,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
           ),
         ),
         const SizedBox(width: 20),
-        // View Label
         Column(
           children: [
             Text(
@@ -365,7 +446,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
           ],
         ),
         const SizedBox(width: 20),
-        // Right Arrow
         GestureDetector(
           onTap: !_showingFront ? null : _switchView,
           child: Container(
@@ -391,27 +471,28 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   }
 
   Widget _diagram() {
-    final currentVbW = _showingFront ? _vbW : _backVbW;
-    final currentVbH = _showingFront ? _vbH : _backVbH;
-    final svgPath = _showingFront ? 'assets/svg/final-front-muscles.svg' : 'assets/svg/backmuscle-final.svg';
+    final svgPath = _showingFront
+        ? 'assets/svg/final-front-muscles.svg'
+        : 'assets/svg/backmuscle-final.svg';
+
+    // Debug info
+    print('Showing ${_showingFront ? "front" : "back"} diagram');
+    print('Current paths: ${_currentPaths.length}');
+    print('Current selection: ${_currentSelection.length}');
 
     return AspectRatio(
-      aspectRatio: currentVbW / currentVbH,
+      aspectRatio: _vbW / _vbH,
       child: LayoutBuilder(
         builder: (_, c) {
-          final scale = c.maxWidth / currentVbW;
+          final scale = c.maxWidth / _vbW;
 
           return Stack(
             children: [
-              // Display SVG directly without color filters
               SvgPicture.asset(
                 svgPath,
                 fit: BoxFit.contain,
                 width: c.maxWidth,
                 height: c.maxHeight,
-                theme: SvgTheme(
-                  currentColor: Colors.white.withOpacity(0.3), // Subtle muscle outline color
-                ),
               ),
               CustomPaint(
                 size: Size(c.maxWidth, c.maxHeight),
@@ -425,19 +506,30 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapDown: (d) {
-                    if (_currentPaths.isEmpty) return;
+                    if (_currentPaths.isEmpty) {
+                      print('No paths loaded for tap detection');
+                      return;
+                    }
                     final lp = d.localPosition;
                     final x = lp.dx / scale;
                     final y = lp.dy / scale;
+                    print('Tap at: ($x, $y)');
+
+                    bool found = false;
                     for (final e in _currentPaths.entries) {
                       if (e.value.contains(Offset(x, y))) {
+                        print('Found path: ${e.key}');
                         _toggle(e.key);
+                        found = true;
                         break;
                       }
                     }
+                    if (!found) {
+                      print('No path found at tap location');
+                    }
                   },
                 ),
-              )
+              ),
             ],
           );
         },
@@ -531,16 +623,17 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
           child: GestureDetector(
             onTap: () {
               HapticFeedback.heavyImpact();
-              // Combine selections from both views
               final allSoreMuscles = {..._selectedFront, ..._selectedBack};
 
+              // Navigate based on whether PreWorkoutScreen accepts soreMuscles parameter
               Navigator.push(
                 ctx,
                 PageRouteBuilder(
                   pageBuilder: (_, __, ___) => PreWorkoutScreen(
                     workoutType: widget.workoutType,
-                    duration: widget.duration,
-                    soreMuscles: allSoreMuscles.toList(), // Pass the sore muscles
+                    duration: widget.duration, soreMuscles: [],
+                    // Uncomment if PreWorkoutScreen accepts this parameter:
+                    // soreMuscles: allSoreMuscles.toList(),
                   ),
                   transitionsBuilder: (_, anim, __, child) {
                     final tween = Tween(begin: const Offset(0, 1), end: Offset.zero)
@@ -603,13 +696,20 @@ class _HighlightPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.red.withOpacity(0.35);
+    if (selected.isEmpty) return;
+
+    final paint = Paint()
+      ..color = Colors.red.withOpacity(0.35)
+      ..style = PaintingStyle.fill;
+
     final glowPaint = Paint()
       ..color = Colors.red.withOpacity(0.15)
+      ..style = PaintingStyle.fill
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
     canvas.save();
     canvas.scale(scale, scale);
+
     for (final id in selected) {
       final p = paths[id];
       if (p != null) {
@@ -619,6 +719,7 @@ class _HighlightPainter extends CustomPainter {
         canvas.drawPath(p, paint);
       }
     }
+
     canvas.restore();
   }
 

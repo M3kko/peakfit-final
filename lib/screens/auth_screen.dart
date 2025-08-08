@@ -468,19 +468,9 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
     try {
       if (!_isLogin) {
-        // Sign Up - Check if email already exists
+        // Sign Up - Check if email already exists using Firestore only
         try {
-          // First check Firebase Auth
-          final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
-          if (methods.isNotEmpty) {
-            setState(() {
-              _loading = false;
-            });
-            _showGlassySnackBar('This email is already registered. Please sign in instead.', true);
-            return;
-          }
-
-          // Also check Firestore to be sure
+          // Check Firestore for email existence
           final emailExists = await _checkEmailExists(email);
           if (emailExists) {
             setState(() {
@@ -591,6 +581,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           _showGlassySnackBar('No account found with this email. Please sign up first.', true);
           break;
         case 'wrong-password':
+        case 'invalid-credential':
           _showGlassySnackBar('Incorrect password. Please try again.', true);
           break;
         case 'invalid-email':

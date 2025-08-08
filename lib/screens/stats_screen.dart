@@ -20,7 +20,7 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
   late AnimationController _slideController;
   late AnimationController _glowController;
 
-  // Stats data
+  // Stats data with separate loading states
   int _totalWorkouts = 0;
   double _totalHours = 0;
   int _currentStreak = 0;
@@ -30,11 +30,17 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
   List<Map<String, dynamic>> _recentWorkouts = [];
   Map<String, dynamic>? _userProfile;
 
+  // Loading states for different sections
+  bool _basicStatsLoaded = false;
+  bool _weeklyDataLoaded = false;
+  bool _distributionLoaded = false;
+  bool _recentActivityLoaded = false;
+
   @override
   void initState() {
     super.initState();
     _initAnimations();
-    _loadStats();
+    _loadStatsIncrementally();
   }
 
   void _initAnimations() {
@@ -54,73 +60,156 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
     )..repeat(reverse: true);
   }
 
-  Future<void> _loadStats() async {
+  Future<void> _loadStatsIncrementally() async {
     if (user == null) return;
 
+    // Load in priority order
+    _loadBasicStats();
+    _loadWeeklyData();
+    _loadDistributionData();
+    _loadRecentActivity();
+  }
+
+  Future<void> _loadBasicStats() async {
     try {
-      // Load user profile
+      // First try cache
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
-          .get();
+          .get(const GetOptions(source: Source.cache));
 
       if (userDoc.exists) {
+        final data = userDoc.data() ?? {};
         setState(() {
-          _userProfile = userDoc.data();
+          _totalWorkouts = data['total_workouts'] ?? 0;
+          _totalHours = (data['total_minutes'] ?? 0) / 60.0;
+          _currentStreak = data['cached_streak'] ?? 0;
+          _longestStreak = data['longestStreak'] ?? 0;
+          _userProfile = data;
+          _basicStatsLoaded = true;
         });
       }
 
-      // Load workout stats
+      // Then fetch fresh data
+      final freshDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get(const GetOptions(source: Source.server));
+
+      if (freshDoc.exists) {
+        final data = freshDoc.data() ?? {};
+
+        // Calculate current streak if not cached
+        int currentStreak = data['cached_streak'] ?? 0;
+        if (currentStreak == 0) {
+          currentStreak = await _calculateCurrentStreak();
+        }
+
+        setState(() {
+          _totalWorkouts = data['total_workouts'] ?? 0;
+          _totalHours = (data['total_minutes'] ?? 0) / 60.0;
+          _currentStreak = currentStreak;
+          _longestStreak = math.max(data['longestStreak'] ?? 0, currentStreak);
+          _userProfile = data;
+          _basicStatsLoaded = true;
+        });
+
+        // Update cache if needed
+        if (data['cached_streak'] != currentStreak) {
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(user!.uid)
+              .update({
+            'cached_streak': currentStreak,
+            'longestStreak': _longestStreak,
+          }).catchError((e) => print('Cache update error: $e'));
+        }
+      }
+    } catch (e) {
+      print('Error loading basic stats: $e');
+      setState(() {
+        _basicStatsLoaded = true; // Show defaults
+      });
+    }
+  }
+
+  Future<void> _loadWeeklyData() async {
+    try {
+      final weeklyProgress = await _calculateWeeklyProgress();
+      if (mounted) {
+        setState(() {
+          _weeklyProgress = weeklyProgress;
+          _weeklyDataLoaded = true;
+        });
+      }
+    } catch (e) {
+      print('Error loading weekly data: $e');
+      setState(() {
+        _weeklyDataLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _loadDistributionData() async {
+    try {
+      // Get workout distribution with limit for speed
       final workoutsQuery = await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
           .collection('workouts')
-          .orderBy('completedAt', descending: true)
+          .limit(100) // Limit for performance
           .get();
 
-      int totalWorkouts = 0;
-      double totalHours = 0;
       Map<String, int> workoutsByType = {
         'strength': 0,
         'warmup': 0,
         'cooldown': 0,
       };
 
-      // Calculate stats
       for (var doc in workoutsQuery.docs) {
-        final data = doc.data();
-        totalWorkouts++;
-        totalHours += (data['duration'] ?? 0) / 60.0; // Convert minutes to hours
-
-        final type = data['type'] ?? 'strength';
+        final type = doc.data()['type'] ?? 'strength';
         workoutsByType[type] = (workoutsByType[type] ?? 0) + 1;
       }
 
-      // Get recent workouts (last 5)
-      final recentWorkouts = workoutsQuery.docs
-          .take(5)
+      if (mounted) {
+        setState(() {
+          _workoutsByType = workoutsByType;
+          _distributionLoaded = true;
+        });
+      }
+    } catch (e) {
+      print('Error loading distribution: $e');
+      setState(() {
+        _distributionLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _loadRecentActivity() async {
+    try {
+      final recentQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .collection('workouts')
+          .orderBy('completedAt', descending: true)
+          .limit(5)
+          .get();
+
+      final recentWorkouts = recentQuery.docs
           .map((doc) => {...doc.data(), 'id': doc.id})
           .toList();
 
-      // Calculate streaks
-      final currentStreak = await _calculateCurrentStreak();
-      final longestStreak = _userProfile?['longestStreak'] ?? 0;
-
-      // Calculate weekly progress
-      final weeklyProgress = await _calculateWeeklyProgress();
-
-      setState(() {
-        _totalWorkouts = totalWorkouts;
-        _totalHours = totalHours;
-        _workoutsByType = workoutsByType;
-        _currentStreak = currentStreak;
-        _longestStreak = math.max(longestStreak, currentStreak);
-        _recentWorkouts = recentWorkouts;
-        _weeklyProgress = weeklyProgress;
-      });
-
+      if (mounted) {
+        setState(() {
+          _recentWorkouts = recentWorkouts;
+          _recentActivityLoaded = true;
+        });
+      }
     } catch (e) {
-      print('Error loading stats: $e');
+      print('Error loading recent activity: $e');
+      setState(() {
+        _recentActivityLoaded = true;
+      });
     }
   }
 
@@ -131,6 +220,7 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
       final now = DateTime.now();
       int streak = 0;
 
+      // Optimized: Check only last 30 days
       for (int i = 0; i < 30; i++) {
         final date = now.subtract(Duration(days: i));
         final startOfDay = DateTime(date.year, date.month, date.day);
@@ -168,27 +258,31 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
     Map<String, double> weeklyData = {};
 
-    for (int i = 0; i < 7; i++) {
-      final date = weekStart.add(Duration(days: i));
-      final dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i];
+    // Batch query for the entire week
+    final startOfWeek = DateTime(weekStart.year, weekStart.month, weekStart.day);
+    final endOfWeek = startOfWeek.add(const Duration(days: 7));
 
-      final startOfDay = DateTime(date.year, date.month, date.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1));
+    final weekWorkouts = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user!.uid)
+        .collection('workouts')
+        .where('completedAt', isGreaterThanOrEqualTo: startOfWeek)
+        .where('completedAt', isLessThan: endOfWeek)
+        .get();
 
-      final workouts = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user!.uid)
-          .collection('workouts')
-          .where('completedAt', isGreaterThanOrEqualTo: startOfDay)
-          .where('completedAt', isLessThan: endOfDay)
-          .get();
+    // Initialize all days with 0
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    for (var day in dayNames) {
+      weeklyData[day] = 0;
+    }
 
-      double totalMinutes = 0;
-      for (var doc in workouts.docs) {
-        totalMinutes += (doc.data()['duration'] ?? 0).toDouble();
-      }
-
-      weeklyData[dayName] = totalMinutes;
+    // Process workouts
+    for (var doc in weekWorkouts.docs) {
+      final data = doc.data();
+      final completedAt = (data['completedAt'] as Timestamp).toDate();
+      final dayIndex = completedAt.weekday - 1;
+      final dayName = dayNames[dayIndex];
+      weeklyData[dayName] = (weeklyData[dayName] ?? 0) + (data['duration'] ?? 0).toDouble();
     }
 
     return weeklyData;
@@ -279,6 +373,10 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
   }
 
   Widget _buildOverviewGrid() {
+    if (!_basicStatsLoaded) {
+      return _buildLoadingGrid();
+    }
+
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -309,6 +407,72 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
           icon: Icons.emoji_events,
         ),
       ],
+    );
+  }
+
+  Widget _buildLoadingGrid() {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      childAspectRatio: 1.2,
+      children: List.generate(4, (index) => _buildLoadingCard()),
+    );
+  }
+
+  Widget _buildLoadingCard() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFD4AF37).withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD4AF37).withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 60,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: 80,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.03),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -399,6 +563,10 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
   }
 
   Widget _buildWeeklyChart() {
+    if (!_weeklyDataLoaded) {
+      return _buildLoadingChart();
+    }
+
     return Container(
       height: 280,
       decoration: BoxDecoration(
@@ -468,13 +636,13 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
                       },
                     ),
                   ),
-                  leftTitles: AxisTitles(
+                  leftTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
                   ),
-                  rightTitles: AxisTitles(
+                  rightTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
                   ),
-                  topTitles: AxisTitles(
+                  topTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
                   ),
                 ),
@@ -522,7 +690,39 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
     );
   }
 
+  Widget _buildLoadingChart() {
+    return Container(
+      height: 280,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFFD4AF37).withOpacity(0.2),
+        ),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: const Center(
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildWorkoutDistribution() {
+    if (!_distributionLoaded) {
+      return _buildLoadingChart();
+    }
+
     final total = _workoutsByType.values.fold(0, (a, b) => a + b);
 
     return Container(
@@ -547,32 +747,33 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
             child: Stack(
               alignment: Alignment.center,
               children: [
-                PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 40,
-                    sections: [
-                      PieChartSectionData(
-                        color: const Color(0xFFD4AF37),
-                        value: (_workoutsByType['strength'] ?? 0).toDouble(),
-                        title: '',
-                        radius: 30,
-                      ),
-                      PieChartSectionData(
-                        color: const Color(0xFFB8941F),
-                        value: (_workoutsByType['warmup'] ?? 0).toDouble(),
-                        title: '',
-                        radius: 30,
-                      ),
-                      PieChartSectionData(
-                        color: const Color(0xFF8B6914),
-                        value: (_workoutsByType['cooldown'] ?? 0).toDouble(),
-                        title: '',
-                        radius: 30,
-                      ),
-                    ],
+                if (total > 0)
+                  PieChart(
+                    PieChartData(
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 40,
+                      sections: [
+                        PieChartSectionData(
+                          color: const Color(0xFFD4AF37),
+                          value: (_workoutsByType['strength'] ?? 0).toDouble(),
+                          title: '',
+                          radius: 30,
+                        ),
+                        PieChartSectionData(
+                          color: const Color(0xFFB8941F),
+                          value: (_workoutsByType['warmup'] ?? 0).toDouble(),
+                          title: '',
+                          radius: 30,
+                        ),
+                        PieChartSectionData(
+                          color: const Color(0xFF8B6914),
+                          value: (_workoutsByType['cooldown'] ?? 0).toDouble(),
+                          title: '',
+                          radius: 30,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 Text(
                   total.toString(),
                   style: const TextStyle(
@@ -654,7 +855,9 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
           ),
         ),
         const SizedBox(height: 16),
-        if (_recentWorkouts.isEmpty)
+        if (!_recentActivityLoaded)
+          _buildLoadingActivity()
+        else if (_recentWorkouts.isEmpty)
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -683,11 +886,71 @@ class _StatsScreenState extends State<StatsScreen> with TickerProviderStateMixin
     );
   }
 
+  Widget _buildLoadingActivity() {
+    return Column(
+      children: List.generate(
+        3,
+            (index) => Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFD4AF37).withOpacity(0.1),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4AF37).withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 120,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 180,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.03),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildActivityItem(Map<String, dynamic> workout) {
     final type = workout['type'] ?? 'strength';
     final duration = workout['duration'] ?? 0;
     final completedAt = (workout['completedAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-    final exercises = workout['exerciseCount'] ?? 0;
+    final exercises = workout['totalExercisesCompleted'] ?? 0;
 
     final typeIcons = {
       'strength': Icons.fitness_center,

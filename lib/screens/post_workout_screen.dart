@@ -286,15 +286,36 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
       final totalWorkouts = (currentStats['total_workouts'] ?? 0) + 1;
       final totalMinutes = (currentStats['total_minutes'] ?? 0) + widget.duration;
 
+      // Get current cached weekly workouts and increment
+      final cachedWeekly = (currentStats['cached_weekly_workouts'] ?? 0);
+
+      // Check if this workout is in the current week
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final startOfWeek = DateTime(weekStart.year, weekStart.month, weekStart.day);
+
+      // If we're in the current week, increment the cached value
+      // Otherwise, recalculate from scratch
+      int weeklyWorkouts;
+      if (now.isAfter(startOfWeek)) {
+        weeklyWorkouts = cachedWeekly + 1;
+      } else {
+        // Full recalculation if needed
+        final weekWorkouts = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('workouts')
+            .where('completedAt', isGreaterThanOrEqualTo: startOfWeek)
+            .get();
+        weeklyWorkouts = weekWorkouts.docs.length + 1; // +1 for current workout
+      }
+
       // Calculate updated streak
       final currentStreak = await _calculateQuickStreak(user.uid);
       final longestStreak = math.max(
         (currentStats['longestStreak'] as int?) ?? 0,
         currentStreak,
       );
-
-      // Calculate weekly workouts more efficiently
-      final weeklyWorkouts = await _calculateWeeklyWorkoutsOptimized(user.uid, workWorkouts.docs.length + 1);
 
       // Update user stats with all calculated values
       final userRef = FirebaseFirestore.instance
@@ -504,14 +525,14 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                                 ),
                               ],
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.emoji_events_outlined,
-                              color: const Color(0xFFD4AF37),
+                              color: Color(0xFFD4AF37),
                               size: 50,
                             ),
                           ),
                           const SizedBox(height: 24),
-                          Text(
+                          const Text(
                             'GREAT WORK!',
                             style: TextStyle(
                               color: Colors.white,
@@ -804,7 +825,7 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
                             ),
                           ),
                           const SizedBox(height: 32),
-                          Text(
+                          const Text(
                             'WORKOUT COMPLETE!',
                             style: TextStyle(
                               color: Colors.white,
@@ -886,10 +907,10 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
       builder: (context, child) {
         return Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [const Color(0xFF1A1A1A), const Color(0xFF0F0F0F)],
+              colors: [Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(

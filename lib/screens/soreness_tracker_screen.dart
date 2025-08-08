@@ -39,9 +39,11 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   bool _isLoading = true;
   String _loadError = '';
 
-  // Raw SVG viewBox - using same dimensions for both for consistency
-  static const double _vbW = 210.0;
-  static const double _vbH = 297.0;
+  // Raw SVG viewBox dimensions
+  static const double _frontVbW = 210.0;
+  static const double _frontVbH = 297.0;
+  static const double _backVbW = 156.0;
+  static const double _backVbH = 236.0;
 
   // Parsed paths for both views
   Map<String, Path> _frontPaths = {};
@@ -471,20 +473,23 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   }
 
   Widget _diagram() {
+    final currentVbW = _showingFront ? _frontVbW : _backVbW;
+    final currentVbH = _showingFront ? _frontVbH : _backVbH;
     final svgPath = _showingFront
         ? 'assets/svg/final-front-muscles.svg'
         : 'assets/svg/backmuscle-final.svg';
 
     // Debug info
     print('Showing ${_showingFront ? "front" : "back"} diagram');
+    print('ViewBox: $currentVbW x $currentVbH');
     print('Current paths: ${_currentPaths.length}');
     print('Current selection: ${_currentSelection.length}');
 
     return AspectRatio(
-      aspectRatio: _vbW / _vbH,
+      aspectRatio: currentVbW / currentVbH,
       child: LayoutBuilder(
         builder: (_, c) {
-          final scale = c.maxWidth / _vbW;
+          final scale = c.maxWidth / currentVbW;
 
           return Stack(
             children: [
@@ -513,7 +518,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                     final lp = d.localPosition;
                     final x = lp.dx / scale;
                     final y = lp.dy / scale;
-                    print('Tap at: ($x, $y)');
+                    print('Tap at screen: (${lp.dx.toStringAsFixed(1)}, ${lp.dy.toStringAsFixed(1)})');
+                    print('Tap at viewBox: (${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)})');
 
                     bool found = false;
                     for (final e in _currentPaths.entries) {

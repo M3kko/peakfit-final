@@ -105,8 +105,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         });
       }
 
-      // Then fetch fresh data in background
-      _loadFreshStats();
+      // Then fetch fresh data from server if needed
+      final serverDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get(const GetOptions(source: Source.server));
+
+      if (serverDoc.exists && mounted) {
+        final data = serverDoc.data() ?? {};
+
+        // Check if cached values are recent (within last hour)
+        final lastUpdate = data['last_stats_update'] as Timestamp?;
+        final needsUpdate = lastUpdate == null ||
+            DateTime.now().difference(lastUpdate.toDate()).inHours > 1;
+
+        setState(() {
+          _totalWorkouts = data['total_workouts'] ?? 0;
+          _currentStreak = data['cached_streak'] ?? 0;
+          _weeklyWorkouts = data['cached_weekly_workouts'] ?? 0;
+          _profileImageUrl = data['profileImageUrl'];
+          _username = data['username'];
+          _statsLoaded = true;
+        });
+
+        // Update if needed in background
+        if (needsUpdate) {
+          _updateLightweightStats();
+        }
+      }
     } catch (e) {
       // If cache fails, load fresh
       _loadFreshStats();
@@ -133,20 +159,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // Lightweight stats update (only today and this week)
+  // Lightweight stats update (only when really needed)
   Future<void> _updateLightweightStats() async {
     if (user == null) return;
 
     try {
+      // First check if we need to update at all
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get();
+
+      if (!userDoc.exists) return;
+
+      final data = userDoc.data() ?? {};
+      final lastUpdate = data['last_stats_update'] as Timestamp?;
+
+      // Skip if updated within last 5 minutes
+      if (lastUpdate != null &&
+          DateTime.now().difference(lastUpdate.toDate()).inMinutes < 5) {
+        // Just use cached values
+        if (mounted) {
+          setState(() {
+            _currentStreak = data['cached_streak'] ?? 0;
+            _weeklyWorkouts = data['cached_weekly_workouts'] ?? 0;
+          });
+        }
+        return;
+      }
+
       final now = DateTime.now();
       final todayStart = DateTime(now.year, now.month, now.day);
-      final weekStart = now.subtract(Duration(days: now.weekday - 1));
-      final weekStartDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
 
-      // Check only today and this week
-      final batch = FirebaseFirestore.instance.batch();
-
-      // Get today's workouts to update streak
+      // Check only today for streak continuation
       final todayWorkouts = await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
@@ -156,18 +201,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           .limit(1)
           .get();
 
-      // Get this week's workouts
+      // Quick streak check - if no workout today and cached streak > 0,
+      // we might have broken the streak
+      int streak = data['cached_streak'] ?? 0;
+      if (todayWorkouts.docs.isEmpty && streak > 0) {
+        // Check yesterday
+        final yesterday = todayStart.subtract(const Duration(days: 1));
+        final yesterdayWorkouts = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user!.uid)
+            .collection('workouts')
+            .where('completedAt', isGreaterThanOrEqualTo: yesterday)
+            .where('completedAt', isLessThan: todayStart)
+            .limit(1)
+            .get();
+
+        if (yesterdayWorkouts.docs.isEmpty) {
+          streak = 0; // Streak is broken
+        }
+      }
+
+      // For weekly workouts, just count this week
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final startOfWeek = DateTime(weekStart.year, weekStart.month, weekStart.day);
+
       final weekWorkouts = await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
           .collection('workouts')
-          .where('completedAt', isGreaterThanOrEqualTo: weekStartDate)
+          .where('completedAt', isGreaterThanOrEqualTo: startOfWeek)
           .get();
 
       final weekCount = weekWorkouts.docs.length;
-
-      // Quick streak check (simplified)
-      int streak = await _calculateQuickStreak();
 
       if (mounted) {
         setState(() {

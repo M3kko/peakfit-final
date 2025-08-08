@@ -48,6 +48,7 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
   bool _showingSummary = false;
   bool _canGoBack = true;
   bool _isSavingToFirebase = false;
+  bool _workoutSaved = false;
 
   // Calculated stats
   late int _caloriesBurned;
@@ -150,7 +151,9 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
     _entryController.forward();
     _confettiController.forward();
     Future.delayed(const Duration(milliseconds: 500), () {
-      _ratingController.forward();
+      if (mounted) {
+        _ratingController.forward();
+      }
     });
   }
 
@@ -164,6 +167,8 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
   }
 
   void _submitRating(int rating) {
+    if (!mounted) return;
+
     HapticFeedback.lightImpact();
     setState(() {
       _exerciseRatings[_currentRatingIndex] = rating;
@@ -171,6 +176,8 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
 
     // Animate to next exercise or show summary
     _ratingController.reverse().then((_) {
+      if (!mounted) return;
+
       if (_currentRatingIndex < widget.exercises.length - 1) {
         setState(() {
           _currentRatingIndex++;
@@ -188,10 +195,11 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
   }
 
   void _goToPreviousRating() {
-    if (!_canGoBack || _currentRatingIndex == 0) return;
+    if (!_canGoBack || _currentRatingIndex == 0 || !mounted) return;
 
     HapticFeedback.lightImpact();
     _ratingController.reverse().then((_) {
+      if (!mounted) return;
       setState(() {
         _currentRatingIndex--;
       });
@@ -200,11 +208,13 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
   }
 
   Future<void> _saveWorkoutToFirebase() async {
-    if (_isSavingToFirebase) return;
+    if (_isSavingToFirebase || _workoutSaved) return;
 
-    setState(() {
-      _isSavingToFirebase = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isSavingToFirebase = true;
+      });
+    }
 
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -217,10 +227,14 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
         averageDifficulty = totalRating / _exerciseRatings.length;
       }
 
+      // Use batch write for better performance
+      final batch = FirebaseFirestore.instance.batch();
+
       // Prepare workout data for the main workout document
-      final workoutData = {
+      final workoutData = <String, dynamic>{
         'userId': user.uid,
         'workoutType': widget.workoutType,
+        'type': widget.workoutType.toLowerCase(),
         'duration': widget.duration,
         'totalSecondsElapsed': widget.totalSecondsElapsed,
         'averageDifficulty': averageDifficulty,
@@ -229,17 +243,19 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
         'date': DateTime.now().toIso8601String().split('T')[0], // YYYY-MM-DD format
       };
 
-      // Save main workout document
-      final workoutRef = await FirebaseFirestore.instance
+      // Create main workout document reference
+      final workoutRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('workouts')
-          .add(workoutData);
+          .doc();
 
-      // Save each exercise as a separate document in exercise_history
+      batch.set(workoutRef, workoutData);
+
+      // Save each exercise as a separate document
       for (int i = 0; i < widget.exercises.length; i++) {
         final exercise = widget.exercises[i];
-        final exerciseData = {
+        final exerciseData = <String, dynamic>{
           'userId': user.uid,
           'workoutId': workoutRef.id,
           'name': exercise['name'],
@@ -251,41 +267,58 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
           'date': DateTime.now().toIso8601String().split('T')[0],
         };
 
-        await FirebaseFirestore.instance
+        final exerciseRef = FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .collection('exercise_history')
-            .add(exerciseData);
+            .doc();
+
+        batch.set(exerciseRef, exerciseData);
       }
 
-      // Update user stats
+      // Get current user stats for updating
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
 
-      if (userDoc.exists) {
-        final currentStats = userDoc.data() ?? {};
-        final totalWorkouts = (currentStats['total_workouts'] ?? 0) + 1;
-        final totalMinutes = (currentStats['total_minutes'] ?? 0) + widget.duration;
+      final currentStats = userDoc.data() ?? {};
+      final totalWorkouts = (currentStats['total_workouts'] ?? 0) + 1;
+      final totalMinutes = (currentStats['total_minutes'] ?? 0) + widget.duration;
 
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({
-          'total_workouts': totalWorkouts,
-          'total_minutes': totalMinutes,
-          'last_workout_date': FieldValue.serverTimestamp(),
-        });
-      }
+      // Calculate updated streak
+      final currentStreak = await _calculateQuickStreak(user.uid);
+      final longestStreak = math.max(
+        (currentStats['longestStreak'] as int?) ?? 0,
+        currentStreak,
+      );
+
+      // Calculate weekly workouts
+      final weeklyWorkouts = await _calculateWeeklyWorkouts(user.uid);
+
+      // Update user stats with all calculated values
+      final userRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+
+      batch.update(userRef, <String, dynamic>{
+        'total_workouts': totalWorkouts,
+        'total_minutes': totalMinutes,
+        'last_workout_date': FieldValue.serverTimestamp(),
+        'cached_streak': currentStreak,
+        'cached_weekly_workouts': weeklyWorkouts,
+        'longestStreak': longestStreak,
+        'last_stats_update': FieldValue.serverTimestamp(),
+      });
 
       // Save workout stats for historical tracking
-      await FirebaseFirestore.instance
+      final statsRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('workout_stats')
-          .doc(workoutRef.id)
-          .set({
+          .doc(workoutRef.id);
+
+      batch.set(statsRef, <String, dynamic>{
         'workoutId': workoutRef.id,
         'duration': widget.duration,
         'totalSecondsElapsed': widget.totalSecondsElapsed,
@@ -296,12 +329,74 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
         'date': DateTime.now().toIso8601String().split('T')[0],
       });
 
+      // Commit all changes at once
+      await batch.commit();
+
+      _workoutSaved = true;
+
     } catch (e) {
       print('Error saving workout: $e');
     } finally {
-      setState(() {
-        _isSavingToFirebase = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSavingToFirebase = false;
+        });
+      }
+    }
+  }
+
+  Future<int> _calculateQuickStreak(String userId) async {
+    try {
+      final now = DateTime.now();
+      int streak = 0;
+      bool streakBroken = false;
+
+      // Only check last 30 days for quick calculation
+      for (int i = 0; i < 30 && !streakBroken; i++) {
+        final date = now.subtract(Duration(days: i));
+        final startOfDay = DateTime(date.year, date.month, date.day);
+        final endOfDay = startOfDay.add(const Duration(days: 1));
+
+        final workouts = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('workouts')
+            .where('completedAt', isGreaterThanOrEqualTo: startOfDay)
+            .where('completedAt', isLessThan: endOfDay)
+            .limit(1)
+            .get();
+
+        if (workouts.docs.isNotEmpty) {
+          streak++;
+        } else if (i > 0) {
+          streakBroken = true;
+        }
+      }
+
+      return streak;
+    } catch (e) {
+      print('Error calculating streak: $e');
+      return 0;
+    }
+  }
+
+  Future<int> _calculateWeeklyWorkouts(String userId) async {
+    try {
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final startOfWeek = DateTime(weekStart.year, weekStart.month, weekStart.day);
+
+      final workouts = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('workouts')
+          .where('completedAt', isGreaterThanOrEqualTo: startOfWeek)
+          .get();
+
+      return workouts.docs.length;
+    } catch (e) {
+      print('Error calculating weekly workouts: $e');
+      return 0;
     }
   }
 
@@ -509,6 +604,7 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
         if (!_showingSummary)
           TextButton(
             onPressed: () {
+              if (!mounted) return;
               setState(() {
                 _showingSummary = true;
               });
@@ -880,36 +976,6 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
     );
   }
 
-  Widget _buildStatItem(IconData icon, String value, String label) {
-    return Column(
-      children: [
-        Icon(
-          icon,
-          color: const Color(0xFFD4AF37).withOpacity(0.7),
-          size: 28,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 32,
-            fontWeight: FontWeight.w200,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 12,
-            letterSpacing: 1.5,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildExerciseSummary() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1004,42 +1070,6 @@ class _PostWorkoutScreenState extends State<PostWorkoutScreen>
           HapticFeedback.mediumImpact();
           Navigator.of(context).popUntil((route) => route.isFirst);
         },
-      ),
-    );
-  }
-
-  Widget _buildSecondaryButton(String label, IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 56,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: Colors.white.withOpacity(0.8),
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: 14,
-                letterSpacing: 1.5,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

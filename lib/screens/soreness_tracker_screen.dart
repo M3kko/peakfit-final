@@ -510,26 +510,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Background glow for selected muscles
-          if (_currentSelection.isNotEmpty)
-            AnimatedBuilder(
-              animation: _selectedPulse,
-              builder: (context, child) {
-                return Container(
-                  width: svgWidth,
-                  height: svgHeight,
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withOpacity(_selectedPulse.value * 0.3),
-                        blurRadius: 40,
-                        spreadRadius: 10,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+          // REMOVED: Background glow AnimatedBuilder section
 
           // SVG Display
           SizedBox(

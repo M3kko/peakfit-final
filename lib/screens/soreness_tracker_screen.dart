@@ -29,21 +29,27 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   late final AnimationController _fadeCtrl;
   late final AnimationController _pulseCtrl;
   late final AnimationController _switchCtrl;
+  late final AnimationController _selectedPulseCtrl;
   late final Animation<double> _fade;
   late final Animation<double> _slideUp;
   late final Animation<double> _pulse;
   late final Animation<double> _switchFade;
+  late final Animation<double> _selectedPulse;
 
   // View state
   bool _showingFront = true;
   bool _isLoading = true;
   String _loadError = '';
 
-  // Raw SVG viewBox dimensions
+  // Raw SVG viewBox dimensions and transforms
   static const double _frontVbW = 210.0;
   static const double _frontVbH = 297.0;
-  static const double _backVbW = 156.0;
-  static const double _backVbH = 236.0;
+  static const double _backVbW = 210.0;
+  static const double _backVbH = 297.0;
+
+  // Back SVG has a transform that shifts content
+  static const double _backTransformX = -27.789474;
+  static const double _backTransformY = -29.526316;
 
   // Parsed paths for both views
   Map<String, Path> _frontPaths = {};
@@ -145,17 +151,21 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   @override
   void initState() {
     super.initState();
-    _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     _pulseCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
       ..repeat(reverse: true);
-    _switchCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _switchCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    _selectedPulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
+      ..repeat(reverse: true);
 
     _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
-    _slideUp = Tween<double>(begin: 24, end: 0)
+    _slideUp = Tween<double>(begin: 30, end: 0)
         .animate(CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic));
-    _pulse = Tween<double>(begin: 0.95, end: 1.05)
+    _pulse = Tween<double>(begin: 0.96, end: 1.04)
         .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
     _switchFade = CurvedAnimation(parent: _switchCtrl, curve: Curves.easeInOut);
+    _selectedPulse = Tween<double>(begin: 0.3, end: 0.5)
+        .animate(CurvedAnimation(parent: _selectedPulseCtrl, curve: Curves.easeInOut));
 
     _fadeCtrl.forward();
     _switchCtrl.value = 1.0;
@@ -170,64 +180,46 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       });
 
       // Load front muscles
-      print('Loading front SVG...');
       final frontRaw = await rootBundle.loadString('assets/svg/final-front-muscles.svg');
       final frontDoc = XmlDocument.parse(frontRaw);
 
-      // Check what's in the front SVG
-      final frontPaths = frontDoc.findAllElements('path').toList();
-      print('Found ${frontPaths.length} paths in front SVG');
-
       final frontMap = <String, Path>{};
-      for (final e in frontPaths) {
+      for (final e in frontDoc.findAllElements('path')) {
         final id = e.getAttribute('id');
         final d = e.getAttribute('d');
         if (id == null || d == null) continue;
 
-        // Skip certain IDs if needed
-        if (id == 'path18' || id == 'path19' || id == 'path28' ||
-            id == 'path29' || id == 'path30' || id == 'path31' ||
-            id == 'path32' || id == 'path33' || id == 'path39' ||
-            id == 'path45') continue;
+        // Skip non-muscle paths
+        if (id.startsWith('path') && RegExp(r'^\d+$').hasMatch(id.substring(4))) continue;
 
         try {
           final p = parseSvgPathData(d);
           frontMap[id] = p;
-          print('Added front path: $id');
         } catch (e) {
           print('Error parsing front path $id: $e');
         }
       }
-      print('Parsed ${frontMap.length} front paths');
 
       // Load back muscles
-      print('Loading back SVG...');
       final backRaw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
       final backDoc = XmlDocument.parse(backRaw);
 
       final backMap = <String, Path>{};
-      final backPaths = backDoc.findAllElements('path').toList();
-      print('Found ${backPaths.length} paths in back SVG');
-
-      for (final e in backPaths) {
+      for (final e in backDoc.findAllElements('path')) {
         final id = e.getAttribute('id');
         final d = e.getAttribute('d');
         if (id == null || d == null) continue;
 
-        // Skip paths without fill or with specific IDs to ignore
-        if (id.startsWith('path29') || id.startsWith('path30') ||
-            id.startsWith('path33') || id.startsWith('path39') ||
-            id.startsWith('path42')) continue;
+        // Skip non-muscle paths
+        if (id.startsWith('path') && RegExp(r'^\d+$').hasMatch(id.substring(4))) continue;
 
         try {
           final p = parseSvgPathData(d);
           backMap[id] = p;
-          print('Added back path: $id');
         } catch (e) {
           print('Error parsing back path $id: $e');
         }
       }
-      print('Parsed ${backMap.length} back paths');
 
       if (!mounted) return;
 
@@ -252,6 +244,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _fadeCtrl.dispose();
     _pulseCtrl.dispose();
     _switchCtrl.dispose();
+    _selectedPulseCtrl.dispose();
     super.dispose();
   }
 
@@ -261,18 +254,14 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       if (_showingFront) {
         if (_selectedFront.contains(id)) {
           _selectedFront.remove(id);
-          print('Removed front selection: $id');
         } else {
           _selectedFront.add(id);
-          print('Added front selection: $id');
         }
       } else {
         if (_selectedBack.contains(id)) {
           _selectedBack.remove(id);
-          print('Removed back selection: $id');
         } else {
           _selectedBack.add(id);
-          print('Added back selection: $id');
         }
       }
     });
@@ -283,7 +272,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _switchCtrl.reverse().then((_) {
       setState(() {
         _showingFront = !_showingFront;
-        print('Switched to ${_showingFront ? "front" : "back"} view');
       });
       _switchCtrl.forward();
     });
@@ -317,32 +305,63 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   }
 
   Widget _background() => Container(
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFF0A0A0A), Color(0xFF0F0F0F), Color(0xFF050505)],
-        stops: [0, 0.5, 1],
+    decoration: BoxDecoration(
+      gradient: RadialGradient(
+        center: Alignment.center,
+        radius: 1.2,
+        colors: [
+          const Color(0xFF1A1A1A),
+          const Color(0xFF0A0A0A),
+        ],
       ),
+    ),
+    child: CustomPaint(
+      painter: _GridPainter(opacity: 0.03),
     ),
   );
 
-  Widget _header(BuildContext ctx) => Padding(
-    padding: const EdgeInsets.all(24),
+  Widget _header(BuildContext ctx) => Container(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
     child: Row(
       children: [
-        IconButton(
-          onPressed: () => Navigator.pop(ctx),
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
+          child: IconButton(
+            onPressed: () => Navigator.pop(ctx),
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          ),
         ),
         const Spacer(),
-        Text(
-          'SORENESS CHECK',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            letterSpacing: 2,
-            fontWeight: FontWeight.w300,
-          ),
+        Column(
+          children: [
+            Text(
+              'SORENESS CHECK',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                letterSpacing: 3,
+                fontWeight: FontWeight.w200,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              width: 100,
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    const Color(0xFFD4AF37).withOpacity(0.5),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
         const Spacer(),
         const SizedBox(width: 48),
@@ -351,104 +370,115 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   );
 
   Widget _body() => SingleChildScrollView(
-    padding: const EdgeInsets.symmetric(horizontal: 24),
+    physics: const BouncingScrollPhysics(),
+    padding: const EdgeInsets.symmetric(horizontal: 20),
     child: Column(
       children: [
-        const SizedBox(height: 20),
-        const Text(
-          'How are you feeling?',
-          style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w200),
-        ),
-        const SizedBox(height: 12),
-        Text('Tap muscles that feel sore', style: TextStyle(color: Colors.white.withOpacity(0.5))),
-        const SizedBox(height: 40),
+        const SizedBox(height: 16),
+        _titleSection(),
+        const SizedBox(height: 32),
         _viewToggle(),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         if (_isLoading)
-          const CircularProgressIndicator(color: Colors.white)
+          SizedBox(
+            height: 400,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: const Color(0xFFD4AF37).withOpacity(0.8),
+                strokeWidth: 2,
+              ),
+            ),
+          )
         else if (_loadError.isNotEmpty)
-          Text('Error: $_loadError', style: const TextStyle(color: Colors.red))
+          Container(
+            height: 400,
+            alignment: Alignment.center,
+            child: Text('Error: $_loadError', style: const TextStyle(color: Colors.red)),
+          )
         else
           FadeTransition(
             opacity: _switchFade,
             child: _diagram(),
           ),
-        const SizedBox(height: 40),
+        const SizedBox(height: 32),
         _legend(),
-        const SizedBox(height: 100),
+        const SizedBox(height: 120),
       ],
     ),
   );
 
+  Widget _titleSection() => Column(
+    children: [
+      ShaderMask(
+        shaderCallback: (bounds) => LinearGradient(
+          colors: [Colors.white, Colors.white.withOpacity(0.8)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(bounds),
+        child: const Text(
+          'How are you feeling?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 32,
+            fontWeight: FontWeight.w200,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'Tap muscles that feel sore',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.4),
+          fontSize: 14,
+          letterSpacing: 0.5,
+        ),
+      ),
+    ],
+  );
+
   Widget _viewToggle() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        GestureDetector(
-          onTap: _showingFront ? null : _switchView,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _showingFront ? Colors.transparent : Colors.white.withOpacity(0.05),
-              border: Border.all(
-                color: _showingFront ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              Icons.arrow_back_ios_rounded,
-              color: _showingFront ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.6),
-              size: 18,
-            ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _viewToggleButton('FRONT', _showingFront, () => _showingFront ? null : _switchView()),
+          const SizedBox(width: 8),
+          _viewToggleButton('BACK', !_showingFront, () => !_showingFront ? null : _switchView()),
+        ],
+      ),
+    );
+  }
+
+  Widget _viewToggleButton(String label, bool isActive, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFD4AF37).withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isActive ? const Color(0xFFD4AF37).withOpacity(0.3) : Colors.transparent,
           ),
         ),
-        const SizedBox(width: 20),
-        Column(
-          children: [
-            Text(
-              _showingFront ? 'FRONT VIEW' : 'BACK VIEW',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 16,
-                letterSpacing: 2,
-                fontWeight: FontWeight.w300,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              width: 80,
-              height: 2,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD4AF37).withOpacity(0.5),
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 20),
-        GestureDetector(
-          onTap: !_showingFront ? null : _switchView,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: !_showingFront ? Colors.transparent : Colors.white.withOpacity(0.05),
-              border: Border.all(
-                color: !_showingFront ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              Icons.arrow_forward_ios_rounded,
-              color: !_showingFront ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.6),
-              size: 18,
-            ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? const Color(0xFFD4AF37) : Colors.white.withOpacity(0.4),
+            fontSize: 13,
+            letterSpacing: 2,
+            fontWeight: FontWeight.w500,
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -457,112 +487,121 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
         ? 'assets/svg/final-front-muscles.svg'
         : 'assets/svg/backmuscle-final.svg';
 
-    // Debug info
-    print('Showing ${_showingFront ? "front" : "back"} diagram');
-    print('Current paths: ${_currentPaths.length}');
-    print('Current selection: ${_currentSelection.length}');
-
-    // Use a consistent height for both views
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
-    final diagramHeight = screenHeight * 0.45; // 45% of screen height
 
-    // Use a square container to ensure both SVGs are centered properly
-    final containerSize = diagramHeight;
+    // Make the diagram larger - use 60% of screen height
+    final maxHeight = screenHeight * 0.6;
+    final maxWidth = screenWidth - 40; // Account for padding
 
-    return SizedBox(
-      height: containerSize,
-      width: screenWidth, // Use full screen width for proper centering
-      child: Center(
-        child: LayoutBuilder(
-          builder: (_, constraints) {
-            final currentVbW = _showingFront ? _frontVbW : _backVbW;
-            final currentVbH = _showingFront ? _frontVbH : _backVbH;
+    // Both SVGs have same viewBox, but back has a transform
+    final currentVbW = _showingFront ? _frontVbW : _backVbW;
+    final currentVbH = _showingFront ? _frontVbH : _backVbH;
 
-            // Calculate scale to fit within the container
-            final scaleX = containerSize / currentVbW;
-            final scaleY = containerSize / currentVbH;
-            final scale = scaleX < scaleY ? scaleX : scaleY; // Use smaller scale to fit
+    // Calculate scale to fit within constraints while maintaining aspect ratio
+    final aspectRatio = currentVbW / currentVbH;
+    double svgHeight = maxHeight;
+    double svgWidth = svgHeight * aspectRatio;
 
-            final scaledWidth = currentVbW * scale;
-            final scaledHeight = currentVbH * scale;
+    // If width exceeds max, scale down
+    if (svgWidth > maxWidth) {
+      svgWidth = maxWidth;
+      svgHeight = svgWidth / aspectRatio;
+    }
 
-            return Stack(
+    final scale = svgWidth / currentVbW;
+
+    return Container(
+      height: svgHeight + 20, // Add some padding
+      width: screenWidth,
+      alignment: Alignment.center,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Background glow for selected muscles
+          if (_currentSelection.isNotEmpty)
+            AnimatedBuilder(
+              animation: _selectedPulse,
+              builder: (context, child) {
+                return Container(
+                  width: svgWidth,
+                  height: svgHeight,
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(_selectedPulse.value * 0.3),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+          // SVG Display
+          SizedBox(
+            width: svgWidth,
+            height: svgHeight,
+            child: SvgPicture.asset(
+              svgPath,
+              fit: BoxFit.contain,
               alignment: Alignment.center,
-              children: [
-                // SVG Display - properly centered
-                Container(
-                  width: scaledWidth,
-                  height: scaledHeight,
-                  child: SvgPicture.asset(
-                    svgPath,
-                    fit: BoxFit.contain,
-                    alignment: Alignment.center,
+            ),
+          ),
+
+          // Custom Paint overlay for highlights
+          SizedBox(
+            width: svgWidth,
+            height: svgHeight,
+            child: AnimatedBuilder(
+              animation: _selectedPulse,
+              builder: (context, child) {
+                return CustomPaint(
+                  size: Size(svgWidth, svgHeight),
+                  painter: _HighlightPainter(
+                    selected: _currentSelection,
+                    paths: _currentPaths,
+                    scale: scale,
+                    pulseValue: _selectedPulse.value,
+                    isBackView: !_showingFront,
                   ),
-                ),
+                );
+              },
+            ),
+          ),
 
-                // Custom Paint overlay for highlights
-                Positioned(
-                  width: scaledWidth,
-                  height: scaledHeight,
-                  child: CustomPaint(
-                    size: Size(scaledWidth, scaledHeight),
-                    painter: _HighlightPainter(
-                      selected: _currentSelection,
-                      paths: _currentPaths,
-                      scale: scale,
-                      isBackView: !_showingFront,
-                    ),
-                  ),
-                ),
+          // Gesture Detector
+          SizedBox(
+            width: svgWidth,
+            height: svgHeight,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (d) {
+                if (_currentPaths.isEmpty) return;
 
-                // Gesture Detector
-                Positioned(
-                  width: scaledWidth,
-                  height: scaledHeight,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapDown: (d) {
-                      if (_currentPaths.isEmpty) {
-                        print('No paths loaded for tap detection');
-                        return;
-                      }
+                final lp = d.localPosition;
 
-                      final lp = d.localPosition;
+                // Convert tap position to SVG coordinate space
+                double x = lp.dx / scale;
+                double y = lp.dy / scale;
 
-                      // Convert tap position to SVG coordinate space
-                      double x, y;
-                      if (_showingFront) {
-                        x = lp.dx / scale;
-                        y = lp.dy / scale;
-                      } else {
-                        // Account for the transform in the back SVG
-                        x = (lp.dx / scale) + 27.789474;
-                        y = (lp.dy / scale) + 29.526316;
-                      }
+                // For back view, we need to account for the transform
+                if (!_showingFront) {
+                  x = x + _backTransformX;
+                  y = y + _backTransformY;
+                }
 
-                      print('Tap at screen: (${lp.dx.toStringAsFixed(1)}, ${lp.dy.toStringAsFixed(1)})');
-                      print('Tap at viewBox: (${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)})');
-
-                      bool found = false;
-                      for (final e in _currentPaths.entries) {
-                        if (e.value.contains(Offset(x, y))) {
-                          print('Found path: ${e.key}');
-                          _toggle(e.key);
-                          found = true;
-                          break;
-                        }
-                      }
-                      if (!found) {
-                        print('No path found at tap location');
-                      }
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+                for (final e in _currentPaths.entries) {
+                  if (e.value.contains(Offset(x, y))) {
+                    _toggle(e.key);
+                    break;
+                  }
+                }
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -574,8 +613,15 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.03),
+            Colors.white.withOpacity(0.01),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
@@ -583,8 +629,21 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
         children: [
           Row(
             children: [
-              Text('SELECTED MUSCLES',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5), letterSpacing: 1.5, fontSize: 12)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.touch_app, color: Colors.white.withOpacity(0.5), size: 16),
+                    const SizedBox(width: 8),
+                    Text('SELECTED MUSCLES',
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), letterSpacing: 1.5, fontSize: 11)),
+                  ],
+                ),
+              ),
               const Spacer(),
               if (currentSelection.isNotEmpty)
                 GestureDetector(
@@ -598,16 +657,30 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                       }
                     });
                   },
-                  child: Text('CLEAR ALL',
-                      style: TextStyle(color: Colors.red.shade400, fontSize: 10, fontWeight: FontWeight.w600)),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    ),
+                    child: Text('CLEAR ALL',
+                        style: TextStyle(color: Colors.red.shade300, fontSize: 10, fontWeight: FontWeight.w600)),
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           if (currentSelection.isEmpty)
             Center(
-              child: Text('No muscles selected',
-                  style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14)),
+              child: Column(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.white.withOpacity(0.2), size: 32),
+                  const SizedBox(height: 8),
+                  Text('No muscles selected',
+                      style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14)),
+                ],
+              ),
             )
           else
             Wrap(
@@ -615,13 +688,22 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
               runSpacing: 8,
               children: currentSelection.map((id) {
                 final name = currentNames[id] ?? id;
-                return Chip(
-                  label: Text(name.toUpperCase(),
-                      style: TextStyle(color: Colors.red.shade300, fontSize: 11, fontWeight: FontWeight.w500)),
-                  backgroundColor: Colors.red.withOpacity(0.15),
-                  side: BorderSide(color: Colors.red.withOpacity(0.3)),
-                  deleteIcon: Icon(Icons.close, size: 14, color: Colors.red.shade300),
-                  onDeleted: () => _toggle(id),
+                return TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 300),
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: value,
+                      child: Chip(
+                        label: Text(name.toUpperCase(),
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500)),
+                        backgroundColor: Colors.red.withOpacity(0.2),
+                        side: BorderSide(color: Colors.red.withOpacity(0.4)),
+                        deleteIcon: const Icon(Icons.close, size: 14, color: Colors.white),
+                        onDeleted: () => _toggle(id),
+                      ),
+                    );
+                  },
                 );
               }).toList(),
             ),
@@ -631,6 +713,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   }
 
   Widget _bottomButton(BuildContext ctx) {
+    final hasSelection = _selectedFront.isNotEmpty || _selectedBack.isNotEmpty;
+
     return Positioned(
       bottom: 0,
       left: 0,
@@ -655,7 +739,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
               HapticFeedback.heavyImpact();
               final allSoreMuscles = {..._selectedFront, ..._selectedBack};
 
-              // Navigate based on whether PreWorkoutScreen accepts soreMuscles parameter
               Navigator.push(
                 ctx,
                 PageRouteBuilder(
@@ -676,31 +759,41 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
             child: Container(
               height: 60,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Colors.white, Color(0xFFE0E0E0)]),
+                gradient: LinearGradient(
+                  colors: hasSelection
+                      ? [const Color(0xFFD4AF37), const Color(0xFFB8941F)]
+                      : [Colors.white, const Color(0xFFE0E0E0)],
+                ),
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.white.withOpacity(0.2),
+                    color: hasSelection
+                        ? const Color(0xFFD4AF37).withOpacity(0.3)
+                        : Colors.white.withOpacity(0.2),
                     blurRadius: 20,
                     spreadRadius: 2,
                   ),
                 ],
               ),
-              child: const Center(
+              child: Center(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'CONTINUE',
+                      hasSelection ? 'CONTINUE WITH ${_selectedFront.length + _selectedBack.length} AREAS' : 'CONTINUE',
                       style: TextStyle(
-                        color: Colors.black,
+                        color: hasSelection ? Colors.white : Colors.black,
                         letterSpacing: 2,
                         fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                        fontSize: 15,
                       ),
                     ),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward, color: Colors.black, size: 20),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward,
+                      color: hasSelection ? Colors.white : Colors.black,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -716,12 +809,14 @@ class _HighlightPainter extends CustomPainter {
   final Set<String> selected;
   final Map<String, Path> paths;
   final double scale;
+  final double pulseValue;
   final bool isBackView;
 
   _HighlightPainter({
     required this.selected,
     required this.paths,
     required this.scale,
+    required this.pulseValue,
     this.isBackView = false,
   });
 
@@ -730,13 +825,18 @@ class _HighlightPainter extends CustomPainter {
     if (selected.isEmpty) return;
 
     final paint = Paint()
-      ..color = Colors.red.withOpacity(0.35)
+      ..color = Colors.red.withOpacity(pulseValue)
       ..style = PaintingStyle.fill;
 
+    final strokePaint = Paint()
+      ..color = Colors.red.withOpacity(0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 / scale;
+
     final glowPaint = Paint()
-      ..color = Colors.red.withOpacity(0.15)
+      ..color = Colors.red.withOpacity(0.2)
       ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
 
     canvas.save();
     canvas.scale(scale, scale);
@@ -749,10 +849,10 @@ class _HighlightPainter extends CustomPainter {
     for (final id in selected) {
       final p = paths[id];
       if (p != null) {
-        // Draw glow effect
+        // Draw multiple layers for better visibility
         canvas.drawPath(p, glowPaint);
-        // Draw main highlight
         canvas.drawPath(p, paint);
+        canvas.drawPath(p, strokePaint);
       }
     }
 
@@ -764,5 +864,32 @@ class _HighlightPainter extends CustomPainter {
       !setEquals(old.selected, selected) ||
           !mapEquals(old.paths, paths) ||
           old.scale != scale ||
+          old.pulseValue != pulseValue ||
           old.isBackView != isBackView;
+}
+
+class _GridPainter extends CustomPainter {
+  final double opacity;
+
+  _GridPainter({required this.opacity});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(opacity)
+      ..strokeWidth = 0.5;
+
+    const spacing = 30.0;
+
+    for (double i = 0; i < size.width; i += spacing) {
+      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
+    }
+
+    for (double i = 0; i < size.height; i += spacing) {
+      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

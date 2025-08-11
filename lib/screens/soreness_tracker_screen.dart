@@ -200,7 +200,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       }
       print('Parsed ${frontMap.length} front paths');
 
-      // Load back muscles - NO TRANSFORM APPLIED
+      // Load back muscles
       print('Loading back SVG...');
       final backRaw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
       final backDoc = XmlDocument.parse(backRaw);
@@ -214,8 +214,12 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
         final d = e.getAttribute('d');
         if (id == null || d == null) continue;
 
+        // Skip paths without fill or with specific IDs to ignore
+        if (id.startsWith('path29') || id.startsWith('path30') ||
+            id.startsWith('path33') || id.startsWith('path39') ||
+            id.startsWith('path42')) continue;
+
         try {
-          // Parse WITHOUT applying transform - let SVG handle it visually
           final p = parseSvgPathData(d);
           backMap[id] = p;
           print('Added back path: $id');
@@ -448,8 +452,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     );
   }
 
-
-
   Widget _diagram() {
     final svgPath = _showingFront
         ? 'assets/svg/final-front-muscles.svg'
@@ -462,80 +464,104 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
 
     // Use a consistent height for both views
     final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
     final diagramHeight = screenHeight * 0.45; // 45% of screen height
 
-    // Calculate width based on each SVG's aspect ratio
-    final currentVbW = _showingFront ? _frontVbW : _backVbW;
-    final currentVbH = _showingFront ? _frontVbH : _backVbH;
-    final aspectRatio = currentVbW / currentVbH;
-    final diagramWidth = diagramHeight * aspectRatio;
+    // Use a square container to ensure both SVGs are centered properly
+    final containerSize = diagramHeight;
 
     return SizedBox(
-      height: diagramHeight,
+      height: containerSize,
+      width: screenWidth, // Use full screen width for proper centering
       child: Center(
-        child: SizedBox(
-          width: diagramWidth,
-          height: diagramHeight,
-          child: LayoutBuilder(
-            builder: (_, constraints) {
-              final scale = constraints.maxHeight / currentVbH; // Scale based on height
+        child: LayoutBuilder(
+          builder: (_, constraints) {
+            final currentVbW = _showingFront ? _frontVbW : _backVbW;
+            final currentVbH = _showingFront ? _frontVbH : _backVbH;
 
-              return Stack(
-                children: [
-                  // SVG Display - scaled to same height
-                  SvgPicture.asset(
+            // Calculate scale to fit within the container
+            final scaleX = containerSize / currentVbW;
+            final scaleY = containerSize / currentVbH;
+            final scale = scaleX < scaleY ? scaleX : scaleY; // Use smaller scale to fit
+
+            final scaledWidth = currentVbW * scale;
+            final scaledHeight = currentVbH * scale;
+
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                // SVG Display - properly centered
+                Container(
+                  width: scaledWidth,
+                  height: scaledHeight,
+                  child: SvgPicture.asset(
                     svgPath,
-                    fit: BoxFit.fill,
-                    width: constraints.maxWidth,
-                    height: constraints.maxHeight,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
                   ),
+                ),
 
-                  // Custom Paint overlay for highlights
-                  CustomPaint(
-                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                // Custom Paint overlay for highlights
+                Positioned(
+                  width: scaledWidth,
+                  height: scaledHeight,
+                  child: CustomPaint(
+                    size: Size(scaledWidth, scaledHeight),
                     painter: _HighlightPainter(
                       selected: _currentSelection,
                       paths: _currentPaths,
                       scale: scale,
+                      isBackView: !_showingFront,
                     ),
                   ),
+                ),
 
-                  // Gesture Detector
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTapDown: (d) {
-                        if (_currentPaths.isEmpty) {
-                          print('No paths loaded for tap detection');
-                          return;
+                // Gesture Detector
+                Positioned(
+                  width: scaledWidth,
+                  height: scaledHeight,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (d) {
+                      if (_currentPaths.isEmpty) {
+                        print('No paths loaded for tap detection');
+                        return;
+                      }
+
+                      final lp = d.localPosition;
+
+                      // Convert tap position to SVG coordinate space
+                      double x, y;
+                      if (_showingFront) {
+                        x = lp.dx / scale;
+                        y = lp.dy / scale;
+                      } else {
+                        // Account for the transform in the back SVG
+                        x = (lp.dx / scale) + 27.789474;
+                        y = (lp.dy / scale) + 29.526316;
+                      }
+
+                      print('Tap at screen: (${lp.dx.toStringAsFixed(1)}, ${lp.dy.toStringAsFixed(1)})');
+                      print('Tap at viewBox: (${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)})');
+
+                      bool found = false;
+                      for (final e in _currentPaths.entries) {
+                        if (e.value.contains(Offset(x, y))) {
+                          print('Found path: ${e.key}');
+                          _toggle(e.key);
+                          found = true;
+                          break;
                         }
-
-                        final lp = d.localPosition;
-                        final x = lp.dx / scale;
-                        final y = lp.dy / scale;
-
-                        print('Tap at screen: (${lp.dx.toStringAsFixed(1)}, ${lp.dy.toStringAsFixed(1)})');
-                        print('Tap at viewBox: (${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)})');
-
-                        bool found = false;
-                        for (final e in _currentPaths.entries) {
-                          if (e.value.contains(Offset(x, y))) {
-                            print('Found path: ${e.key}');
-                            _toggle(e.key);
-                            found = true;
-                            break;
-                          }
-                        }
-                        if (!found) {
-                          print('No path found at tap location');
-                        }
-                      },
-                    ),
+                      }
+                      if (!found) {
+                        print('No path found at tap location');
+                      }
+                    },
                   ),
-                ],
-              );
-            },
-          ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -635,9 +661,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                 PageRouteBuilder(
                   pageBuilder: (_, __, ___) => PreWorkoutScreen(
                     workoutType: widget.workoutType,
-                    duration: widget.duration, soreMuscles: [],
-                    // Uncomment if PreWorkoutScreen accepts this parameter:
-                    // soreMuscles: allSoreMuscles.toList(),
+                    duration: widget.duration,
+                    soreMuscles: allSoreMuscles.toList(),
                   ),
                   transitionsBuilder: (_, anim, __, child) {
                     final tween = Tween(begin: const Offset(0, 1), end: Offset.zero)
@@ -691,11 +716,13 @@ class _HighlightPainter extends CustomPainter {
   final Set<String> selected;
   final Map<String, Path> paths;
   final double scale;
+  final bool isBackView;
 
   _HighlightPainter({
     required this.selected,
     required this.paths,
     required this.scale,
+    this.isBackView = false,
   });
 
   @override
@@ -714,6 +741,11 @@ class _HighlightPainter extends CustomPainter {
     canvas.save();
     canvas.scale(scale, scale);
 
+    // Apply transform for back view to match the SVG's transform
+    if (isBackView) {
+      canvas.translate(-27.789474, -29.526316);
+    }
+
     for (final id in selected) {
       final p = paths[id];
       if (p != null) {
@@ -731,5 +763,6 @@ class _HighlightPainter extends CustomPainter {
   bool shouldRepaint(covariant _HighlightPainter old) =>
       !setEquals(old.selected, selected) ||
           !mapEquals(old.paths, paths) ||
-          old.scale != scale;
+          old.scale != scale ||
+          old.isBackView != isBackView;
 }

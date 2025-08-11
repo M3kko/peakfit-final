@@ -41,15 +41,11 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   bool _isLoading = true;
   String _loadError = '';
 
-  // Raw SVG viewBox dimensions and transforms
+  // Raw SVG viewBox dimensions
   static const double _frontVbW = 210.0;
   static const double _frontVbH = 297.0;
   static const double _backVbW = 210.0;
   static const double _backVbH = 297.0;
-
-  // Back SVG has a transform that shifts content
-  static const double _backTransformX = -27.789474;
-  static const double _backTransformY = -29.526316;
 
   // Parsed paths for both views
   Map<String, Path> _frontPaths = {};
@@ -494,12 +490,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     final maxHeight = screenHeight * 0.6;
     final maxWidth = screenWidth - 40; // Account for padding
 
-    // Both SVGs have same viewBox, but back has a transform
-    final currentVbW = _showingFront ? _frontVbW : _backVbW;
-    final currentVbH = _showingFront ? _frontVbH : _backVbH;
-
     // Calculate scale to fit within constraints while maintaining aspect ratio
-    final aspectRatio = currentVbW / currentVbH;
+    final aspectRatio = _frontVbW / _frontVbH;
     double svgHeight = maxHeight;
     double svgWidth = svgHeight * aspectRatio;
 
@@ -509,7 +501,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       svgHeight = svgWidth / aspectRatio;
     }
 
-    final scale = svgWidth / currentVbW;
+    final scale = svgWidth / _frontVbW;
 
     return Container(
       height: svgHeight + 20, // Add some padding
@@ -564,7 +556,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                     paths: _currentPaths,
                     scale: scale,
                     pulseValue: _selectedPulse.value,
-                    isBackView: !_showingFront,
                   ),
                 );
               },
@@ -581,16 +572,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                 if (_currentPaths.isEmpty) return;
 
                 final lp = d.localPosition;
-
-                // Convert tap position to SVG coordinate space
-                double x = lp.dx / scale;
-                double y = lp.dy / scale;
-
-                // For back view, we need to account for the transform
-                if (!_showingFront) {
-                  x = x + _backTransformX;
-                  y = y + _backTransformY;
-                }
+                final x = lp.dx / scale;
+                final y = lp.dy / scale;
 
                 for (final e in _currentPaths.entries) {
                   if (e.value.contains(Offset(x, y))) {
@@ -810,14 +793,12 @@ class _HighlightPainter extends CustomPainter {
   final Map<String, Path> paths;
   final double scale;
   final double pulseValue;
-  final bool isBackView;
 
   _HighlightPainter({
     required this.selected,
     required this.paths,
     required this.scale,
     required this.pulseValue,
-    this.isBackView = false,
   });
 
   @override
@@ -841,11 +822,6 @@ class _HighlightPainter extends CustomPainter {
     canvas.save();
     canvas.scale(scale, scale);
 
-    // Apply transform for back view to match the SVG's transform
-    if (isBackView) {
-      canvas.translate(-27.789474, -29.526316);
-    }
-
     for (final id in selected) {
       final p = paths[id];
       if (p != null) {
@@ -864,8 +840,7 @@ class _HighlightPainter extends CustomPainter {
       !setEquals(old.selected, selected) ||
           !mapEquals(old.paths, paths) ||
           old.scale != scale ||
-          old.pulseValue != pulseValue ||
-          old.isBackView != isBackView;
+          old.pulseValue != pulseValue;
 }
 
 class _GridPainter extends CustomPainter {

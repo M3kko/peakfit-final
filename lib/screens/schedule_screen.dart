@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' as math;
 
 class ScheduleScreen extends StatefulWidget {
@@ -25,59 +27,196 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   // Current week
   int _currentWeekOffset = 0;
   late DateTime _currentWeekStart;
+  DateTime? _accountCreatedDate;
+  bool _isFirstWeek = false;
 
-  // Placeholder workout schedule
+  // Basketball-specific workout schedule for vertical jump & posture improvement
+  // Includes ankle-friendly modifications
+  final Map<String, Map<String, dynamic>> _basketballSchedule = {
+    'Day 1': {
+      'title': 'EXPLOSIVE POWER',
+      'focus': ['PLYOMETRICS', 'GLUTES', 'CORE'],
+      'intensity': 'HIGH',
+      'completed': false,
+      'exercises': [
+        'Box Jumps (modified height)',
+        'Single-Leg Bounds',
+        'Broad Jumps',
+        'Plank Variations',
+        'Bird Dogs'
+      ],
+      'notes': 'Focus on soft landings to protect ankle'
+    },
+    'Day 2': {
+      'title': 'POSTURE & STABILITY',
+      'focus': ['UPPER BACK', 'SHOULDERS', 'BALANCE'],
+      'intensity': 'MEDIUM',
+      'completed': false,
+      'exercises': [
+        'Wall Angels',
+        'Y-T-W Raises',
+        'Single-Leg Balance',
+        'Band Pull-Aparts',
+        'Cat-Cow Stretches'
+      ],
+      'notes': 'Emphasize shoulder blade control'
+    },
+    'Day 3': {
+      'title': 'LOWER BODY STRENGTH',
+      'focus': ['QUADS', 'HAMSTRINGS', 'CALVES'],
+      'intensity': 'HIGH',
+      'completed': false,
+      'exercises': [
+        'Jump Squats',
+        'Bulgarian Split Squats',
+        'Nordic Curls (assisted)',
+        'Calf Raises (bilateral)',
+        'Ankle Mobility Work'
+      ],
+      'notes': 'Build bilateral strength first'
+    },
+    'Day 4': {
+      'title': 'ACTIVE RECOVERY',
+      'focus': ['MOBILITY', 'FLEXIBILITY', 'ANKLE REHAB'],
+      'intensity': 'LOW',
+      'completed': false,
+      'exercises': [
+        'Dynamic Stretching',
+        'Foam Rolling',
+        'Ankle Circles & Flexion',
+        'Hip Mobility',
+        'Light Shooting Practice'
+      ],
+      'notes': 'Focus on ankle rehabilitation'
+    },
+    'Day 5': {
+      'title': 'VERTICAL FOCUS',
+      'focus': ['JUMP TECHNIQUE', 'EXPLOSIVENESS', 'CORE'],
+      'intensity': 'HIGH',
+      'completed': false,
+      'exercises': [
+        'Depth Jumps (low height)',
+        'Medicine Ball Slams',
+        'Squat Jumps',
+        'Hollow Body Holds',
+        'Russian Twists'
+      ],
+      'notes': 'Progressive jump height based on ankle comfort'
+    },
+    'Day 6': {
+      'title': 'BASKETBALL SKILLS',
+      'focus': ['AGILITY', 'COORDINATION', 'ENDURANCE'],
+      'intensity': 'MEDIUM',
+      'completed': false,
+      'exercises': [
+        'Ladder Drills',
+        'Defensive Slides',
+        'Sprint Intervals',
+        'Ball Handling',
+        'Post Work'
+      ],
+      'notes': 'Sport-specific movement patterns'
+    },
+    'Day 7': {
+      'title': 'REST & RECOVERY',
+      'focus': ['RECOVERY', 'NUTRITION', 'MENTAL'],
+      'intensity': 'REST',
+      'completed': false,
+      'exercises': [
+        'Light Walking',
+        'Meditation',
+        'Film Study',
+        'Hydration Focus',
+        'Sleep Optimization'
+      ],
+      'notes': 'Complete rest or light activity only'
+    },
+  };
+
+  // Standard weekly schedule (after first week)
   final Map<String, Map<String, dynamic>> _weeklySchedule = {
     'Monday': {
-      'title': 'UPPER BODY STRENGTH',
-      'focus': ['CHEST', 'SHOULDERS', 'TRICEPS'],
+      'title': 'EXPLOSIVE POWER',
+      'focus': ['PLYOMETRICS', 'GLUTES', 'CORE'],
       'intensity': 'HIGH',
       'completed': false,
     },
     'Tuesday': {
-      'title': 'CARDIO & CORE',
-      'focus': ['HIIT', 'ABS', 'OBLIQUES'],
+      'title': 'POSTURE & STABILITY',
+      'focus': ['UPPER BACK', 'SHOULDERS', 'BALANCE'],
       'intensity': 'MEDIUM',
-      'completed': true,
+      'completed': false,
     },
     'Wednesday': {
-      'title': 'LOWER BODY POWER',
-      'focus': ['QUADS', 'GLUTES', 'CALVES'],
+      'title': 'LOWER BODY STRENGTH',
+      'focus': ['QUADS', 'HAMSTRINGS', 'CALVES'],
       'intensity': 'HIGH',
       'completed': false,
     },
     'Thursday': {
       'title': 'ACTIVE RECOVERY',
-      'focus': ['YOGA', 'STRETCHING', 'MOBILITY'],
+      'focus': ['MOBILITY', 'FLEXIBILITY', 'ANKLE REHAB'],
       'intensity': 'LOW',
       'completed': false,
     },
     'Friday': {
-      'title': 'FULL BODY CIRCUIT',
-      'focus': ['STRENGTH', 'ENDURANCE', 'POWER'],
+      'title': 'VERTICAL FOCUS',
+      'focus': ['JUMP TECHNIQUE', 'EXPLOSIVENESS', 'CORE'],
       'intensity': 'HIGH',
       'completed': false,
     },
     'Saturday': {
-      'title': 'OUTDOOR ACTIVITY',
-      'focus': ['RUN', 'BIKE', 'SWIM'],
+      'title': 'BASKETBALL SKILLS',
+      'focus': ['AGILITY', 'COORDINATION', 'ENDURANCE'],
       'intensity': 'MEDIUM',
       'completed': false,
     },
     'Sunday': {
-      'title': 'REST DAY',
-      'focus': ['RECOVERY', 'NUTRITION', 'HYDRATION'],
+      'title': 'REST & RECOVERY',
+      'focus': ['RECOVERY', 'NUTRITION', 'MENTAL'],
       'intensity': 'REST',
-      'completed': true,
+      'completed': false,
     },
   };
 
   @override
   void initState() {
     super.initState();
+    _loadAccountCreatedDate();
     _initializeWeek();
     _initAnimations();
     _startAnimations();
+  }
+
+  Future<void> _loadAccountCreatedDate() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (doc.exists && doc.data()?['createdAt'] != null) {
+          setState(() {
+            _accountCreatedDate = (doc.data()!['createdAt'] as Timestamp).toDate();
+            _checkIfFirstWeek();
+          });
+        }
+      } catch (e) {
+        print('Error loading account creation date: $e');
+      }
+    }
+  }
+
+  void _checkIfFirstWeek() {
+    if (_accountCreatedDate != null) {
+      final now = DateTime.now();
+      final daysSinceCreation = now.difference(_accountCreatedDate!).inDays;
+
+      // Check if we're still in the first week (0-6 days since creation)
+      _isFirstWeek = daysSinceCreation < 7 && _currentWeekOffset == 0;
+    }
   }
 
   void _initializeWeek() {
@@ -150,6 +289,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   void _goToPreviousWeek() {
     setState(() {
       _currentWeekOffset--;
+      _checkIfFirstWeek();
       _dayCardController.reset();
       _dayCardController.forward();
     });
@@ -159,6 +299,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   void _goToNextWeek() {
     setState(() {
       _currentWeekOffset++;
+      _checkIfFirstWeek();
       _dayCardController.reset();
       _dayCardController.forward();
     });
@@ -179,12 +320,62 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     }
   }
 
-  bool _isToday(String dayName) {
-    if (_currentWeekOffset != 0) return false;
+  List<Map<String, dynamic>> _getCurrentSchedule() {
+    if (_isFirstWeek && _accountCreatedDate != null) {
+      // First week: Start from account creation day
+      final creationWeekday = _accountCreatedDate!.weekday;
+      final daysSinceCreation = DateTime.now().difference(_accountCreatedDate!).inDays;
 
+      List<Map<String, dynamic>> schedule = [];
+
+      // Add days from creation day to end of week
+      for (int i = 0; i < 7; i++) {
+        final dayNumber = i + 1;
+        final dayData = Map<String, dynamic>.from(_basketballSchedule['Day $dayNumber']!);
+
+        // Calculate actual date for this day
+        final dayDate = _accountCreatedDate!.add(Duration(days: i));
+        final isToday = _isToday(dayDate);
+        final isPast = i < daysSinceCreation;
+
+        dayData['dayName'] = 'Day $dayNumber';
+        dayData['date'] = dayDate;
+        dayData['isToday'] = isToday;
+        dayData['isPast'] = isPast;
+
+        schedule.add(dayData);
+      }
+
+      return schedule;
+    } else {
+      // Regular weeks: Monday to Sunday
+      final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      List<Map<String, dynamic>> schedule = [];
+
+      for (int i = 0; i < days.length; i++) {
+        final dayName = days[i];
+        final dayData = Map<String, dynamic>.from(_weeklySchedule[dayName]!);
+
+        final weekStart = _currentWeekStart.add(Duration(days: _currentWeekOffset * 7));
+        final dayDate = weekStart.add(Duration(days: i));
+
+        dayData['dayName'] = dayName;
+        dayData['date'] = dayDate;
+        dayData['isToday'] = _isToday(dayDate);
+        dayData['isPast'] = dayDate.isBefore(DateTime.now().subtract(const Duration(days: 1)));
+
+        schedule.add(dayData);
+      }
+
+      return schedule;
+    }
+  }
+
+  bool _isToday(DateTime date) {
     final now = DateTime.now();
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    return days[now.weekday - 1] == dayName;
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 
   Color _getIntensityColor(String intensity) {
@@ -225,6 +416,8 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                           _buildHeader(),
                           const SizedBox(height: 32),
                           _buildWeekSelector(),
+                          const SizedBox(height: 24),
+                          _buildProgramInfo(),
                           const SizedBox(height: 32),
                           _buildScheduleList(),
                           const SizedBox(height: 100),
@@ -283,13 +476,76 @@ class _ScheduleScreenState extends State<ScheduleScreen>
             ),
           ),
           const SizedBox(width: 16),
-          const Text(
-            'WEEKLY SCHEDULE',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w300,
-              color: Colors.white,
-              letterSpacing: 2,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'BASKETBALL TRAINING',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w300,
+                  color: Colors.white,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'VERTICAL & POSTURE FOCUS',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: const Color(0xFFD4AF37).withOpacity(0.8),
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgramInfo() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD4AF37).withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFD4AF37).withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.sports_basketball,
+            color: const Color(0xFFD4AF37).withOpacity(0.8),
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'FORWARD POSITION',
+                  style: TextStyle(
+                    color: const Color(0xFFD4AF37),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Bodyweight • Ankle-Safe • Progressive',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -298,6 +554,11 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 
   Widget _buildWeekSelector() {
+    final weekLabel = _isFirstWeek ? 'WEEK 1 - ONBOARDING' :
+    _currentWeekOffset == 0 ? 'CURRENT WEEK' :
+    _currentWeekOffset < 0 ? '${-_currentWeekOffset} WEEK${-_currentWeekOffset > 1 ? 'S' : ''} AGO' :
+    '${_currentWeekOffset} WEEK${_currentWeekOffset > 1 ? 'S' : ''} AHEAD';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
@@ -330,20 +591,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               children: [
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  transitionBuilder: (Widget child, Animation<double> animation) {
-                    return FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0.0, 0.2),
-                          end: Offset.zero,
-                        ).animate(animation),
-                        child: child,
-                      ),
-                    );
-                  },
                   child: Text(
                     _getWeekDateRange(),
                     key: ValueKey<String>(_getWeekDateRange()),
@@ -356,28 +603,17 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   ),
                 ),
                 const SizedBox(height: 8),
-                if (_currentWeekOffset == 0)
-                  Text(
-                    'CURRENT WEEK',
-                    style: TextStyle(
-                      color: const Color(0xFFD4AF37).withOpacity(0.8),
-                      fontSize: 12,
-                      letterSpacing: 1.5,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  )
-                else
-                  Text(
-                    _currentWeekOffset < 0
-                        ? '${-_currentWeekOffset} WEEK${-_currentWeekOffset > 1 ? 'S' : ''} AGO'
-                        : '${_currentWeekOffset} WEEK${_currentWeekOffset > 1 ? 'S' : ''} AHEAD',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 12,
-                      letterSpacing: 1.5,
-                      fontWeight: FontWeight.w400,
-                    ),
+                Text(
+                  weekLabel,
+                  style: TextStyle(
+                    color: _isFirstWeek || _currentWeekOffset == 0
+                        ? const Color(0xFFD4AF37).withOpacity(0.8)
+                        : Colors.white.withOpacity(0.5),
+                    fontSize: 12,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.w400,
                   ),
+                ),
               ],
             ),
           ),
@@ -404,7 +640,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 
   Widget _buildScheduleList() {
-    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final schedule = _getCurrentSchedule();
 
     return AnimatedBuilder(
       animation: _dayCardScale,
@@ -412,11 +648,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         return Transform.scale(
           scale: _dayCardScale.value,
           child: Column(
-            children: days.asMap().entries.map((entry) {
+            children: schedule.asMap().entries.map((entry) {
               final index = entry.key;
-              final day = entry.value;
-              final workout = _weeklySchedule[day]!;
-              final isToday = _isToday(day);
+              final dayData = entry.value;
 
               return TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0.0, end: 1.0),
@@ -427,7 +661,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                     opacity: value,
                     child: Transform.translate(
                       offset: Offset(0, 20 * (1 - value)),
-                      child: _buildDayCard(day, workout, isToday),
+                      child: _buildDayCard(dayData),
                     ),
                   );
                 },
@@ -439,7 +673,11 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     );
   }
 
-  Widget _buildDayCard(String day, Map<String, dynamic> workout, bool isToday) {
+  Widget _buildDayCard(Map<String, dynamic> dayData) {
+    final isToday = dayData['isToday'] ?? false;
+    final isPast = dayData['isPast'] ?? false;
+    final dayName = dayData['dayName'];
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: AnimatedBuilder(
@@ -489,7 +727,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                               Row(
                                 children: [
                                   Text(
-                                    day.toUpperCase(),
+                                    dayName.toUpperCase(),
                                     style: TextStyle(
                                       color: isToday
                                           ? const Color(0xFFD4AF37)
@@ -525,7 +763,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                workout['title'],
+                                dayData['title'],
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -535,7 +773,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                               ),
                             ],
                           ),
-                          if (workout['completed'] == true)
+                          if (dayData['completed'] == true || isPast)
                             Container(
                               width: 32,
                               height: 32,
@@ -559,7 +797,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: (workout['focus'] as List<String>).map((focus) {
+                        children: (dayData['focus'] as List<String>).map((focus) {
                           return Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -589,18 +827,34 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                         children: [
                           Icon(
                             Icons.local_fire_department,
-                            color: _getIntensityColor(workout['intensity']),
+                            color: _getIntensityColor(dayData['intensity']),
                             size: 16,
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            workout['intensity'],
+                            dayData['intensity'],
                             style: TextStyle(
-                              color: _getIntensityColor(workout['intensity']),
+                              color: _getIntensityColor(dayData['intensity']),
                               fontSize: 12,
                               letterSpacing: 0.5,
                             ),
                           ),
+                          if (dayData['intensity'] == 'HIGH') ...[
+                            const SizedBox(width: 16),
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.orange.withOpacity(0.7),
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Ankle-Safe',
+                              style: TextStyle(
+                                color: Colors.orange.withOpacity(0.7),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],

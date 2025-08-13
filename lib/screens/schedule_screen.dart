@@ -499,7 +499,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'FORWARD POSITION',
+                  'FORWARD/CENTER POSITION',
                   style: TextStyle(
                     color: const Color(0xFFD4AF37),
                     fontSize: 12,

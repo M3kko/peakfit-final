@@ -257,6 +257,23 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     });
   }
 
+  void _skipExercise() {
+    HapticFeedback.mediumImpact();
+    _timer?.cancel();
+
+    if (_currentExerciseIndex < widget.exercises.length - 1) {
+      setState(() {
+        _currentExerciseIndex++;
+        _currentSet = 1;
+        _isResting = false;
+        _totalExercisesCompleted++;
+      });
+      _startExercise();
+    } else {
+      _completeWorkout();
+    }
+  }
+
   void _goToNextExercise() {
     setState(() {
       _totalExercisesCompleted++;
@@ -439,15 +456,33 @@ class _WorkoutScreenState extends State<WorkoutScreen>
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          IconButton(
-            onPressed: _togglePause,
-            icon: Icon(
-              _isPaused ? Icons.play_arrow : Icons.pause,
-              color: Colors.white,
-              size: 24,
-            ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
+          Row(
+            children: [
+              IconButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _skipExercise();
+                },
+                icon: const Icon(
+                  Icons.skip_next,
+                  color: Colors.orange,
+                  size: 20,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _togglePause,
+                icon: Icon(
+                  _isPaused ? Icons.play_arrow : Icons.pause,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
           ),
         ],
       ),

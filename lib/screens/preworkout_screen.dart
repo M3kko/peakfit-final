@@ -761,19 +761,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                               ],
                             ],
                           ),
-                          if (exercise['notes'] != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              exercise['upgradeNotes'] ?? exercise['notes'],
-                              style: TextStyle(
-                                color: isUpgraded
-                                    ? Colors.green.withOpacity(0.6)
-                                    : Colors.white.withOpacity(0.4),
-                                fontSize: 11,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
+
                         ],
                       ),
                     ),
@@ -821,7 +809,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Ankle protection: Focus on soft landings and controlled movements',
+                            'Ankle protection: soft landings',
                             style: TextStyle(
                               color: const Color(0xFFD4AF37).withOpacity(0.8),
                               fontSize: 11,

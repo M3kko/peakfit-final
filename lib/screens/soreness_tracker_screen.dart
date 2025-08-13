@@ -59,50 +59,50 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   Map<String, Path> get _currentPaths => _showingFront ? _frontPaths : _backPaths;
   Matrix4? get _currentTransform => _showingFront ? _frontTransform : _backTransform;
 
-  // Muscle display names for front
+  // Muscle display names for front (mirrored - anatomical right is user's left)
   static const Map<String, String> _frontNames = {
     'neck': 'Neck',
-    'upper-trapezius-left': 'Left Upper Traps',
-    'upper-trapezius-right': 'Right Upper Traps',
-    'upper-pectoralis-right': 'Right Upper Chest',
-    'upper-pectoralis-left': 'Left Upper Chest',
-    'anterior-deltoid-right': 'Right Front Delt',
-    'anterior-deltoid-left': 'Left Front Delt',
-    'lateral-deltoid-right': 'Right Side Delt',
-    'lateral-deltoid-left': 'Left Side Delt',
-    'mid-lower-pectoralis-right': 'Right Lower Chest',
-    'mid-lower-pectoralis-left': 'Left Lower Chest',
-    'obliques-left': 'Left Obliques',
-    'obliques-right': 'Right Obliques',
-    'short-head-bicep-left': 'Left Bicep (Short)',
-    'long-head-bicep-left': 'Left Bicep (Long)',
-    'short-head-bicep-right': 'Right Bicep (Short)',
-    'long-head-bicep-right': 'Right Bicep (Long)',
-    'wrist-extensors-left': 'Left Wrist Extensors',
-    'wrist-flexors-left': 'Left Wrist Flexors',
-    'wrist-left': 'Left Wrist',
-    'wrist-extensors-right': 'Right Wrist Extensors',
-    'wrist-flexors-right': 'Right Wrist Flexors',
-    'wrist-right': 'Right Wrist',
+    'upper-trapezius-left': 'Right Upper Traps',  // Mirrored
+    'upper-trapezius-right': 'Left Upper Traps',  // Mirrored
+    'upper-pectoralis-right': 'Left Upper Chest',  // Mirrored
+    'upper-pectoralis-left': 'Right Upper Chest',  // Mirrored
+    'anterior-deltoid-right': 'Left Front Delt',  // Mirrored
+    'anterior-deltoid-left': 'Right Front Delt',  // Mirrored
+    'lateral-deltoid-right': 'Left Side Delt',  // Mirrored
+    'lateral-deltoid-left': 'Right Side Delt',  // Mirrored
+    'mid-lower-pectoralis-right': 'Left Lower Chest',  // Mirrored
+    'mid-lower-pectoralis-left': 'Right Lower Chest',  // Mirrored
+    'obliques-left': 'Right Obliques',  // Mirrored
+    'obliques-right': 'Left Obliques',  // Mirrored
+    'short-head-bicep-left': 'Right Bicep (Short)',  // Mirrored
+    'long-head-bicep-left': 'Right Bicep (Long)',  // Mirrored
+    'short-head-bicep-right': 'Left Bicep (Short)',  // Mirrored
+    'long-head-bicep-right': 'Left Bicep (Long)',  // Mirrored
+    'wrist-extensors-left': 'Right Wrist Extensors',  // Mirrored
+    'wrist-flexors-left': 'Right Wrist Flexors',  // Mirrored
+    'wrist-left': 'Right Wrist',  // Mirrored
+    'wrist-extensors-right': 'Left Wrist Extensors',  // Mirrored
+    'wrist-flexors-right': 'Left Wrist Flexors',  // Mirrored
+    'wrist-right': 'Left Wrist',  // Mirrored
     'groin': 'Groin',
     'lower-abdominals': 'Lower Abs',
     'upper-abdominals': 'Upper Abs',
-    'outer-quadricep-right': 'Right Outer Quad',
-    'outer-quadricep-left': 'Left Outer Quad',
-    'rectus-femoris-right': 'Right Rectus Femoris',
-    'rectus-femoris-left': 'Left Rectus Femoris',
-    'inner-quadricep-right': 'Right Inner Quad',
-    'inner-quadricep-left': 'Left Inner Quad',
-    'inner-thigh-right': 'Right Inner Thigh',
-    'inner-thigh-left': 'Left Inner Thigh',
-    'tibialis-right': 'Right Tibialis',
-    'tibialis-left': 'Left Tibialis',
-    'gastrocnemius-right': 'Right Calf',
-    'gastrocnemius-left': 'Left Calf',
-    'soleus-right': 'Right Soleus',
-    'soleus-left': 'Left Soleus',
-    'foot-right': 'Right Foot',
-    'foot-left': 'Left Foot',
+    'outer-quadricep-right': 'Left Outer Quad',  // Mirrored
+    'outer-quadricep-left': 'Right Outer Quad',  // Mirrored
+    'rectus-femoris-right': 'Left Rectus Femoris',  // Mirrored
+    'rectus-femoris-left': 'Right Rectus Femoris',  // Mirrored
+    'inner-quadricep-right': 'Left Inner Quad',  // Mirrored
+    'inner-quadricep-left': 'Right Inner Quad',  // Mirrored
+    'inner-thigh-right': 'Left Inner Thigh',  // Mirrored
+    'inner-thigh-left': 'Right Inner Thigh',  // Mirrored
+    'tibialis-right': 'Left Tibialis',  // Mirrored
+    'tibialis-left': 'Right Tibialis',  // Mirrored
+    'gastrocnemius-right': 'Left Calf',  // Mirrored
+    'gastrocnemius-left': 'Right Calf',  // Mirrored
+    'soleus-right': 'Left Soleus',  // Mirrored
+    'soleus-left': 'Right Soleus',  // Mirrored
+    'foot-right': 'Left Foot',  // Mirrored
+    'foot-left': 'Right Foot',  // Mirrored
   };
 
   // Muscle display names for back
@@ -845,20 +845,15 @@ class _HighlightPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (selected.isEmpty) return;
 
-    // Red glass effect with subtle pulse
+    // Clean red glass effect with subtle pulse - no outline
     final paint = Paint()
-      ..color = Colors.red.withOpacity(pulseValue * 0.3) // Subtle pulse
+      ..color = Colors.red.withOpacity(pulseValue * 0.4) // Slightly stronger pulse for visibility
       ..style = PaintingStyle.fill;
 
-    final strokePaint = Paint()
-      ..color = Colors.red.withOpacity(0.6)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
     final glowPaint = Paint()
-      ..color = Colors.red.withOpacity(0.15)
+      ..color = Colors.red.withOpacity(0.2)
       ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
 
     // Calculate scale from viewBox to display size
     final scaleX = displayWidth / viewBoxWidth;
@@ -870,10 +865,9 @@ class _HighlightPainter extends CustomPainter {
     for (final id in selected) {
       final path = paths[id];
       if (path != null) {
-        // Draw glow, fill, and stroke
+        // Draw only glow and fill - no stroke for cleaner look
         canvas.drawPath(path, glowPaint);
         canvas.drawPath(path, paint);
-        canvas.drawPath(path, strokePaint);
       }
     }
 

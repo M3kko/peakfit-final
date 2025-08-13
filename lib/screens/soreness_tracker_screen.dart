@@ -29,18 +29,19 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   late final AnimationController _fadeCtrl;
   late final AnimationController _pulseCtrl;
   late final AnimationController _switchCtrl;
+  late final AnimationController _selectedPulseCtrl;
   late final Animation<double> _fade;
   late final Animation<double> _slideUp;
   late final Animation<double> _pulse;
   late final Animation<double> _switchFade;
+  late final Animation<double> _selectedPulse;
 
   // View state
   bool _showingFront = true;
   bool _isLoading = true;
   String _loadError = '';
 
-  // IMPORTANT: These should match your actual SVG viewBox values
-  // Based on your SVG files, both have viewBox="0 0 210 297"
+  // SVG viewBox dimensions (both SVGs have same viewBox)
   static const double _svgViewBoxWidth = 210.0;
   static const double _svgViewBoxHeight = 297.0;
 
@@ -152,6 +153,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _pulseCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
       ..repeat(reverse: true);
     _switchCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    _selectedPulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
+      ..repeat(reverse: true);
 
     _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _slideUp = Tween<double>(begin: 30, end: 0)
@@ -159,6 +162,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _pulse = Tween<double>(begin: 0.96, end: 1.04)
         .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
     _switchFade = CurvedAnimation(parent: _switchCtrl, curve: Curves.easeInOut);
+    _selectedPulse = Tween<double>(begin: 0.3, end: 0.5)
+        .animate(CurvedAnimation(parent: _selectedPulseCtrl, curve: Curves.easeInOut));
 
     _fadeCtrl.forward();
     _switchCtrl.value = 1.0;
@@ -192,6 +197,12 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
         _isLoading = false;
       });
 
+      // Debug output
+      print('Front paths loaded: ${_frontPaths.length}');
+      print('Front transform: $_frontTransform');
+      print('Back paths loaded: ${_backPaths.length}');
+      print('Back transform: $_backTransform');
+
     } catch (e) {
       print('Error loading paths: $e');
       if (!mounted) return;
@@ -206,10 +217,11 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     final paths = <String, Path>{};
     Matrix4? groupTransform;
 
-    // Check for group transforms (your back SVG has a transform on the layer1 group)
+    // Find the layer1 group and extract its transform
     final groups = doc.findAllElements('g');
     for (final group in groups) {
-      if (group.getAttribute('id') == 'layer1') {
+      final id = group.getAttribute('id');
+      if (id == 'layer1') {
         final transformStr = group.getAttribute('transform');
         if (transformStr != null && transformStr.contains('translate')) {
           // Parse translate transform
@@ -219,36 +231,37 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
             final tx = double.parse(match.group(1)!);
             final ty = double.parse(match.group(2)!);
             groupTransform = Matrix4.identity()..translate(tx, ty);
+            print('Found transform: translate($tx, $ty)');
+          }
+        }
+
+        // Parse paths within this group
+        for (final element in group.findAllElements('path')) {
+          final pathId = element.getAttribute('id');
+          final d = element.getAttribute('d');
+
+          if (pathId == null || d == null) continue;
+
+          // Skip numbered paths (path18, path19, etc.)
+          if (RegExp(r'^path\d+$').hasMatch(pathId)) continue;
+
+          try {
+            var path = parseSvgPathData(d);
+
+            // Apply the group transform to the path
+            if (groupTransform != null) {
+              path = path.transform(groupTransform.storage);
+            }
+
+            paths[pathId] = path;
+          } catch (e) {
+            print('Error parsing path $pathId: $e');
           }
         }
       }
     }
 
-    // Parse all path elements
-    for (final element in doc.findAllElements('path')) {
-      final id = element.getAttribute('id');
-      final d = element.getAttribute('d');
-
-      if (id == null || d == null) continue;
-
-      // Skip numbered paths
-      if (id.startsWith('path') && RegExp(r'^\d+$').hasMatch(id.substring(4))) continue;
-
-      try {
-        var path = parseSvgPathData(d);
-
-        // Apply group transform if exists
-        if (groupTransform != null) {
-          final transformedPath = path.transform(groupTransform.storage);
-          paths[id] = transformedPath;
-        } else {
-          paths[id] = path;
-        }
-      } catch (e) {
-        print('Error parsing path $id: $e');
-      }
-    }
-
+    print('Parsed ${paths.length} paths');
     return {
       'paths': paths,
       'transform': groupTransform,
@@ -260,13 +273,13 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _fadeCtrl.dispose();
     _pulseCtrl.dispose();
     _switchCtrl.dispose();
+    _selectedPulseCtrl.dispose();
     super.dispose();
   }
 
   void _toggle(String id) {
     HapticFeedback.lightImpact();
     setState(() {
-      // Simple toggle - only affects the current view's selection
       if (_showingFront) {
         if (_selectedFront.contains(id)) {
           _selectedFront.remove(id);
@@ -332,20 +345,26 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
             ),
           ),
 
-          // Custom Paint overlay - simple, no animation
+          // Custom Paint overlay with animation
           SizedBox(
             width: displayWidth,
             height: displayHeight,
-            child: CustomPaint(
-              size: Size(displayWidth, displayHeight),
-              painter: _HighlightPainter(
-                selected: _currentSelection,
-                paths: _currentPaths,
-                viewBoxWidth: _svgViewBoxWidth,
-                viewBoxHeight: _svgViewBoxHeight,
-                displayWidth: displayWidth,
-                displayHeight: displayHeight,
-              ),
+            child: AnimatedBuilder(
+              animation: _selectedPulse,
+              builder: (context, child) {
+                return CustomPaint(
+                  size: Size(displayWidth, displayHeight),
+                  painter: _HighlightPainter(
+                    selected: _currentSelection,
+                    paths: _currentPaths,
+                    viewBoxWidth: _svgViewBoxWidth,
+                    viewBoxHeight: _svgViewBoxHeight,
+                    displayWidth: displayWidth,
+                    displayHeight: displayHeight,
+                    pulseValue: _selectedPulse.value,
+                  ),
+                );
+              },
             ),
           ),
 
@@ -369,6 +388,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                 for (final entry in _currentPaths.entries) {
                   if (entry.value.contains(Offset(svgX, svgY))) {
                     _toggle(entry.key);
+                    print('Hit: ${entry.key}');
                     break;
                   }
                 }
@@ -801,7 +821,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   }
 }
 
-// Simple static highlight painter - reverted to original style
+// Highlight painter with subtle animation
 class _HighlightPainter extends CustomPainter {
   final Set<String> selected;
   final Map<String, Path> paths;
@@ -809,6 +829,7 @@ class _HighlightPainter extends CustomPainter {
   final double viewBoxHeight;
   final double displayWidth;
   final double displayHeight;
+  final double pulseValue;
 
   _HighlightPainter({
     required this.selected,
@@ -817,21 +838,27 @@ class _HighlightPainter extends CustomPainter {
     required this.viewBoxHeight,
     required this.displayWidth,
     required this.displayHeight,
+    required this.pulseValue,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (selected.isEmpty) return;
 
-    // Static red glass effect - simple and clean
+    // Red glass effect with subtle pulse
     final paint = Paint()
-      ..color = Colors.red.withOpacity(0.1) // Light fill
+      ..color = Colors.red.withOpacity(pulseValue * 0.3) // Subtle pulse
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = Colors.red.withOpacity(0.3) // Subtle border
+      ..color = Colors.red.withOpacity(0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
+
+    final glowPaint = Paint()
+      ..color = Colors.red.withOpacity(0.15)
+      ..style = PaintingStyle.fill
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
     // Calculate scale from viewBox to display size
     final scaleX = displayWidth / viewBoxWidth;
@@ -843,7 +870,8 @@ class _HighlightPainter extends CustomPainter {
     for (final id in selected) {
       final path = paths[id];
       if (path != null) {
-        // Simple fill and stroke, no animation or glow
+        // Draw glow, fill, and stroke
+        canvas.drawPath(path, glowPaint);
         canvas.drawPath(path, paint);
         canvas.drawPath(path, strokePaint);
       }
@@ -859,7 +887,8 @@ class _HighlightPainter extends CustomPainter {
           old.viewBoxWidth != viewBoxWidth ||
           old.viewBoxHeight != viewBoxHeight ||
           old.displayWidth != displayWidth ||
-          old.displayHeight != displayHeight;
+          old.displayHeight != displayHeight ||
+          old.pulseValue != pulseValue;
 }
 
 class _GridPainter extends CustomPainter {

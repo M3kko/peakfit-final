@@ -125,7 +125,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     },
     {
       'name': 'WALL SIT',
-      'originalName': null, // No change
+      'originalName': 'PISTOL SQUATS', // Changed from pistol squats
       'baseReps': '30 seconds',
       'downgradeReps': '20 seconds',
       'sets': '2',
@@ -407,7 +407,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '51% • 14.3 STRAIN',
+                  '51% RECOVERY',
                   style: TextStyle(
                     color: Colors.orange.withOpacity(0.5),
                     fontSize: 12,
@@ -543,32 +543,9 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '14.3 STRAIN',
-                              style: TextStyle(
-                                color: Colors.red.shade400,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Medium recovery with high strain detected. Volume reduced by 20% and added recovery exercises.',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
-                          fontSize: 11,
-                        ),
-                      ),
+
                     ],
                   ),
                 ),
@@ -911,77 +888,28 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          exercise['name'],
-                                          style: TextStyle(
-                                            color: Colors.orange.shade400,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ),
-                                      if (isRecovery) ...[
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            'RECOVERY',
-                                            style: TextStyle(
-                                              color: Colors.blue.shade400,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w600,
-                                              letterSpacing: 1,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
+                                  child: Text(
+                                    exercise['name'],
+                                    style: TextStyle(
+                                      color: Colors.orange.shade400,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ] else ...[
                             // No name change, just show the exercise name
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    exercise['name'],
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w400,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                                if (isRecovery) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      'RECOVERY',
-                                      style: TextStyle(
-                                        color: Colors.blue.shade400,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                            Text(
+                              exercise['name'],
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w400,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ],
                           const SizedBox(height: 8),
@@ -1033,17 +961,6 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                                         ? Colors.blue.shade300
                                         : Colors.white.withOpacity(0.6),
                                     fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                              if (exercise['notes'] != null) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  exercise['notes'],
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.4),
-                                    fontSize: 12,
-                                    fontStyle: FontStyle.italic,
                                   ),
                                 ),
                               ],
@@ -1187,15 +1104,10 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                   height: 60,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.orange.shade400,
-                        Colors.orange.shade600,
-                      ],
-                    ),
+                    color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.orange.withOpacity(0.3),
+                        color: Colors.white.withOpacity(0.2),
                         blurRadius: 20,
                         offset: const Offset(0, 0),
                         spreadRadius: 2,
@@ -1208,7 +1120,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                       const Text(
                         'BEGIN RECOVERY WORKOUT',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Colors.black,
                           fontSize: 16,
                           letterSpacing: 2,
                           fontWeight: FontWeight.w600,
@@ -1217,7 +1129,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                       const SizedBox(width: 8),
                       Icon(
                         Icons.arrow_forward,
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.black.withOpacity(0.8),
                         size: 20,
                       ),
                     ],

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' as math;
+import 'home_screen.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({Key? key}) : super(key: key);
@@ -247,6 +248,15 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     super.dispose();
   }
 
+  void _navigateToHome() {
+    // Navigate to home screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+    );
+    HapticFeedback.lightImpact();
+  }
+
   void _goToPreviousWeek() {
     setState(() {
       _currentWeekOffset--;
@@ -417,7 +427,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: _navigateToHome,
             child: Container(
               width: 48,
               height: 48,

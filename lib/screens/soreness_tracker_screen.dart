@@ -539,7 +539,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
               ],
             ),
           ),
-          
+
         ),
       ),
 
@@ -547,7 +547,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     ),
     ),
     );
-
     Overlay.of(context).insert(_overlayEntry!);
   }
 

@@ -429,8 +429,8 @@ class _WorkoutScreenState extends State<WorkoutScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Left side - close button
           IconButton(
             onPressed: () {
               HapticFeedback.lightImpact();
@@ -444,20 +444,36 @@ class _WorkoutScreenState extends State<WorkoutScreen>
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
-          Flexible(
-            child: Text(
-              'EXERCISE ${_currentExerciseIndex + 1} OF ${widget.exercises.length}',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 13,
-                fontWeight: FontWeight.w300,
-                letterSpacing: 1.2,
+          // Center - expanded and centered text
+          Expanded(
+            child: Center(
+              child: Text(
+                'EXERCISE ${_currentExerciseIndex + 1} OF ${widget.exercises.length}',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 1.2,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
+          // Right side - pause and skip buttons
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                onPressed: _togglePause,
+                icon: Icon(
+                  _isPaused ? Icons.play_arrow : Icons.pause,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 12),
               IconButton(
                 onPressed: () {
                   HapticFeedback.lightImpact();
@@ -466,17 +482,6 @@ class _WorkoutScreenState extends State<WorkoutScreen>
                 icon: const Icon(
                   Icons.skip_next,
                   color: Colors.orange,
-                  size: 20,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _togglePause,
-                icon: Icon(
-                  _isPaused ? Icons.play_arrow : Icons.pause,
-                  color: Colors.white,
                   size: 24,
                 ),
                 padding: EdgeInsets.zero,

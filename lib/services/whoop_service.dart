@@ -246,18 +246,18 @@ class WhoopService {
         isRed: false,
       ),
       sleep: WhoopSleep(
-        sleepPerformance: 78,
-        totalSleepMinutes: 420,
-        remSleepMinutes: 95,
-        deepSleepMinutes: 110,
+        sleepPerformance: 82,
+        totalSleepMinutes: 390, // 6.5 hours
+        remSleepMinutes: 85,
+        deepSleepMinutes: 95,
         lightSleepMinutes: 180,
-        awakeMinutes: 35,
+        awakeMinutes: 30,
       ),
       strain: WhoopStrain(
-        dayStrain: 14.3,
-        caloriesBurned: 2100,
-        averageHeartRate: 72,
-        maxHeartRate: 165,
+        dayStrain: 15.1,
+        caloriesBurned: 2250,
+        averageHeartRate: 75,
+        maxHeartRate: 168,
       ),
     );
   }

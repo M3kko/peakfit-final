@@ -33,6 +33,12 @@ dependencies:
   video_player: ^2.8.1
   image_picker: ^1.0.7
 
+  # OAuth & API Integration (for WHOOP)
+  http: ^1.1.0
+  flutter_secure_storage: ^9.0.0
+  url_launcher: ^6.2.1
+  flutter_appauth: ^6.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

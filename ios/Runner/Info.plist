@@ -48,6 +48,21 @@
     <key>MinimumOSVersion</key>
     <string>12.0</string>
 
+    <!-- OAuth URL Schemes for WHOOP and other wearables -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLName</key>
+            <string>peakfit-oauth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>peakfit</string>
+            </array>
+        </dict>
+    </array>
+
     <!-- Image Picker Permissions -->
     <key>NSPhotoLibraryUsageDescription</key>
     <string>PeakFit needs access to your photo library to let you choose a profile picture</string>

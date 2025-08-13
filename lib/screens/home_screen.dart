@@ -36,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final user = FirebaseAuth.instance.currentUser;
   String? _profileImageUrl;
   String? _username;
+  DateTime? _accountCreatedDate;
 
   // Stats data with caching
   int _currentStreak = 0;
@@ -77,6 +78,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             _weeklyWorkouts = data?['cached_weekly_workouts'] ?? _weeklyWorkouts;
             _profileImageUrl = data?['profileImageUrl'];
             _username = data?['username'];
+            if (data?['createdAt'] != null) {
+              _accountCreatedDate = (data!['createdAt'] as Timestamp).toDate();
+            }
           });
         }
       }
@@ -101,6 +105,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _weeklyWorkouts = userDoc.data()?['cached_weekly_workouts'] ?? 0;
           _profileImageUrl = userDoc.data()?['profileImageUrl'];
           _username = userDoc.data()?['username'];
+          if (userDoc.data()?['createdAt'] != null) {
+            _accountCreatedDate = (userDoc.data()!['createdAt'] as Timestamp).toDate();
+          }
           _statsLoaded = true;
         });
       }
@@ -125,6 +132,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _weeklyWorkouts = data['cached_weekly_workouts'] ?? 0;
           _profileImageUrl = data['profileImageUrl'];
           _username = data['username'];
+          if (data['createdAt'] != null) {
+            _accountCreatedDate = (data['createdAt'] as Timestamp).toDate();
+          }
           _statsLoaded = true;
         });
 
@@ -152,6 +162,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         setState(() {
           _profileImageUrl = doc.data()?['profileImageUrl'];
           _username = doc.data()?['username'];
+          if (doc.data()?['createdAt'] != null) {
+            _accountCreatedDate = (doc.data()!['createdAt'] as Timestamp).toDate();
+          }
         });
       }
     } catch (e) {
@@ -313,6 +326,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       if (userDoc.exists) {
         _totalWorkouts = userDoc.data()?['total_workouts'] ?? 0;
+        if (userDoc.data()?['createdAt'] != null) {
+          _accountCreatedDate = (userDoc.data()!['createdAt'] as Timestamp).toDate();
+        }
       }
 
       // Calculate current streak and weekly workouts in parallel
@@ -528,6 +544,104 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return 'Good Evening';
   }
 
+  Map<String, dynamic>? _getTodaysWorkout() {
+    // Basketball-specific schedule matching the ScheduleScreen
+    final basketballSchedule = {
+      'Monday': {
+        'title': 'EXPLOSIVE POWER',
+        'focus': ['PLYOMETRICS', 'GLUTES', 'CORE'],
+        'intensity': 'HIGH',
+      },
+      'Tuesday': {
+        'title': 'POSTURE & STABILITY',
+        'focus': ['UPPER BACK', 'SHOULDERS', 'BALANCE'],
+        'intensity': 'MEDIUM',
+      },
+      'Wednesday': {
+        'title': 'LOWER BODY STRENGTH',
+        'focus': ['QUADS', 'HAMSTRINGS', 'CALVES'],
+        'intensity': 'HIGH',
+      },
+      'Thursday': {
+        'title': 'ACTIVE RECOVERY',
+        'focus': ['MOBILITY', 'FLEXIBILITY', 'ANKLE REHAB'],
+        'intensity': 'LOW',
+      },
+      'Friday': {
+        'title': 'VERTICAL FOCUS',
+        'focus': ['JUMP TECHNIQUE', 'EXPLOSIVENESS', 'CORE'],
+        'intensity': 'HIGH',
+      },
+      'Saturday': {
+        'title': 'BASKETBALL SKILLS',
+        'focus': ['AGILITY', 'COORDINATION', 'ENDURANCE'],
+        'intensity': 'MEDIUM',
+      },
+      'Sunday': {
+        'title': 'REST & RECOVERY',
+        'focus': ['RECOVERY', 'NUTRITION', 'MENTAL'],
+        'intensity': 'REST',
+      },
+    };
+
+    // First week schedule (Day 1-7)
+    final firstWeekSchedule = {
+      'Day 1': {
+        'title': 'EXPLOSIVE POWER',
+        'focus': ['PLYOMETRICS', 'GLUTES', 'CORE'],
+        'intensity': 'HIGH',
+      },
+      'Day 2': {
+        'title': 'POSTURE & STABILITY',
+        'focus': ['UPPER BACK', 'SHOULDERS', 'BALANCE'],
+        'intensity': 'MEDIUM',
+      },
+      'Day 3': {
+        'title': 'LOWER BODY STRENGTH',
+        'focus': ['QUADS', 'HAMSTRINGS', 'CALVES'],
+        'intensity': 'HIGH',
+      },
+      'Day 4': {
+        'title': 'ACTIVE RECOVERY',
+        'focus': ['MOBILITY', 'FLEXIBILITY', 'ANKLE REHAB'],
+        'intensity': 'LOW',
+      },
+      'Day 5': {
+        'title': 'VERTICAL FOCUS',
+        'focus': ['JUMP TECHNIQUE', 'EXPLOSIVENESS', 'CORE'],
+        'intensity': 'HIGH',
+      },
+      'Day 6': {
+        'title': 'BASKETBALL SKILLS',
+        'focus': ['AGILITY', 'COORDINATION', 'ENDURANCE'],
+        'intensity': 'MEDIUM',
+      },
+      'Day 7': {
+        'title': 'REST & RECOVERY',
+        'focus': ['RECOVERY', 'NUTRITION', 'MENTAL'],
+        'intensity': 'REST',
+      },
+    };
+
+    final now = DateTime.now();
+
+    // Check if user is in first week (account created within last 7 days)
+    if (_accountCreatedDate != null) {
+      final daysSinceCreation = now.difference(_accountCreatedDate!).inDays;
+
+      if (daysSinceCreation < 7) {
+        // User is in first week - use Day 1-7 schedule
+        final dayNumber = daysSinceCreation + 1;
+        return firstWeekSchedule['Day $dayNumber'];
+      }
+    }
+
+    // After first week, use standard Monday-Sunday schedule
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final today = days[now.weekday - 1];
+    return basketballSchedule[today];
+  }
+
   String _getDateString() {
     final now = DateTime.now();
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -708,10 +822,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMainWorkout() {
-    final isSelected = _selectedWorkout == 'strength';
+    final todaysWorkout = _getTodaysWorkout();
+    final workoutTitle = todaysWorkout?['title']?.split(' ').first ?? 'TRAINING';
+    final fullTitle = todaysWorkout?['title'] ?? 'BASKETBALL TRAINING';
+    final intensity = todaysWorkout?['intensity'] ?? 'MEDIUM';
+    final isRest = intensity == 'REST';
+    final isSelected = _selectedWorkout == 'main';
 
     return GestureDetector(
-      onTap: () => _onWorkoutSelected('strength'),
+      onTap: isRest ? null : () => _onWorkoutSelected('main'),
       child: AnimatedBuilder(
         animation: _glowFade,
         builder: (context, child) {
@@ -722,10 +841,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               shape: BoxShape.circle,
               color: const Color(0xFF0A0A0A),
               border: Border.all(
-                color: Colors.white.withOpacity(isSelected ? 0.8 : 0.15),
+                color: isRest
+                    ? const Color(0xFFD4AF37).withOpacity(0.3)
+                    : Colors.white.withOpacity(isSelected ? 0.8 : 0.15),
                 width: isSelected ? 2 : 1,
               ),
-              boxShadow: isSelected ? [
+              boxShadow: isSelected && !isRest ? [
                 BoxShadow(
                   color: Colors.white.withOpacity(0.4 * _glowFade.value),
                   blurRadius: 30,
@@ -741,18 +862,70 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   blurRadius: 100,
                   spreadRadius: 30,
                 ),
+              ] : isRest ? [
+                BoxShadow(
+                  color: const Color(0xFFD4AF37).withOpacity(0.1),
+                  blurRadius: 20,
+                  spreadRadius: 1,
+                ),
               ] : [],
             ),
-            child: Center(
-              child: Text(
-                'STRENGTH',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(isSelected ? 1.0 : 0.7),
-                  fontSize: 28,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 3,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isRest) ...[
+                  Icon(
+                    Icons.spa_outlined,
+                    color: const Color(0xFFD4AF37).withOpacity(0.8),
+                    size: 48,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  isRest ? 'REST DAY' : workoutTitle.toUpperCase(),
+                  style: TextStyle(
+                    color: isRest
+                        ? const Color(0xFFD4AF37).withOpacity(0.9)
+                        : Colors.white.withOpacity(isSelected ? 1.0 : 0.7),
+                    fontSize: isRest ? 24 : 28,
+                    fontWeight: FontWeight.w300,
+                    letterSpacing: 3,
+                  ),
                 ),
-              ),
+                if (todaysWorkout != null && !isRest) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD4AF37).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFD4AF37).withOpacity(0.3),
+                      ),
+                    ),
+                    child: Text(
+                      'TODAY\'S FOCUS',
+                      style: TextStyle(
+                        color: const Color(0xFFD4AF37).withOpacity(0.9),
+                        fontSize: 10,
+                        letterSpacing: 1.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+                if (isRest) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Recovery & Nutrition',
+                    style: TextStyle(
+                      color: const Color(0xFFD4AF37).withOpacity(0.6),
+                      fontSize: 12,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ],
             ),
           );
         },
@@ -761,66 +934,73 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildSecondaryWorkouts() {
+    final todaysWorkout = _getTodaysWorkout();
+    final intensity = todaysWorkout?['intensity'] ?? 'MEDIUM';
+    final isRest = intensity == 'REST';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildSecondaryOption('WARM UP', Icons.wb_sunny_outlined, 'warmup'),
+        _buildSecondaryOption('WARM UP', Icons.wb_sunny_outlined, 'warmup', !isRest),
         const SizedBox(width: 60),
-        _buildSecondaryOption('COOL DOWN', Icons.ac_unit, 'cooldown'),
+        _buildSecondaryOption('COOL DOWN', Icons.ac_unit, 'cooldown', !isRest),
       ],
     );
   }
 
-  Widget _buildSecondaryOption(String title, IconData icon, String id) {
+  Widget _buildSecondaryOption(String title, IconData icon, String id, bool enabled) {
     final isSelected = _selectedWorkout == id;
 
     return GestureDetector(
-      onTap: () => _onWorkoutSelected(id),
+      onTap: enabled ? () => _onWorkoutSelected(id) : null,
       child: AnimatedBuilder(
         animation: _glowFade,
         builder: (context, child) {
-          return Column(
-            children: [
-              Container(
-                width: 85,
-                height: 85,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF0A0A0A),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(isSelected ? 0.7 : 0.15),
-                    width: isSelected ? 1.5 : 1,
+          return Opacity(
+            opacity: enabled ? 1.0 : 0.4,
+            child: Column(
+              children: [
+                Container(
+                  width: 85,
+                  height: 85,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF0A0A0A),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(isSelected && enabled ? 0.7 : 0.15),
+                      width: isSelected && enabled ? 1.5 : 1,
+                    ),
+                    boxShadow: isSelected && enabled ? [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.3 * _glowFade.value),
+                        blurRadius: 25,
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.15 * _glowFade.value),
+                        blurRadius: 50,
+                        spreadRadius: 5,
+                      ),
+                    ] : [],
                   ),
-                  boxShadow: isSelected ? [
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.3 * _glowFade.value),
-                      blurRadius: 25,
-                      spreadRadius: 1,
-                    ),
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.15 * _glowFade.value),
-                      blurRadius: 50,
-                      spreadRadius: 5,
-                    ),
-                  ] : [],
+                  child: Icon(
+                    icon,
+                    color: Colors.white.withOpacity(isSelected && enabled ? 0.8 : 0.4),
+                    size: 36,
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  color: Colors.white.withOpacity(isSelected ? 0.8 : 0.4),
-                  size: 36,
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(isSelected && enabled ? 0.9 : 0.6),
+                    fontSize: 14,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(isSelected ? 0.9 : 0.6),
-                  fontSize: 14,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -828,6 +1008,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildStatsOrButton() {
+    final todaysWorkout = _getTodaysWorkout();
+    final intensity = todaysWorkout?['intensity'] ?? 'MEDIUM';
+    final isRest = intensity == 'REST';
+
     return AnimatedBuilder(
       animation: _transform,
       builder: (context, child) {
@@ -837,7 +1021,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             firstChild: _buildStatsBox(),
             secondChild: Container(
               padding: const EdgeInsets.symmetric(vertical: 40),
-              child: _buildStartButton(),
+              child: isRest ? _buildRestDayMessage() : _buildStartButton(),
             ),
             crossFadeState: _selectedWorkout == null
                 ? CrossFadeState.showFirst
@@ -847,6 +1031,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildRestDayMessage() {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFD4AF37).withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFFD4AF37).withOpacity(0.2),
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.self_improvement,
+              color: const Color(0xFFD4AF37).withOpacity(0.8),
+              size: 32,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Rest & Recover',
+              style: TextStyle(
+                color: const Color(0xFFD4AF37),
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Focus on nutrition and sleep today',
+              style: TextStyle(
+                color: const Color(0xFFD4AF37).withOpacity(0.6),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

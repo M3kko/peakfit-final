@@ -23,7 +23,6 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     with TickerProviderStateMixin {
   // Animation Controllers
   late AnimationController _entryController;
-  late AnimationController _glowController;
   late AnimationController _pulseController;
   late AnimationController _exerciseCardController;
   late AnimationController _upgradeArrowController;
@@ -32,7 +31,6 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
   // Animations
   late Animation<double> _fadeIn;
   late Animation<double> _slideUp;
-  late Animation<double> _glow;
   late Animation<double> _pulse;
   late Animation<double> _exerciseCardScale;
   late Animation<double> _upgradeArrowBounce;
@@ -150,11 +148,6 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
       vsync: this,
     );
 
-    _glowController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
-
     _pulseController = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
@@ -186,14 +179,6 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     ).animate(CurvedAnimation(
       parent: _entryController,
       curve: Curves.easeOutCubic,
-    ));
-
-    _glow = Tween<double>(
-      begin: 0.3,
-      end: 0.6,
-    ).animate(CurvedAnimation(
-      parent: _glowController,
-      curve: Curves.easeInOut,
     ));
 
     _pulse = Tween<double>(
@@ -240,7 +225,6 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
   @override
   void dispose() {
     _entryController.dispose();
-    _glowController.dispose();
     _pulseController.dispose();
     _exerciseCardController.dispose();
     _upgradeArrowController.dispose();
@@ -281,17 +265,15 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                         _buildHeader(),
                         Expanded(
                           child: SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const SizedBox(height: 20),
                                 _buildRecoveryTip(),
                                 const SizedBox(height: 20),
                                 _buildWorkoutInfo(),
                                 const SizedBox(height: 40),
                                 _buildExerciseList(),
-                                const SizedBox(height: 100),
                               ],
                             ),
                           ),
@@ -311,16 +293,16 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
 
   Widget _buildBackground() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF0A0A0A),
-            const Color(0xFF0F0F0F),
-            const Color(0xFF050505),
+            Color(0xFF0A0A0A),
+            Color(0xFF0F0F0F),
+            Color(0xFF050505),
           ],
-          stops: const [0.0, 0.5, 1.0],
+          stops: [0.0, 0.5, 1.0],
         ),
       ),
     );
@@ -343,17 +325,19 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
             ),
             padding: EdgeInsets.zero,
           ),
-          const Spacer(),
-          Text(
-            'OVERVIEW',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 16,
-              fontWeight: FontWeight.w300,
-              letterSpacing: 2,
+          Expanded(
+            child: Center(
+              child: Text(
+                'OVERVIEW',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 2,
+                ),
+              ),
             ),
           ),
-          const Spacer(),
           const SizedBox(width: 48), // Balance the header
         ],
       ),
@@ -367,6 +351,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
         return Transform.translate(
           offset: Offset(0, _tipCardSlide.value),
           child: Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -462,17 +447,18 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
           ),
         ),
         const SizedBox(height: 12),
-        Row(
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
           children: [
             _buildInfoChip(Icons.access_time, '${widget.duration} MIN'),
-            const SizedBox(width: 16),
             _buildInfoChip(Icons.fitness_center, '${_exercises.length} EXERCISES'),
-            const SizedBox(width: 16),
             _buildInfoChip(Icons.trending_up, 'ENHANCED', Colors.green),
           ],
         ),
         const SizedBox(height: 24),
         Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.03),
@@ -598,6 +584,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                 ),
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.arrow_upward,
@@ -656,6 +643,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     final bool isUpgraded = exercise['upgraded'] ?? false;
 
     return Container(
+      width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         gradient: isUpgraded
@@ -689,6 +677,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
             child: Column(
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       width: 50,
@@ -730,7 +719,8 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Row(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '${exercise['sets']} sets × ${exercise['baseReps']}',
@@ -741,28 +731,32 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                                 ),
                               ),
                               if (isUpgraded) ...[
-                                const SizedBox(width: 8),
-                                AnimatedBuilder(
-                                  animation: _upgradeArrowBounce,
-                                  builder: (context, child) {
-                                    return Transform.translate(
-                                      offset: Offset(_upgradeArrowBounce.value, 0),
-                                      child: Icon(
-                                        Icons.arrow_forward,
-                                        color: Colors.green,
-                                        size: 16,
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    AnimatedBuilder(
+                                      animation: _upgradeArrowBounce,
+                                      builder: (context, child) {
+                                        return Transform.translate(
+                                          offset: Offset(_upgradeArrowBounce.value, 0),
+                                          child: Icon(
+                                            Icons.arrow_forward,
+                                            color: Colors.green,
+                                            size: 16,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${exercise['upgradeSets']} sets × ${exercise['upgradeReps']}',
+                                      style: TextStyle(
+                                        color: Colors.green.shade400,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${exercise['upgradeSets']} sets × ${exercise['upgradeReps']}',
-                                  style: TextStyle(
-                                    color: Colors.green.shade400,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ],
@@ -808,6 +802,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                 if (isUpgraded && index == 3) ...[
                   const SizedBox(height: 12),
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: const Color(0xFFD4AF37).withOpacity(0.05),
@@ -877,7 +872,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
           ),
         ),
         child: AnimatedBuilder(
-          animation: Listenable.merge([_glow, _pulse]),
+          animation: _pulse,
           builder: (context, child) {
             return Transform.scale(
               scale: _pulse.value,
@@ -915,24 +910,13 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                   height: 60,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.green.shade400,
-                        Colors.green.shade600,
-                      ],
-                    ),
+                    color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.green.withOpacity(0.3 * _glow.value),
+                        color: Colors.white.withOpacity(0.2),
                         blurRadius: 20,
                         offset: const Offset(0, 0),
                         spreadRadius: 2,
-                      ),
-                      BoxShadow(
-                        color: Colors.green.withOpacity(0.15 * _glow.value),
-                        blurRadius: 40,
-                        offset: const Offset(0, 0),
-                        spreadRadius: 5,
                       ),
                     ],
                   ),
@@ -942,7 +926,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                       const Text(
                         'BEGIN ENHANCED WORKOUT',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Colors.black,
                           fontSize: 16,
                           letterSpacing: 2,
                           fontWeight: FontWeight.w600,
@@ -951,7 +935,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                       const SizedBox(width: 8),
                       Icon(
                         Icons.arrow_forward,
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.black.withOpacity(0.8),
                         size: 20,
                       ),
                     ],

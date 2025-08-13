@@ -22,6 +22,7 @@ class PreWorkoutScreen extends StatefulWidget {
 class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     with TickerProviderStateMixin {
   // Animation Controllers
+  late AnimationController _loadingController;
   late AnimationController _entryController;
   late AnimationController _pulseController;
   late AnimationController _exerciseCardController;
@@ -29,12 +30,17 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
   late AnimationController _tipCardController;
 
   // Animations
+  late Animation<double> _loadingRotation;
+  late Animation<double> _loadingFade;
   late Animation<double> _fadeIn;
   late Animation<double> _slideUp;
   late Animation<double> _pulse;
   late Animation<double> _exerciseCardScale;
   late Animation<double> _downgradeArrowBounce;
   late Animation<double> _tipCardSlide;
+
+  // Loading state
+  bool _isLoading = true;
 
   // Simulated recovery data - ADJUSTED FOR YOUR ACTUAL DATA
   final int recoveryScore = 51; // Medium recovery from WHOOP
@@ -45,6 +51,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
   final List<Map<String, dynamic>> _exercises = [
     {
       'name': 'ANKLE MOBILITY WARM-UP',
+      'originalName': null, // No change in exercise type
       'baseReps': '45 seconds',
       'downgradeReps': '30 seconds',
       'sets': '2',
@@ -56,7 +63,8 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     },
     {
       'name': 'BODYWEIGHT SQUATS',
-      'baseReps': '12',
+      'originalName': 'JUMP SQUATS', // Changed from jump squats
+      'baseReps': '15',
       'downgradeReps': '8',
       'sets': '3',
       'downgradeSets': '2',
@@ -67,6 +75,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     },
     {
       'name': 'HIP FLEXOR STRETCH',
+      'originalName': null,
       'baseReps': '45 seconds each',
       'downgradeReps': '30 seconds each',
       'sets': '2',
@@ -79,7 +88,8 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     },
     {
       'name': 'STATIONARY LUNGES',
-      'baseReps': '10 each',
+      'originalName': 'BULGARIAN SPLIT SQUATS', // Changed from Bulgarian splits
+      'baseReps': '12 each',
       'downgradeReps': '6 each',
       'sets': '3',
       'downgradeSets': '2',
@@ -90,7 +100,8 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     },
     {
       'name': 'CALF RAISES (BILATERAL)',
-      'baseReps': '20',
+      'originalName': 'SINGLE-LEG CALF RAISES', // Changed from single-leg
+      'baseReps': '25',
       'downgradeReps': '12',
       'sets': '3',
       'downgradeSets': '2',
@@ -101,6 +112,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     },
     {
       'name': 'HAMSTRING STRETCH',
+      'originalName': null,
       'baseReps': '45 seconds each',
       'downgradeReps': '30 seconds each',
       'sets': '2',
@@ -113,6 +125,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     },
     {
       'name': 'WALL SIT',
+      'originalName': null, // No change
       'baseReps': '30 seconds',
       'downgradeReps': '20 seconds',
       'sets': '2',
@@ -124,7 +137,8 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     },
     {
       'name': 'GLUTE BRIDGES',
-      'baseReps': '12',
+      'originalName': 'DEPTH JUMPS', // Changed from depth jumps
+      'baseReps': '15',
       'downgradeReps': '8',
       'sets': '3',
       'downgradeSets': '2',
@@ -139,10 +153,33 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
   void initState() {
     super.initState();
     _initAnimations();
-    _startAnimations();
+    _startLoadingSequence();
   }
 
   void _initAnimations() {
+    // Loading animation
+    _loadingController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    );
+
+    _loadingRotation = Tween<double>(
+      begin: 0.0,
+      end: 2 * math.pi,
+    ).animate(CurvedAnimation(
+      parent: _loadingController,
+      curve: Curves.linear,
+    ));
+
+    _loadingFade = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _loadingController,
+      curve: const Interval(0.8, 1.0, curve: Curves.easeOut),
+    ));
+
+    // Entry animations
     _entryController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -151,7 +188,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     _pulseController = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
-    )..repeat(reverse: true);
+    );
 
     _exerciseCardController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -161,7 +198,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     _downgradeArrowController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat(reverse: true);
+    );
 
     _tipCardController = AnimationController(
       duration: const Duration(milliseconds: 1200),
@@ -214,8 +251,20 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
     ));
   }
 
+  void _startLoadingSequence() {
+    _loadingController.forward();
+    Future.delayed(const Duration(seconds: 1), () {
+      setState(() {
+        _isLoading = false;
+      });
+      _startAnimations();
+    });
+  }
+
   void _startAnimations() {
     _entryController.forward();
+    _pulseController.repeat(reverse: true);
+    _downgradeArrowController.repeat(reverse: true);
     Future.delayed(const Duration(milliseconds: 300), () {
       _exerciseCardController.forward();
       _tipCardController.forward();
@@ -224,6 +273,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
 
   @override
   void dispose() {
+    _loadingController.dispose();
     _entryController.dispose();
     _pulseController.dispose();
     _exerciseCardController.dispose();
@@ -252,42 +302,123 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
       body: Stack(
         children: [
           _buildBackground(),
-          SafeArea(
-            child: AnimatedBuilder(
-              animation: _fadeIn,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeIn.value,
-                  child: Transform.translate(
-                    offset: Offset(0, _slideUp.value),
-                    child: Column(
-                      children: [
-                        _buildHeader(),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildRecoveryTip(),
-                                const SizedBox(height: 20),
-                                _buildWorkoutInfo(),
-                                const SizedBox(height: 40),
-                                _buildExerciseList(),
-                              ],
+          if (_isLoading)
+            _buildLoadingScreen()
+          else
+            SafeArea(
+              child: AnimatedBuilder(
+                animation: _fadeIn,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _fadeIn.value,
+                    child: Transform.translate(
+                      offset: Offset(0, _slideUp.value),
+                      child: Column(
+                        children: [
+                          _buildHeader(),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildRecoveryTip(),
+                                  const SizedBox(height: 20),
+                                  _buildWorkoutInfo(),
+                                  const SizedBox(height: 40),
+                                  _buildExerciseList(),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          if (!_isLoading) _buildBottomButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingScreen() {
+    return AnimatedBuilder(
+      animation: _loadingFade,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _loadingFade.value,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedBuilder(
+                  animation: _loadingRotation,
+                  builder: (context, child) {
+                    return Transform.rotate(
+                      angle: _loadingRotation.value,
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: SweepGradient(
+                            colors: [
+                              Colors.orange.withOpacity(0.0),
+                              Colors.orange.withOpacity(0.3),
+                              Colors.orange.withOpacity(0.6),
+                              Colors.orange.withOpacity(0.9),
+                              Colors.orange.withOpacity(0.6),
+                              Colors.orange.withOpacity(0.3),
+                              Colors.orange.withOpacity(0.0),
+                            ],
+                          ),
+                        ),
+                        child: Center(
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A0A0A),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.fitness_center,
+                              color: Colors.orange.withOpacity(0.8),
+                              size: 28,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'ANALYZING RECOVERY',
+                  style: TextStyle(
+                    color: Colors.orange.withOpacity(0.8),
+                    fontSize: 14,
+                    letterSpacing: 3,
+                    fontWeight: FontWeight.w300,
                   ),
-                );
-              },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '51% • 14.3 STRAIN',
+                  style: TextStyle(
+                    color: Colors.orange.withOpacity(0.5),
+                    fontSize: 12,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ],
             ),
           ),
-          _buildBottomButton(),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -554,20 +685,20 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFFD4AF37).withOpacity(0.2),
-            const Color(0xFFD4AF37).withOpacity(0.1),
+            Colors.orange.withOpacity(0.2),
+            Colors.orange.withOpacity(0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFFD4AF37).withOpacity(0.3),
+          color: Colors.orange.withOpacity(0.3),
           width: 1,
         ),
       ),
       child: Text(
         tag,
         style: TextStyle(
-          color: const Color(0xFFD4AF37).withOpacity(0.9),
+          color: Colors.orange.withOpacity(0.9),
           fontSize: 11,
           letterSpacing: 1,
           fontWeight: FontWeight.w500,
@@ -660,6 +791,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
   Widget _buildExerciseCard(Map<String, dynamic> exercise, int index) {
     final bool isDowngraded = exercise['downgraded'] ?? false;
     final bool isRecovery = exercise['isRecovery'] ?? false;
+    final String? originalName = exercise['originalName'];
 
     return Container(
       width: double.infinity,
@@ -747,40 +879,113 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  exercise['name'],
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w400,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
+                          // Exercise Name Section
+                          if (originalName != null) ...[
+                            // Show original exercise name crossed out
+                            Text(
+                              originalName,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.3),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w400,
+                                letterSpacing: 0.5,
+                                decoration: TextDecoration.lineThrough,
                               ),
-                              if (isRecovery) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'RECOVERY',
-                                    style: TextStyle(
-                                      color: Colors.blue.shade400,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 1,
-                                    ),
+                            ),
+                            const SizedBox(height: 4),
+                            // Show new exercise name with arrow
+                            Row(
+                              children: [
+                                AnimatedBuilder(
+                                  animation: _downgradeArrowBounce,
+                                  builder: (context, child) {
+                                    return Transform.translate(
+                                      offset: Offset(_downgradeArrowBounce.value, 0),
+                                      child: Icon(
+                                        Icons.arrow_forward,
+                                        color: Colors.orange,
+                                        size: 16,
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          exercise['name'],
+                                          style: TextStyle(
+                                            color: Colors.orange.shade400,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isRecovery) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            'RECOVERY',
+                                            style: TextStyle(
+                                              color: Colors.blue.shade400,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 1,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
                               ],
-                            ],
-                          ),
-                          const SizedBox(height: 4),
+                            ),
+                          ] else ...[
+                            // No name change, just show the exercise name
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    exercise['name'],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                if (isRecovery) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'RECOVERY',
+                                      style: TextStyle(
+                                        color: Colors.blue.shade400,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          // Sets and Reps Section
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -875,17 +1080,17 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD4AF37).withOpacity(0.05),
+                      color: Colors.orange.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: const Color(0xFFD4AF37).withOpacity(0.2),
+                        color: Colors.orange.withOpacity(0.2),
                       ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.info_outline,
-                          color: const Color(0xFFD4AF37).withOpacity(0.8),
+                          color: Colors.orange.withOpacity(0.8),
                           size: 16,
                         ),
                         const SizedBox(width: 8),
@@ -893,7 +1098,7 @@ class _PreWorkoutScreenState extends State<PreWorkoutScreen>
                           child: Text(
                             'Focus on mobility and recovery today',
                             style: TextStyle(
-                              color: const Color(0xFFD4AF37).withOpacity(0.8),
+                              color: Colors.orange.withOpacity(0.8),
                               fontSize: 11,
                             ),
                           ),

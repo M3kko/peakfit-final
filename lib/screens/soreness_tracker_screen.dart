@@ -445,6 +445,160 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
             ),
           ),
           _bottomButton(context),
+          // Soreness Level Popup - Now at the top level of the Stack
+          if (_showingSorenessPopup != null)
+            Positioned(
+              top: MediaQuery.of(context).size.height * 0.35, // Center vertically
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  width: 280,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.red.withOpacity(0.5), width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.8),
+                        blurRadius: 30,
+                        spreadRadius: 10,
+                      ),
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'SORENESS LEVEL',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 14,
+                              letterSpacing: 2,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _closeSorenessPopup,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.close,
+                                color: Colors.white.withOpacity(0.7),
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // First row: 1-5
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (index) {
+                          final level = index + 1;
+                          final isSelected = _sorenessLevels[_showingSorenessPopup] == level;
+                          return GestureDetector(
+                            onTap: () {
+                              _setSorenessLevel(_showingSorenessPopup!, level);
+                              HapticFeedback.lightImpact();
+                              Future.delayed(const Duration(milliseconds: 200), () {
+                                _closeSorenessPopup();
+                              });
+                            },
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.red
+                                    : Colors.red.withOpacity(0.05 + (level * 0.09)),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.red
+                                      : Colors.red.withOpacity(0.3),
+                                  width: isSelected ? 2 : 1,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$level',
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 12),
+                      // Second row: 6-10
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (index) {
+                          final level = index + 6;
+                          final isSelected = _sorenessLevels[_showingSorenessPopup] == level;
+                          return GestureDetector(
+                            onTap: () {
+                              _setSorenessLevel(_showingSorenessPopup!, level);
+                              HapticFeedback.lightImpact();
+                              Future.delayed(const Duration(milliseconds: 200), () {
+                                _closeSorenessPopup();
+                              });
+                            },
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.red
+                                    : Colors.red.withOpacity(0.05 + (level * 0.09)),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.red
+                                      : Colors.red.withOpacity(0.3),
+                                  width: isSelected ? 2 : 1,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$level',
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

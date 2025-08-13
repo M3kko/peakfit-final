@@ -384,6 +384,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                     displayWidth: displayWidth,
                     displayHeight: displayHeight,
                     pulseValue: _selectedPulse.value,
+                    sorenessLevels: _sorenessLevels,
                   ),
                 );
               },
@@ -417,95 +418,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
               },
             ),
           ),
-
-          // Soreness Level Popup
-          if (_showingSorenessPopup != null)
-            Positioned(
-              top: displayHeight / 2 - 60,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.red.withOpacity(0.5)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.withOpacity(0.2),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'SORENESS LEVEL',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 12,
-                            letterSpacing: 2,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _closeSorenessPopup,
-                          child: Icon(
-                            Icons.close,
-                            color: Colors.white.withOpacity(0.5),
-                            size: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: List.generate(10, (index) {
-                        final level = index + 1;
-                        final isSelected = _sorenessLevels[_showingSorenessPopup] == level;
-                        return GestureDetector(
-                          onTap: () {
-                            _setSorenessLevel(_showingSorenessPopup!, level);
-                            HapticFeedback.lightImpact();
-                            Future.delayed(const Duration(milliseconds: 200), () {
-                              _closeSorenessPopup();
-                            });
-                          },
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? Colors.red
-                                  : Colors.red.withOpacity(0.1 + (level * 0.08)),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isSelected
-                                    ? Colors.red
-                                    : Colors.red.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '$level',
-                                style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -606,37 +518,195 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   Widget _body() => SingleChildScrollView(
     physics: const BouncingScrollPhysics(),
     padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Column(
+    child: Stack(
       children: [
-        const SizedBox(height: 16),
-        _titleSection(),
-        const SizedBox(height: 32),
-        _viewToggle(),
-        const SizedBox(height: 24),
-        if (_isLoading)
-          SizedBox(
-            height: 400,
+        Column(
+          children: [
+            const SizedBox(height: 16),
+            _titleSection(),
+            const SizedBox(height: 32),
+            _viewToggle(),
+            const SizedBox(height: 24),
+            if (_isLoading)
+              SizedBox(
+                height: 400,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: const Color(0xFFD4AF37).withOpacity(0.8),
+                    strokeWidth: 2,
+                  ),
+                ),
+              )
+            else if (_loadError.isNotEmpty)
+              Container(
+                height: 400,
+                alignment: Alignment.center,
+                child: Text('Error: $_loadError', style: const TextStyle(color: Colors.red)),
+              )
+            else
+              FadeTransition(
+                opacity: _switchFade,
+                child: _diagram(),
+              ),
+            const SizedBox(height: 16), // Reduced from 32
+            _legend(),
+            const SizedBox(height: 120),
+          ],
+        ),
+        // Soreness Level Popup - Now positioned absolutely over everything
+        if (_showingSorenessPopup != null)
+          Positioned(
+            top: 200, // Fixed position from top
+            left: 0,
+            right: 0,
             child: Center(
-              child: CircularProgressIndicator(
-                color: const Color(0xFFD4AF37).withOpacity(0.8),
-                strokeWidth: 2,
+              child: Container(
+                width: 280,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.red.withOpacity(0.5), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.8),
+                      blurRadius: 30,
+                      spreadRadius: 10,
+                    ),
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.3),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'SORENESS LEVEL',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 14,
+                            letterSpacing: 2,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _closeSorenessPopup,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.close,
+                              color: Colors.white.withOpacity(0.7),
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // First row: 1-5
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        final level = index + 1;
+                        final isSelected = _sorenessLevels[_showingSorenessPopup] == level;
+                        return GestureDetector(
+                          onTap: () {
+                            _setSorenessLevel(_showingSorenessPopup!, level);
+                            HapticFeedback.lightImpact();
+                            Future.delayed(const Duration(milliseconds: 200), () {
+                              _closeSorenessPopup();
+                            });
+                          },
+                          child: Container(
+                            width: 42,
+                            height: 42,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Colors.red
+                                  : Colors.red.withOpacity(0.05 + (level * 0.09)),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? Colors.red
+                                    : Colors.red.withOpacity(0.3),
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$level',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    // Second row: 6-10
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        final level = index + 6;
+                        final isSelected = _sorenessLevels[_showingSorenessPopup] == level;
+                        return GestureDetector(
+                          onTap: () {
+                            _setSorenessLevel(_showingSorenessPopup!, level);
+                            HapticFeedback.lightImpact();
+                            Future.delayed(const Duration(milliseconds: 200), () {
+                              _closeSorenessPopup();
+                            });
+                          },
+                          child: Container(
+                            width: 42,
+                            height: 42,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Colors.red
+                                  : Colors.red.withOpacity(0.05 + (level * 0.09)),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? Colors.red
+                                    : Colors.red.withOpacity(0.3),
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$level',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
               ),
             ),
-          )
-        else if (_loadError.isNotEmpty)
-          Container(
-            height: 400,
-            alignment: Alignment.center,
-            child: Text('Error: $_loadError', style: const TextStyle(color: Colors.red)),
-          )
-        else
-          FadeTransition(
-            opacity: _switchFade,
-            child: _diagram(),
           ),
-        const SizedBox(height: 16), // Reduced from 32
-        _legend(),
-        const SizedBox(height: 120),
       ],
     ),
   );
@@ -829,8 +899,8 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                                   '${name.toUpperCase()} ($sorenessLevel)',
                                   style: TextStyle(
                                     color: Colors.red.shade300,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w500,
+                                    fontSize: 10, // Increased from 9
+                                    fontWeight: FontWeight.w600, // Bolder
                                     letterSpacing: 0.3,
                                   ),
                                   overflow: TextOverflow.ellipsis,
@@ -945,7 +1015,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   }
 }
 
-// Highlight painter with subtle animation
+// Highlight painter with soreness-based opacity
 class _HighlightPainter extends CustomPainter {
   final Set<String> selected;
   final Map<String, Path> paths;
@@ -954,6 +1024,7 @@ class _HighlightPainter extends CustomPainter {
   final double displayWidth;
   final double displayHeight;
   final double pulseValue;
+  final Map<String, int> sorenessLevels;
 
   _HighlightPainter({
     required this.selected,
@@ -963,21 +1034,12 @@ class _HighlightPainter extends CustomPainter {
     required this.displayWidth,
     required this.displayHeight,
     required this.pulseValue,
+    required this.sorenessLevels,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (selected.isEmpty) return;
-
-    // Brighter, more vibrant red with stronger presence
-    final paint = Paint()
-      ..color = Colors.red.withOpacity(0.5 + pulseValue * 0.2) // Stronger base opacity
-      ..style = PaintingStyle.fill;
-
-    final glowPaint = Paint()
-      ..color = Colors.red.withOpacity(0.3) // Stronger glow
-      ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
 
     // Calculate scale from viewBox to display size
     final scaleX = displayWidth / viewBoxWidth;
@@ -989,6 +1051,24 @@ class _HighlightPainter extends CustomPainter {
     for (final id in selected) {
       final path = paths[id];
       if (path != null) {
+        // Get soreness level (default to 5 if not set)
+        final sorenessLevel = sorenessLevels[id] ?? 5;
+
+        // Calculate opacity based on soreness level (1 = 0.2, 10 = 0.8)
+        final baseOpacity = 0.15 + (sorenessLevel * 0.065);
+        final fillOpacity = baseOpacity + (pulseValue * 0.1);
+        final glowOpacity = baseOpacity * 0.6;
+
+        // Dynamic red color based on soreness
+        final paint = Paint()
+          ..color = Colors.red.withOpacity(fillOpacity)
+          ..style = PaintingStyle.fill;
+
+        final glowPaint = Paint()
+          ..color = Colors.red.withOpacity(glowOpacity)
+          ..style = PaintingStyle.fill
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+
         // Draw only glow and fill - no stroke for cleaner look
         canvas.drawPath(path, glowPaint);
         canvas.drawPath(path, paint);
@@ -1006,7 +1086,8 @@ class _HighlightPainter extends CustomPainter {
           old.viewBoxHeight != viewBoxHeight ||
           old.displayWidth != displayWidth ||
           old.displayHeight != displayHeight ||
-          old.pulseValue != pulseValue;
+          old.pulseValue != pulseValue ||
+          !mapEquals(old.sorenessLevels, sorenessLevels);
 }
 
 class _GridPainter extends CustomPainter {

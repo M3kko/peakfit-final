@@ -29,56 +29,34 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   late final AnimationController _fadeCtrl;
   late final AnimationController _pulseCtrl;
   late final AnimationController _switchCtrl;
-  late final AnimationController _selectedPulseCtrl;
   late final Animation<double> _fade;
   late final Animation<double> _slideUp;
   late final Animation<double> _pulse;
   late final Animation<double> _switchFade;
-  late final Animation<double> _selectedPulse;
 
   // View state
   bool _showingFront = true;
   bool _isLoading = true;
   String _loadError = '';
 
-  // Raw SVG viewBox dimensions
-  static const double _frontVbW = 210.0;
-  static const double _frontVbH = 297.0;
-  static const double _backVbW = 210.0;
-  static const double _backVbH = 297.0;
+  // IMPORTANT: These should match your actual SVG viewBox values
+  // Based on your SVG files, both have viewBox="0 0 210 297"
+  static const double _svgViewBoxWidth = 210.0;
+  static const double _svgViewBoxHeight = 297.0;
 
-  // SVG transform offsets from the transform attributes
-  static const Offset _frontOffset = Offset(-6.7140355, 1.1376368);
-  static const Offset _backOffset = Offset(1.9550705, -1.1792923);
-
-  // Parsed paths for both views
+  // Parsed paths and transforms for both views
   Map<String, Path> _frontPaths = {};
   Map<String, Path> _backPaths = {};
+  Matrix4? _frontTransform;
+  Matrix4? _backTransform;
+
   final Set<String> _selectedFront = {};
   final Set<String> _selectedBack = {};
-
-  // Bilateral muscle pairs (muscles that appear on both sides)
-  static const Map<String, String> _bilateralPairs = {
-    'soleus-right': 'soleus-left',
-    'soleus-left': 'soleus-right',
-    'gastrocnemius-right': 'gastrocnemius-left',
-    'gastrocnemius-left': 'gastrocnemius-right',
-    'right-soleus': 'left-soleus',
-    'left-soleus': 'right-soleus',
-    'right-gastrocnemius': 'left-gastrocnemius',
-    'left-gastrocnemius': 'right-gastrocnemius',
-    'tibialis-right': 'tibialis-left',
-    'tibialis-left': 'tibialis-right',
-    'foot-right': 'foot-left',
-    'foot-left': 'foot-right',
-    'right-foot': 'left-foot',
-    'left-foot': 'right-foot',
-  };
 
   // Get current selection based on view
   Set<String> get _currentSelection => _showingFront ? _selectedFront : _selectedBack;
   Map<String, Path> get _currentPaths => _showingFront ? _frontPaths : _backPaths;
-  Offset get _currentOffset => _showingFront ? _frontOffset : _backOffset;
+  Matrix4? get _currentTransform => _showingFront ? _frontTransform : _backTransform;
 
   // Muscle display names for front
   static const Map<String, String> _frontNames = {
@@ -174,8 +152,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _pulseCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
       ..repeat(reverse: true);
     _switchCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
-    _selectedPulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
-      ..repeat(reverse: true);
 
     _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _slideUp = Tween<double>(begin: 30, end: 0)
@@ -183,8 +159,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _pulse = Tween<double>(begin: 0.96, end: 1.04)
         .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
     _switchFade = CurvedAnimation(parent: _switchCtrl, curve: Curves.easeInOut);
-    _selectedPulse = Tween<double>(begin: 0.15, end: 0.25)  // Reduced opacity for subtler effect
-        .animate(CurvedAnimation(parent: _selectedPulseCtrl, curve: Curves.easeInOut));
 
     _fadeCtrl.forward();
     _switchCtrl.value = 1.0;
@@ -198,63 +172,23 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
         _loadError = '';
       });
 
-      // Load front muscles
+      // Load and parse front SVG
       final frontRaw = await rootBundle.loadString('assets/svg/final-front-muscles.svg');
       final frontDoc = XmlDocument.parse(frontRaw);
+      final frontData = _parseSvgPaths(frontDoc);
 
-      final frontMap = <String, Path>{};
-      // Apply transform to front paths
-      for (final e in frontDoc.findAllElements('path')) {
-        final id = e.getAttribute('id');
-        final d = e.getAttribute('d');
-        if (id == null || d == null) continue;
-
-        // Skip non-muscle paths
-        if (id.startsWith('path') && RegExp(r'^\d+$').hasMatch(id.substring(4))) continue;
-
-        try {
-          final p = parseSvgPathData(d);
-          // Apply the transform offset
-          final transformedPath = p.transform(
-              Matrix4.translationValues(-_frontOffset.dx, -_frontOffset.dy, 0).storage
-          );
-          frontMap[id] = transformedPath;
-        } catch (e) {
-          print('Error parsing front path $id: $e');
-        }
-      }
-
-      // Load back muscles
+      // Load and parse back SVG
       final backRaw = await rootBundle.loadString('assets/svg/backmuscle-final.svg');
       final backDoc = XmlDocument.parse(backRaw);
-
-      final backMap = <String, Path>{};
-      // Apply transform to back paths
-      for (final e in backDoc.findAllElements('path')) {
-        final id = e.getAttribute('id');
-        final d = e.getAttribute('d');
-        if (id == null || d == null) continue;
-
-        // Skip non-muscle paths
-        if (id.startsWith('path') && RegExp(r'^\d+$').hasMatch(id.substring(4))) continue;
-
-        try {
-          final p = parseSvgPathData(d);
-          // Apply the transform offset
-          final transformedPath = p.transform(
-              Matrix4.translationValues(-_backOffset.dx, -_backOffset.dy, 0).storage
-          );
-          backMap[id] = transformedPath;
-        } catch (e) {
-          print('Error parsing back path $id: $e');
-        }
-      }
+      final backData = _parseSvgPaths(backDoc);
 
       if (!mounted) return;
 
       setState(() {
-        _frontPaths = frontMap;
-        _backPaths = backMap;
+        _frontPaths = frontData['paths'] as Map<String, Path>;
+        _frontTransform = frontData['transform'] as Matrix4?;
+        _backPaths = backData['paths'] as Map<String, Path>;
+        _backTransform = backData['transform'] as Matrix4?;
         _isLoading = false;
       });
 
@@ -268,49 +202,82 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     }
   }
 
+  Map<String, dynamic> _parseSvgPaths(XmlDocument doc) {
+    final paths = <String, Path>{};
+    Matrix4? groupTransform;
+
+    // Check for group transforms (your back SVG has a transform on the layer1 group)
+    final groups = doc.findAllElements('g');
+    for (final group in groups) {
+      if (group.getAttribute('id') == 'layer1') {
+        final transformStr = group.getAttribute('transform');
+        if (transformStr != null && transformStr.contains('translate')) {
+          // Parse translate transform
+          final regex = RegExp(r'translate\(([-\d.]+),([-\d.]+)\)');
+          final match = regex.firstMatch(transformStr);
+          if (match != null) {
+            final tx = double.parse(match.group(1)!);
+            final ty = double.parse(match.group(2)!);
+            groupTransform = Matrix4.identity()..translate(tx, ty);
+          }
+        }
+      }
+    }
+
+    // Parse all path elements
+    for (final element in doc.findAllElements('path')) {
+      final id = element.getAttribute('id');
+      final d = element.getAttribute('d');
+
+      if (id == null || d == null) continue;
+
+      // Skip numbered paths
+      if (id.startsWith('path') && RegExp(r'^\d+$').hasMatch(id.substring(4))) continue;
+
+      try {
+        var path = parseSvgPathData(d);
+
+        // Apply group transform if exists
+        if (groupTransform != null) {
+          final transformedPath = path.transform(groupTransform.storage);
+          paths[id] = transformedPath;
+        } else {
+          paths[id] = path;
+        }
+      } catch (e) {
+        print('Error parsing path $id: $e');
+      }
+    }
+
+    return {
+      'paths': paths,
+      'transform': groupTransform,
+    };
+  }
+
   @override
   void dispose() {
     _fadeCtrl.dispose();
     _pulseCtrl.dispose();
     _switchCtrl.dispose();
-    _selectedPulseCtrl.dispose();
     super.dispose();
   }
 
   void _toggle(String id) {
     HapticFeedback.lightImpact();
     setState(() {
+      // Simple toggle - only affects the current view's selection
       if (_showingFront) {
         if (_selectedFront.contains(id)) {
           _selectedFront.remove(id);
-          // Check for bilateral pair
-          final pair = _bilateralPairs[id];
-          if (pair != null) {
-            _selectedFront.remove(pair);
-          }
         } else {
           _selectedFront.add(id);
-          // Check for bilateral pair
-          final pair = _bilateralPairs[id];
-          if (pair != null && _frontPaths.containsKey(pair)) {
-            _selectedFront.add(pair);
-          }
         }
       } else {
         if (_selectedBack.contains(id)) {
           _selectedBack.remove(id);
-          // Check for bilateral pair
-          final pair = _bilateralPairs[id];
-          if (pair != null) {
-            _selectedBack.remove(pair);
-          }
         } else {
           _selectedBack.add(id);
-          // Check for bilateral pair
-          final pair = _bilateralPairs[id];
-          if (pair != null && _backPaths.containsKey(pair)) {
-            _selectedBack.add(pair);
-          }
         }
       }
     });
@@ -324,6 +291,93 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       });
       _switchCtrl.forward();
     });
+  }
+
+  Widget _diagram() {
+    final svgPath = _showingFront
+        ? 'assets/svg/final-front-muscles.svg'
+        : 'assets/svg/backmuscle-final.svg';
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Calculate display size
+    final maxHeight = screenHeight * 0.6;
+    final maxWidth = screenWidth - 40;
+
+    final aspectRatio = _svgViewBoxWidth / _svgViewBoxHeight;
+    double displayHeight = maxHeight;
+    double displayWidth = displayHeight * aspectRatio;
+
+    if (displayWidth > maxWidth) {
+      displayWidth = maxWidth;
+      displayHeight = displayWidth / aspectRatio;
+    }
+
+    return Container(
+      height: displayHeight + 20,
+      width: screenWidth,
+      alignment: Alignment.center,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // SVG Display
+          SizedBox(
+            width: displayWidth,
+            height: displayHeight,
+            child: SvgPicture.asset(
+              svgPath,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+            ),
+          ),
+
+          // Custom Paint overlay - simple, no animation
+          SizedBox(
+            width: displayWidth,
+            height: displayHeight,
+            child: CustomPaint(
+              size: Size(displayWidth, displayHeight),
+              painter: _HighlightPainter(
+                selected: _currentSelection,
+                paths: _currentPaths,
+                viewBoxWidth: _svgViewBoxWidth,
+                viewBoxHeight: _svgViewBoxHeight,
+                displayWidth: displayWidth,
+                displayHeight: displayHeight,
+              ),
+            ),
+          ),
+
+          // Gesture Detector
+          SizedBox(
+            width: displayWidth,
+            height: displayHeight,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) {
+                if (_currentPaths.isEmpty) return;
+
+                // Convert tap position to SVG coordinates
+                final scaleX = _svgViewBoxWidth / displayWidth;
+                final scaleY = _svgViewBoxHeight / displayHeight;
+
+                final svgX = details.localPosition.dx * scaleX;
+                final svgY = details.localPosition.dy * scaleY;
+
+                // Check hit test
+                for (final entry in _currentPaths.entries) {
+                  if (entry.value.contains(Offset(svgX, svgY))) {
+                    _toggle(entry.key);
+                    break;
+                  }
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -531,96 +585,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     );
   }
 
-  Widget _diagram() {
-    final svgPath = _showingFront
-        ? 'assets/svg/final-front-muscles.svg'
-        : 'assets/svg/backmuscle-final.svg';
-
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    // Make the diagram larger - use 60% of screen height
-    final maxHeight = screenHeight * 0.6;
-    final maxWidth = screenWidth - 40; // Account for padding
-
-    // Calculate scale to fit within constraints while maintaining aspect ratio
-    final aspectRatio = _frontVbW / _frontVbH;
-    double svgHeight = maxHeight;
-    double svgWidth = svgHeight * aspectRatio;
-
-    // If width exceeds max, scale down
-    if (svgWidth > maxWidth) {
-      svgWidth = maxWidth;
-      svgHeight = svgWidth / aspectRatio;
-    }
-
-    final scale = svgWidth / _frontVbW;
-
-    return Container(
-      height: svgHeight + 20, // Add some padding
-      width: screenWidth,
-      alignment: Alignment.center,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // SVG Display
-          SizedBox(
-            width: svgWidth,
-            height: svgHeight,
-            child: SvgPicture.asset(
-              svgPath,
-              fit: BoxFit.contain,
-              alignment: Alignment.center,
-            ),
-          ),
-
-          // Custom Paint overlay for highlights
-          SizedBox(
-            width: svgWidth,
-            height: svgHeight,
-            child: AnimatedBuilder(
-              animation: _selectedPulse,
-              builder: (context, child) {
-                return CustomPaint(
-                  size: Size(svgWidth, svgHeight),
-                  painter: _HighlightPainter(
-                    selected: _currentSelection,
-                    paths: _currentPaths,
-                    scale: scale,
-                    pulseValue: _selectedPulse.value,
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Gesture Detector
-          SizedBox(
-            width: svgWidth,
-            height: svgHeight,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapDown: (d) {
-                if (_currentPaths.isEmpty) return;
-
-                final lp = d.localPosition;
-                final x = lp.dx / scale;
-                final y = lp.dy / scale;
-
-                for (final e in _currentPaths.entries) {
-                  if (e.value.contains(Offset(x, y))) {
-                    _toggle(e.key);
-                    break;
-                  }
-                }
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _legend() {
     final currentNames = _showingFront ? _frontNames : _backNames;
     final currentSelection = _showingFront ? _selectedFront : _selectedBack;
@@ -709,13 +673,30 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
                   builder: (context, value, child) {
                     return Transform.scale(
                       scale: value,
-                      child: Chip(
-                        label: Text(name.toUpperCase(),
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500)),
-                        backgroundColor: Colors.red.withOpacity(0.2),
-                        side: BorderSide(color: Colors.red.withOpacity(0.4)),
-                        deleteIcon: const Icon(Icons.close, size: 14, color: Colors.white),
-                        onDeleted: () => _toggle(id),
+                      child: GestureDetector(
+                        onTap: () => _toggle(id),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.red.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(name.toUpperCase(),
+                                  style: TextStyle(
+                                    color: Colors.red.shade300,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.5,
+                                  )),
+                              const SizedBox(width: 8),
+                              Icon(Icons.close, size: 14, color: Colors.red.shade300),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -820,48 +801,51 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   }
 }
 
+// Simple static highlight painter - reverted to original style
 class _HighlightPainter extends CustomPainter {
   final Set<String> selected;
   final Map<String, Path> paths;
-  final double scale;
-  final double pulseValue;
+  final double viewBoxWidth;
+  final double viewBoxHeight;
+  final double displayWidth;
+  final double displayHeight;
 
   _HighlightPainter({
     required this.selected,
     required this.paths,
-    required this.scale,
-    required this.pulseValue,
+    required this.viewBoxWidth,
+    required this.viewBoxHeight,
+    required this.displayWidth,
+    required this.displayHeight,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (selected.isEmpty) return;
 
-    // More subtle, glassy red color matching the "Clear All" button
+    // Static red glass effect - simple and clean
     final paint = Paint()
-      ..color = Colors.red.withOpacity(pulseValue)
+      ..color = Colors.red.withOpacity(0.1) // Light fill
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = Colors.red.withOpacity(0.3)  // Much more subtle stroke
+      ..color = Colors.red.withOpacity(0.3) // Subtle border
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5 / scale;
+      ..strokeWidth = 2.0;
 
-    final glowPaint = Paint()
-      ..color = Colors.red.withOpacity(0.1)  // Very subtle glow
-      ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    // Calculate scale from viewBox to display size
+    final scaleX = displayWidth / viewBoxWidth;
+    final scaleY = displayHeight / viewBoxHeight;
 
     canvas.save();
-    canvas.scale(scale, scale);
+    canvas.scale(scaleX, scaleY);
 
     for (final id in selected) {
-      final p = paths[id];
-      if (p != null) {
-        // Draw multiple layers for better visibility
-        canvas.drawPath(p, glowPaint);
-        canvas.drawPath(p, paint);
-        canvas.drawPath(p, strokePaint);
+      final path = paths[id];
+      if (path != null) {
+        // Simple fill and stroke, no animation or glow
+        canvas.drawPath(path, paint);
+        canvas.drawPath(path, strokePaint);
       }
     }
 
@@ -872,8 +856,10 @@ class _HighlightPainter extends CustomPainter {
   bool shouldRepaint(covariant _HighlightPainter old) =>
       !setEquals(old.selected, selected) ||
           !mapEquals(old.paths, paths) ||
-          old.scale != scale ||
-          old.pulseValue != pulseValue;
+          old.viewBoxWidth != viewBoxWidth ||
+          old.viewBoxHeight != viewBoxHeight ||
+          old.displayWidth != displayWidth ||
+          old.displayHeight != displayHeight;
 }
 
 class _GridPainter extends CustomPainter {

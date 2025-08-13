@@ -239,7 +239,7 @@ class WhoopService {
     return WhoopMetrics(
       recovery: WhoopRecovery(
         recoveryScore: 51,
-        hrv: 45.2,
+        hrv: 81,
         restingHeartRate: 58,
         isGreen: false,
         isYellow: true,
@@ -247,7 +247,7 @@ class WhoopService {
       ),
       sleep: WhoopSleep(
         sleepPerformance: 82,
-        totalSleepMinutes: 390, // 6.5 hours
+        totalSleepMinutes: 397, // 6.5 hours
         remSleepMinutes: 85,
         deepSleepMinutes: 95,
         lightSleepMinutes: 180,

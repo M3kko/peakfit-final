@@ -34,34 +34,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   // Includes ankle-friendly modifications
   final Map<String, Map<String, dynamic>> _basketballSchedule = {
     'Day 1': {
-      'title': 'EXPLOSIVE POWER',
-      'focus': ['PLYOMETRICS', 'GLUTES', 'CORE'],
-      'intensity': 'HIGH',
-      'completed': false,
-      'exercises': [
-        'Box Jumps (modified height)',
-        'Single-Leg Bounds',
-        'Broad Jumps',
-        'Plank Variations',
-        'Bird Dogs'
-      ],
-      'notes': 'Focus on soft landings to protect ankle'
-    },
-    'Day 2': {
-      'title': 'POSTURE & STABILITY',
-      'focus': ['UPPER BACK', 'SHOULDERS', 'BALANCE'],
-      'intensity': 'MEDIUM',
-      'completed': false,
-      'exercises': [
-        'Wall Angels',
-        'Y-T-W Raises',
-        'Single-Leg Balance',
-        'Band Pull-Aparts',
-        'Cat-Cow Stretches'
-      ],
-      'notes': 'Emphasize shoulder blade control'
-    },
-    'Day 3': {
       'title': 'LOWER BODY STRENGTH',
       'focus': ['QUADS', 'HAMSTRINGS', 'CALVES'],
       'intensity': 'HIGH',
@@ -75,7 +47,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       ],
       'notes': 'Build bilateral strength first'
     },
-    'Day 4': {
+    'Day 2': {
       'title': 'ACTIVE RECOVERY',
       'focus': ['MOBILITY', 'FLEXIBILITY', 'ANKLE REHAB'],
       'intensity': 'LOW',
@@ -89,7 +61,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       ],
       'notes': 'Focus on ankle rehabilitation'
     },
-    'Day 5': {
+    'Day 3': {
       'title': 'VERTICAL FOCUS',
       'focus': ['JUMP TECHNIQUE', 'EXPLOSIVENESS', 'CORE'],
       'intensity': 'HIGH',
@@ -103,7 +75,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       ],
       'notes': 'Progressive jump height based on ankle comfort'
     },
-    'Day 6': {
+    'Day 4': {
       'title': 'BASKETBALL SKILLS',
       'focus': ['AGILITY', 'COORDINATION', 'ENDURANCE'],
       'intensity': 'MEDIUM',
@@ -117,7 +89,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       ],
       'notes': 'Sport-specific movement patterns'
     },
-    'Day 7': {
+    'Day 5': {
       'title': 'REST & RECOVERY',
       'focus': ['RECOVERY', 'NUTRITION', 'MENTAL'],
       'intensity': 'REST',
@@ -133,20 +105,8 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     },
   };
 
-  // Standard weekly schedule (after first week)
+  // Standard weekly schedule (starting from Wednesday)
   final Map<String, Map<String, dynamic>> _weeklySchedule = {
-    'Monday': {
-      'title': 'EXPLOSIVE POWER',
-      'focus': ['PLYOMETRICS', 'GLUTES', 'CORE'],
-      'intensity': 'HIGH',
-      'completed': false,
-    },
-    'Tuesday': {
-      'title': 'POSTURE & STABILITY',
-      'focus': ['UPPER BACK', 'SHOULDERS', 'BALANCE'],
-      'intensity': 'MEDIUM',
-      'completed': false,
-    },
     'Wednesday': {
       'title': 'LOWER BODY STRENGTH',
       'focus': ['QUADS', 'HAMSTRINGS', 'CALVES'],
@@ -214,15 +174,16 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       final now = DateTime.now();
       final daysSinceCreation = now.difference(_accountCreatedDate!).inDays;
 
-      // Check if we're still in the first week (0-6 days since creation)
-      _isFirstWeek = daysSinceCreation < 7 && _currentWeekOffset == 0;
+      // Check if we're still in the first week (0-4 days since creation for 5-day schedule)
+      _isFirstWeek = daysSinceCreation < 5 && _currentWeekOffset == 0;
     }
   }
 
   void _initializeWeek() {
     final now = DateTime.now();
-    final weekday = now.weekday;
-    _currentWeekStart = now.subtract(Duration(days: weekday - 1));
+    // Set week start to Wednesday (day 3)
+    final daysFromWednesday = (now.weekday - 3 + 7) % 7;
+    _currentWeekStart = now.subtract(Duration(days: daysFromWednesday));
   }
 
   void _initAnimations() {
@@ -308,7 +269,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   String _getWeekDateRange() {
     final weekStart = _currentWeekStart.add(Duration(days: _currentWeekOffset * 7));
-    final weekEnd = weekStart.add(const Duration(days: 6));
+    final weekEnd = weekStart.add(const Duration(days: 4)); // 5 days from Wed to Sun
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -323,13 +284,12 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   List<Map<String, dynamic>> _getCurrentSchedule() {
     if (_isFirstWeek && _accountCreatedDate != null) {
       // First week: Start from account creation day
-      final creationWeekday = _accountCreatedDate!.weekday;
       final daysSinceCreation = DateTime.now().difference(_accountCreatedDate!).inDays;
 
       List<Map<String, dynamic>> schedule = [];
 
-      // Add days from creation day to end of week
-      for (int i = 0; i < 7; i++) {
+      // Add days from creation day (5-day schedule)
+      for (int i = 0; i < 5; i++) {
         final dayNumber = i + 1;
         final dayData = Map<String, dynamic>.from(_basketballSchedule['Day $dayNumber']!);
 
@@ -348,8 +308,8 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
       return schedule;
     } else {
-      // Regular weeks: Monday to Sunday
-      final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      // Regular weeks: Wednesday to Sunday
+      final days = ['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       List<Map<String, dynamic>> schedule = [];
 
       for (int i = 0; i < days.length; i++) {

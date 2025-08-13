@@ -47,15 +47,38 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
   static const double _backVbW = 210.0;
   static const double _backVbH = 297.0;
 
+  // SVG transform offsets from the transform attributes
+  static const Offset _frontOffset = Offset(-6.7140355, 1.1376368);
+  static const Offset _backOffset = Offset(1.9550705, -1.1792923);
+
   // Parsed paths for both views
   Map<String, Path> _frontPaths = {};
   Map<String, Path> _backPaths = {};
   final Set<String> _selectedFront = {};
   final Set<String> _selectedBack = {};
 
+  // Bilateral muscle pairs (muscles that appear on both sides)
+  static const Map<String, String> _bilateralPairs = {
+    'soleus-right': 'soleus-left',
+    'soleus-left': 'soleus-right',
+    'gastrocnemius-right': 'gastrocnemius-left',
+    'gastrocnemius-left': 'gastrocnemius-right',
+    'right-soleus': 'left-soleus',
+    'left-soleus': 'right-soleus',
+    'right-gastrocnemius': 'left-gastrocnemius',
+    'left-gastrocnemius': 'right-gastrocnemius',
+    'tibialis-right': 'tibialis-left',
+    'tibialis-left': 'tibialis-right',
+    'foot-right': 'foot-left',
+    'foot-left': 'foot-right',
+    'right-foot': 'left-foot',
+    'left-foot': 'right-foot',
+  };
+
   // Get current selection based on view
   Set<String> get _currentSelection => _showingFront ? _selectedFront : _selectedBack;
   Map<String, Path> get _currentPaths => _showingFront ? _frontPaths : _backPaths;
+  Offset get _currentOffset => _showingFront ? _frontOffset : _backOffset;
 
   // Muscle display names for front
   static const Map<String, String> _frontNames = {
@@ -160,7 +183,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
     _pulse = Tween<double>(begin: 0.96, end: 1.04)
         .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
     _switchFade = CurvedAnimation(parent: _switchCtrl, curve: Curves.easeInOut);
-    _selectedPulse = Tween<double>(begin: 0.3, end: 0.5)
+    _selectedPulse = Tween<double>(begin: 0.15, end: 0.25)  // Reduced opacity for subtler effect
         .animate(CurvedAnimation(parent: _selectedPulseCtrl, curve: Curves.easeInOut));
 
     _fadeCtrl.forward();
@@ -180,6 +203,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       final frontDoc = XmlDocument.parse(frontRaw);
 
       final frontMap = <String, Path>{};
+      // Apply transform to front paths
       for (final e in frontDoc.findAllElements('path')) {
         final id = e.getAttribute('id');
         final d = e.getAttribute('d');
@@ -190,7 +214,11 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
 
         try {
           final p = parseSvgPathData(d);
-          frontMap[id] = p;
+          // Apply the transform offset
+          final transformedPath = p.transform(
+              Matrix4.translationValues(-_frontOffset.dx, -_frontOffset.dy, 0).storage
+          );
+          frontMap[id] = transformedPath;
         } catch (e) {
           print('Error parsing front path $id: $e');
         }
@@ -201,6 +229,7 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       final backDoc = XmlDocument.parse(backRaw);
 
       final backMap = <String, Path>{};
+      // Apply transform to back paths
       for (final e in backDoc.findAllElements('path')) {
         final id = e.getAttribute('id');
         final d = e.getAttribute('d');
@@ -211,7 +240,11 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
 
         try {
           final p = parseSvgPathData(d);
-          backMap[id] = p;
+          // Apply the transform offset
+          final transformedPath = p.transform(
+              Matrix4.translationValues(-_backOffset.dx, -_backOffset.dy, 0).storage
+          );
+          backMap[id] = transformedPath;
         } catch (e) {
           print('Error parsing back path $id: $e');
         }
@@ -250,14 +283,34 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       if (_showingFront) {
         if (_selectedFront.contains(id)) {
           _selectedFront.remove(id);
+          // Check for bilateral pair
+          final pair = _bilateralPairs[id];
+          if (pair != null) {
+            _selectedFront.remove(pair);
+          }
         } else {
           _selectedFront.add(id);
+          // Check for bilateral pair
+          final pair = _bilateralPairs[id];
+          if (pair != null && _frontPaths.containsKey(pair)) {
+            _selectedFront.add(pair);
+          }
         }
       } else {
         if (_selectedBack.contains(id)) {
           _selectedBack.remove(id);
+          // Check for bilateral pair
+          final pair = _bilateralPairs[id];
+          if (pair != null) {
+            _selectedBack.remove(pair);
+          }
         } else {
           _selectedBack.add(id);
+          // Check for bilateral pair
+          final pair = _bilateralPairs[id];
+          if (pair != null && _backPaths.containsKey(pair)) {
+            _selectedBack.add(pair);
+          }
         }
       }
     });
@@ -510,8 +563,6 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // REMOVED: Background glow AnimatedBuilder section
-
           // SVG Display
           SizedBox(
             width: svgWidth,
@@ -786,19 +837,20 @@ class _HighlightPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (selected.isEmpty) return;
 
+    // More subtle, glassy red color matching the "Clear All" button
     final paint = Paint()
       ..color = Colors.red.withOpacity(pulseValue)
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = Colors.red.withOpacity(0.8)
+      ..color = Colors.red.withOpacity(0.3)  // Much more subtle stroke
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0 / scale;
+      ..strokeWidth = 1.5 / scale;
 
     final glowPaint = Paint()
-      ..color = Colors.red.withOpacity(0.2)
+      ..color = Colors.red.withOpacity(0.1)  // Very subtle glow
       ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
     canvas.save();
     canvas.scale(scale, scale);

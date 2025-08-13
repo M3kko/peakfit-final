@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import 'preworkout_screen.dart';
+import '../services/whoop_service.dart';  // Add this import
 
 class WearableConnectionScreen extends StatefulWidget {
   final String workoutType;
@@ -46,11 +47,41 @@ class _WearableConnectionScreenState extends State<WearableConnectionScreen>
   bool _ouraConnecting = false;
   bool _ouraConnected = false;
 
+  // WHOOP Service
+  final WhoopService _whoopService = WhoopService();
+  WhoopMetrics? _whoopMetrics;
+
   @override
   void initState() {
     super.initState();
     _initAnimations();
     _startAnimations();
+    _checkExistingConnections();
+  }
+
+  // Check if already connected to WHOOP
+  Future<void> _checkExistingConnections() async {
+    final isConnected = await _whoopService.isConnected();
+    if (isConnected) {
+      setState(() {
+        _whoopConnected = true;
+      });
+      _loadWhoopData();
+    }
+  }
+
+  // Load WHOOP data
+  Future<void> _loadWhoopData() async {
+    try {
+      final metrics = await _whoopService.getAllMetrics();
+      if (mounted && metrics != null) {
+        setState(() {
+          _whoopMetrics = metrics;
+        });
+      }
+    } catch (e) {
+      print('Error loading WHOOP data: $e');
+    }
   }
 
   void _initAnimations() {
@@ -158,6 +189,7 @@ class _WearableConnectionScreenState extends State<WearableConnectionScreen>
     super.dispose();
   }
 
+  // Real WHOOP connection
   void _connectWhoop() async {
     if (_whoopConnecting || _whoopConnected) return;
 
@@ -168,19 +200,83 @@ class _WearableConnectionScreenState extends State<WearableConnectionScreen>
 
     _ringRotationController.repeat();
 
-    // Simulate connection delay
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Attempt real WHOOP authentication
+      final success = await _whoopService.authenticate();
 
-    _ringRotationController.stop();
-    _whoopSyncController.forward();
-    _successCheckController.forward();
+      if (success) {
+        // Load WHOOP data after successful connection
+        await _loadWhoopData();
 
+        _ringRotationController.stop();
+        _whoopSyncController.forward();
+        _successCheckController.forward();
+
+        setState(() {
+          _whoopConnecting = false;
+          _whoopConnected = true;
+        });
+
+        HapticFeedback.heavyImpact();
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Successfully connected to WHOOP!'),
+              backgroundColor: Color(0xFF00B4D8),
+            ),
+          );
+        }
+      } else {
+        // Connection failed
+        _ringRotationController.stop();
+        setState(() {
+          _whoopConnecting = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to connect to WHOOP. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('WHOOP connection error: $e');
+      _ringRotationController.stop();
+      setState(() {
+        _whoopConnecting = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Disconnect from WHOOP
+  void _disconnectWhoop() async {
+    await _whoopService.disconnect();
     setState(() {
-      _whoopConnecting = false;
-      _whoopConnected = true;
+      _whoopConnected = false;
+      _whoopMetrics = null;
     });
 
-    HapticFeedback.heavyImpact();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Disconnected from WHOOP'),
+        ),
+      );
+    }
   }
 
   void _connectOura() async {
@@ -193,7 +289,7 @@ class _WearableConnectionScreenState extends State<WearableConnectionScreen>
 
     _ringRotationController.repeat();
 
-    // Simulate connection delay
+    // Simulate Oura connection (placeholder for now)
     await Future.delayed(const Duration(seconds: 2));
 
     _ringRotationController.stop();
@@ -346,15 +442,7 @@ class _WearableConnectionScreenState extends State<WearableConnectionScreen>
   Widget _buildWearableCards() {
     return Column(
       children: [
-        _buildWearableCard(
-          'WHOOP',
-          'Recovery & strain tracking',
-          _whoopConnecting,
-          _whoopConnected,
-          _connectWhoop,
-          _whoopSync,
-          const Color(0xFF00B4D8),
-        ),
+        _buildWhoopCard(),
         const SizedBox(height: 16),
         _buildWearableCard(
           'OURA',
@@ -364,8 +452,200 @@ class _WearableConnectionScreenState extends State<WearableConnectionScreen>
           _connectOura,
           _ouraSync,
           const Color(0xFFB388FF),
+          null, // No disconnect for Oura yet
         ),
       ],
+    );
+  }
+
+  Widget _buildWhoopCard() {
+    return GestureDetector(
+      onTap: _whoopConnected ? null : _connectWhoop,
+      onLongPress: _whoopConnected ? _disconnectWhoop : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _whoopConnected
+                ? [
+              const Color(0xFF00B4D8).withOpacity(0.1),
+              const Color(0xFF00B4D8).withOpacity(0.05),
+            ]
+                : [
+              Colors.white.withOpacity(0.03),
+              Colors.white.withOpacity(0.01),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _whoopConnected
+                ? const Color(0xFF00B4D8).withOpacity(0.3)
+                : Colors.white.withOpacity(0.05),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Icon/Logo area
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: _whoopConnected
+                    ? const Color(0xFF00B4D8).withOpacity(0.15)
+                    : Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _whoopConnected
+                      ? const Color(0xFF00B4D8).withOpacity(0.3)
+                      : Colors.white.withOpacity(0.1),
+                ),
+              ),
+              child: Center(
+                child: _whoopConnecting
+                    ? AnimatedBuilder(
+                  animation: _ringRotation,
+                  builder: (context, child) {
+                    return Transform.rotate(
+                      angle: _ringRotation.value,
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            const Color(0xFF00B4D8).withOpacity(0.8),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                )
+                    : _whoopConnected
+                    ? ScaleTransition(
+                  scale: _successCheck,
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Color(0xFF00B4D8),
+                    size: 28,
+                  ),
+                )
+                    : Icon(
+                  Icons.watch,
+                  color: Colors.white.withOpacity(0.6),
+                  size: 28,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Text content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'WHOOP',
+                    style: TextStyle(
+                      color: Color(0xFF00B4D8),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _whoopConnected ? 'Connected' : 'Recovery & strain tracking',
+                    style: TextStyle(
+                      color: _whoopConnected
+                          ? const Color(0xFF00B4D8).withOpacity(0.8)
+                          : Colors.white.withOpacity(0.4),
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (_whoopConnected) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Long press to disconnect',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.3),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Status/Action
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: _whoopConnected
+                  ? Container(
+                key: const ValueKey('connected'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00B4D8).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF00B4D8).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF00B4D8),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'SYNCED',
+                      style: TextStyle(
+                        color: Color(0xFF00B4D8),
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : Container(
+                key: const ValueKey('connect'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+                child: Text(
+                  'CONNECT',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 11,
+                    letterSpacing: 1,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -377,9 +657,11 @@ class _WearableConnectionScreenState extends State<WearableConnectionScreen>
       VoidCallback onConnect,
       Animation<double> syncAnimation,
       Color accentColor,
+      VoidCallback? onDisconnect,
       ) {
     return GestureDetector(
       onTap: isConnected ? null : onConnect,
+      onLongPress: isConnected ? onDisconnect : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.all(20),
@@ -600,12 +882,94 @@ class _WearableConnectionScreenState extends State<WearableConnectionScreen>
           ),
           const SizedBox(height: 16),
           if (hasConnections) ...[
-            if (_whoopConnected) _buildInsightRow('Recovery Score', '85%', Colors.green),
-            if (_whoopConnected) const SizedBox(height: 12),
-            if (_ouraConnected) _buildInsightRow('Sleep Quality', '92%', Colors.blue),
-            if (_ouraConnected) const SizedBox(height: 12),
-            if (_whoopConnected || _ouraConnected)
-              _buildInsightRow('Readiness', 'Optimal', const Color(0xFFD4AF37)),
+            // WHOOP Data
+            if (_whoopConnected && _whoopMetrics != null) ...[
+              if (_whoopMetrics!.recovery != null) ...[
+                _buildInsightRow(
+                  'Recovery Score',
+                  '${_whoopMetrics!.recovery!.recoveryScore}%',
+                  _whoopMetrics!.recovery!.color,
+                ),
+                const SizedBox(height: 12),
+                _buildInsightRow(
+                  'HRV',
+                  '${_whoopMetrics!.recovery!.hrv.toStringAsFixed(1)} ms',
+                  Colors.purple,
+                ),
+                const SizedBox(height: 12),
+                _buildInsightRow(
+                  'Resting HR',
+                  '${_whoopMetrics!.recovery!.restingHeartRate.toStringAsFixed(0)} bpm',
+                  Colors.red,
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_whoopMetrics!.sleep != null) ...[
+                _buildInsightRow(
+                  'Sleep Quality',
+                  '${_whoopMetrics!.sleep!.sleepPerformance}%',
+                  Colors.blue,
+                ),
+                const SizedBox(height: 12),
+                _buildInsightRow(
+                  'Total Sleep',
+                  _whoopMetrics!.sleep!.totalSleepFormatted,
+                  Colors.indigo,
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_whoopMetrics!.strain != null && _whoopMetrics!.strain!.dayStrain > 0) ...[
+                _buildInsightRow(
+                  'Day Strain',
+                  _whoopMetrics!.strain!.dayStrain.toStringAsFixed(1),
+                  Colors.orange,
+                ),
+                const SizedBox(height: 12),
+              ],
+              _buildInsightRow(
+                'Readiness',
+                _whoopMetrics?.recovery?.status ?? 'Unknown',
+                const Color(0xFFD4AF37),
+              ),
+            ] else if (_whoopConnected && _whoopMetrics == null) ...[
+              // Loading state
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            const Color(0xFF00B4D8).withOpacity(0.8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Loading WHOOP data...',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
+            // Oura placeholder data
+            if (_ouraConnected) ...[
+              if (!_whoopConnected || _whoopMetrics == null) ...[
+                _buildInsightRow('Sleep Quality', '92%', Colors.blue),
+                const SizedBox(height: 12),
+                _buildInsightRow('Readiness', 'Optimal', const Color(0xFFD4AF37)),
+              ],
+            ],
           ] else
             Center(
               child: Padding(

@@ -7,7 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:xml/xml.dart';
 import 'package:path_drawing/path_drawing.dart';
 
-import 'preworkout_screen.dart';
+import 'wearable_connection_screen.dart';  // Updated import
 
 class SorenessTrackerScreen extends StatefulWidget {
   final String workoutType;
@@ -321,231 +321,231 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
         color: Colors.transparent,
         child: Stack(
           children: [
-        // Semi-transparent background
-        Positioned.fill(
-        child: GestureDetector(
-        onTap: _closeSorenessPopup,
-          child: Container(
-            color: Colors.black.withOpacity(0.5),
-          ),
-        ),
-      ),
-      // Popup with flexible sizing
-      Center(
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width - 64,
-            maxHeight: MediaQuery.of(context).size.height * 0.5,
-          ),
-          padding: const EdgeInsets.all(20),
-          margin: const EdgeInsets.symmetric(horizontal: 32),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.red.withOpacity(0.5), width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.8),
-                blurRadius: 30,
-                spreadRadius: 10,
+            // Semi-transparent background
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _closeSorenessPopup,
+                child: Container(
+                  color: Colors.black.withOpacity(0.5),
+                ),
               ),
-              BoxShadow(
-                color: Colors.red.withOpacity(0.3),
-                blurRadius: 20,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: IntrinsicWidth(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'SORENESS LEVEL',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 11,
-                              letterSpacing: 1.5,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            muscleName.toUpperCase(),
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.95),
-                              fontSize: 14,
-                              letterSpacing: 0.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 2,
-                          ),
-                        ],
-                      ),
+            ),
+            // Popup with flexible sizing
+            Center(
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width - 64,
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                padding: const EdgeInsets.all(20),
+                margin: const EdgeInsets.symmetric(horizontal: 32),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.red.withOpacity(0.5), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.8),
+                      blurRadius: 30,
+                      spreadRadius: 10,
                     ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: _closeSorenessPopup,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          color: Colors.white.withOpacity(0.7),
-                          size: 18,
-                        ),
-                      ),
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.3),
+                      blurRadius: 20,
+                      spreadRadius: 2,
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                // First row: 1-5
-                Flexible(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                child: IntrinsicWidth(
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: List.generate(5, (index) {
-                      final level = index + 1;
-                      final isSelected = _sorenessLevels[muscleId] == level;
-                      return GestureDetector(
-                        onTap: () {
-                          _setSorenessLevel(muscleId, level);
-                          HapticFeedback.lightImpact();
-                          Future.delayed(const Duration(milliseconds: 200), () {
-                            _closeSorenessPopup();
-                          });
-                        },
-                        child: Container(
-                          width: 46,
-                          height: 46,
-                          margin: const EdgeInsets.symmetric(horizontal: 5),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.red
-                                : Colors.red.withOpacity(0.05 + (level * 0.08)),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.red.shade400
-                                  : Colors.red.withOpacity(0.3),
-                              width: isSelected ? 2.5 : 1.5,
-                            ),
-                            boxShadow: isSelected ? [
-                              BoxShadow(
-                                color: Colors.red.withOpacity(0.5),
-                                blurRadius: 10,
-                                spreadRadius: 1,
-                              ),
-                            ] : [],
-                          ),
-                          child: Center(
-                            child: Text(
-                              '$level',
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
+                    children: [
+                      // Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'SORENESS LEVEL',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontSize: 11,
+                                    letterSpacing: 1.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  muscleName.toUpperCase(),
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.95),
+                                    fontSize: 14,
+                                    letterSpacing: 0.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                ),
+                              ],
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: _closeSorenessPopup,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.close,
+                                color: Colors.white.withOpacity(0.7),
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      // First row: 1-5
+                      Flexible(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(5, (index) {
+                            final level = index + 1;
+                            final isSelected = _sorenessLevels[muscleId] == level;
+                            return GestureDetector(
+                              onTap: () {
+                                _setSorenessLevel(muscleId, level);
+                                HapticFeedback.lightImpact();
+                                Future.delayed(const Duration(milliseconds: 200), () {
+                                  _closeSorenessPopup();
+                                });
+                              },
+                              child: Container(
+                                width: 46,
+                                height: 46,
+                                margin: const EdgeInsets.symmetric(horizontal: 5),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.red
+                                      : Colors.red.withOpacity(0.05 + (level * 0.08)),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? Colors.red.shade400
+                                        : Colors.red.withOpacity(0.3),
+                                    width: isSelected ? 2.5 : 1.5,
+                                  ),
+                                  boxShadow: isSelected ? [
+                                    BoxShadow(
+                                      color: Colors.red.withOpacity(0.5),
+                                      blurRadius: 10,
+                                      spreadRadius: 1,
+                                    ),
+                                  ] : [],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '$level',
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
                         ),
-                      );
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Second row: 6-10
-                Flexible(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(5, (index) {
-                      final level = index + 6;
-                      final isSelected = _sorenessLevels[muscleId] == level;
-                      return GestureDetector(
-                        onTap: () {
-                          _setSorenessLevel(muscleId, level);
-                          HapticFeedback.lightImpact();
-                          Future.delayed(const Duration(milliseconds: 200), () {
-                            _closeSorenessPopup();
-                          });
-                        },
-                        child: Container(
-                          width: 46,
-                          height: 46,
-                          margin: const EdgeInsets.symmetric(horizontal: 5),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.red
-                                : Colors.red.withOpacity(0.05 + (level * 0.08)),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.red.shade400
-                                  : Colors.red.withOpacity(0.3),
-                              width: isSelected ? 2.5 : 1.5,
-                            ),
-                            boxShadow: isSelected ? [
-                              BoxShadow(
-                                color: Colors.red.withOpacity(0.5),
-                                blurRadius: 10,
-                                spreadRadius: 1,
+                      ),
+                      const SizedBox(height: 12),
+                      // Second row: 6-10
+                      Flexible(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(5, (index) {
+                            final level = index + 6;
+                            final isSelected = _sorenessLevels[muscleId] == level;
+                            return GestureDetector(
+                              onTap: () {
+                                _setSorenessLevel(muscleId, level);
+                                HapticFeedback.lightImpact();
+                                Future.delayed(const Duration(milliseconds: 200), () {
+                                  _closeSorenessPopup();
+                                });
+                              },
+                              child: Container(
+                                width: 46,
+                                height: 46,
+                                margin: const EdgeInsets.symmetric(horizontal: 5),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.red
+                                      : Colors.red.withOpacity(0.05 + (level * 0.08)),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? Colors.red.shade400
+                                        : Colors.red.withOpacity(0.3),
+                                    width: isSelected ? 2.5 : 1.5,
+                                  ),
+                                  boxShadow: isSelected ? [
+                                    BoxShadow(
+                                      color: Colors.red.withOpacity(0.5),
+                                      blurRadius: 10,
+                                      spreadRadius: 1,
+                                    ),
+                                  ] : [],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '$level',
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ] : [],
-                          ),
-                          child: Center(
-                            child: Text(
-                              '$level',
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
+                            );
+                          }),
                         ),
-                      );
-                    }),
+                      ),
+                      const SizedBox(height: 16),
+                      // Instruction text
+                      Flexible(
+                        child: Text(
+                          'Select how sore this muscle feels',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.4),
+                            fontSize: 12,
+                            letterSpacing: 0.3,
+                          ),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                // Instruction text
-                Flexible(
-                  child: Text(
-                    'Select how sore this muscle feels',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.4),
-                      fontSize: 12,
-                      letterSpacing: 0.3,
-                    ),
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2,
-                  ),
-                ),
-              ],
-            ),
-          ),
 
+              ),
+            ),
+
+          ],
         ),
       ),
-
-    ],
-    ),
-    ),
     );
     Overlay.of(context).insert(_overlayEntry!);
   }
@@ -1037,10 +1037,11 @@ class _SorenessTrackerScreenState extends State<SorenessTrackerScreen>
               HapticFeedback.heavyImpact();
               final allSoreMuscles = {..._selectedFront, ..._selectedBack};
 
+              // Updated navigation to go through WearableConnectionScreen
               Navigator.push(
                 ctx,
                 PageRouteBuilder(
-                  pageBuilder: (_, __, ___) => PreWorkoutScreen(
+                  pageBuilder: (_, __, ___) => WearableConnectionScreen(
                     workoutType: widget.workoutType,
                     duration: widget.duration,
                     soreMuscles: allSoreMuscles.toList(),

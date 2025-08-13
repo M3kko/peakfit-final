@@ -11,7 +11,7 @@ import 'sport_page.dart';
 import 'training_hours_page.dart';
 import 'flexibility_page.dart';
 import '../home_screen.dart';
-
+import '../schedule_screen.dart';
 class QuestionnaireScreen extends StatefulWidget {
   @override
   _QuestionnaireScreenState createState() => _QuestionnaireScreenState();
@@ -262,7 +262,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> with TickerPr
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomeScreen()),
+          MaterialPageRoute(builder: (context) => ScheduleScreen()),
         );
       }
     } catch (e) {
